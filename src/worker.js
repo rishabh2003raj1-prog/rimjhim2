@@ -272,6 +272,74 @@ async function handleAi(req, env) {
   }
 }
 
+// ---- import from the old single-file app ----
+// The old app's "Cloud sync → Push to cloud" sends every list in one PUT to
+// {Backend URL}/api/data?outlet=..., with the API key in an x-api-key header.
+// Accept that here (the PIN is the API key) so old data moves over in one tap,
+// without copying a backup that phones cut short.
+const LEGACY_CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, PUT, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, x-api-key",
+  "Access-Control-Max-Age": "86400"
+};
+
+function mergeIncoming(current, incoming) {
+  if (!Array.isArray(incoming)) {
+    if (incoming && typeof incoming === "object" && current && typeof current === "object" && !Array.isArray(current)) {
+      return Object.assign({}, current, incoming);
+    }
+    return incoming === null || incoming === undefined ? current : incoming;
+  }
+  if (!Array.isArray(current) || !current.length) return incoming;
+  const withIds = (a) => a.every((x) => x && typeof x === "object" && x.id !== undefined);
+  if (!withIds(current) || !withIds(incoming)) {
+    const seen = new Set(current.map((x) => JSON.stringify(x)));
+    return current.concat(incoming.filter((x) => !seen.has(JSON.stringify(x))));
+  }
+  const out = current.slice();
+  const at = new Map(out.map((x, i) => [x.id, i]));
+  for (const x of incoming) {
+    if (at.has(x.id)) out[at.get(x.id)] = x; else out.push(x);
+  }
+  return out;
+}
+
+async function handleLegacyPush(req, env, url) {
+  const ip = req.headers.get("CF-Connecting-IP") || "unknown";
+  const since = Date.now() - LOGIN_WINDOW_MS;
+  const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_fails WHERE ip = ? AND ts > ?").bind(ip, since).first();
+  if (row && row.n >= LOGIN_MAX_FAILS) return json({ error: "Too many wrong attempts. Wait 15 minutes." }, 429, LEGACY_CORS);
+  const key = req.headers.get("x-api-key") || "";
+  if (!safeEqual(await hmacHex("pin-check", key), await hmacHex("pin-check", env.APP_PIN))) {
+    await env.DB.prepare("INSERT INTO login_fails (ip, ts) VALUES (?, ?)").bind(ip, Date.now()).run();
+    return json({ error: "Wrong API key - use the app PIN." }, 401, LEGACY_CORS);
+  }
+  const outlet = outletOf(url);
+  if (!outlet) return json({ error: "bad outlet" }, 400, LEGACY_CORS);
+  if (req.method === "GET") {
+    const items = await readAll(env, outlet, -1);
+    const data = {};
+    for (const k of Object.keys(items)) data[k] = items[k].value;
+    return json({ data }, 200, LEGACY_CORS);
+  }
+  let body;
+  try { body = await req.json(); } catch (e) { return json({ error: "bad json" }, 400, LEGACY_CORS); }
+  if (!body || typeof body !== "object") return json({ error: "bad data" }, 400, LEGACY_CORS);
+  const counts = {};
+  for (const k of Object.keys(body)) {
+    if (!validKey(k)) continue;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const cur = await readOne(env, outlet, k);
+      const r = await writeOne(env, outlet, k, mergeIncoming(cur.value, body[k]), cur.rev);
+      if (r.tooBig) return json({ error: "too big: " + k }, 413, LEGACY_CORS);
+      if (!r.conflict) break;
+    }
+    if (Array.isArray(body[k])) counts[k] = body[k].length;
+  }
+  return json({ ok: true, imported: counts }, 200, LEGACY_CORS);
+}
+
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -280,6 +348,12 @@ export default {
 
     if (!env.APP_PIN) {
       return json({ error: "The server has no APP_PIN set. Run: npx wrangler secret put APP_PIN" }, 500);
+    }
+    const legacy = path === "/api/data" && (req.headers.has("x-api-key") || req.method === "OPTIONS");
+    if (legacy && req.method === "OPTIONS") return new Response(null, { status: 204, headers: LEGACY_CORS });
+    if (legacy) {
+      try { await ensureSchema(env); return await handleLegacyPush(req, env, url); }
+      catch (e) { return json({ error: "server error", detail: String(e && e.message || e) }, 500, LEGACY_CORS); }
     }
     // Cookie auth + JSON bodies: reject cross-site writes outright.
     if (req.method !== "GET") {

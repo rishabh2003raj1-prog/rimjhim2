@@ -1010,6 +1010,11 @@ function syncFromServer(done){
       }
       if(cloud.values[key]!==undefined) cacheWrite(key);
     });
+    // Data pushed from the old app still carries photos inline - move them to photo storage.
+    Object.keys(PHOTO_FIELDS).forEach(function(key){
+      var f = PHOTO_FIELDS[key], list = cloud.values[key];
+      if(Array.isArray(list) && list.some(function(x){ return x && typeof x[f]==="string" && x[f].indexOf("data:")===0; })) cloud.dirty[key] = true;
+    });
     done();
   }).catch(function(){
     cloud.state = "offline";
