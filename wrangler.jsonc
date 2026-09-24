@@ -16,5 +16,7 @@
       "database_id": "00000000-0000-0000-0000-000000000000"
     }
   ],
+  // Free AI for reading notes (used when no ANTHROPIC_API_KEY is set).
+  "ai": { "binding": "AI" },
   "observability": { "enabled": true }
 }

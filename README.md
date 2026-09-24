@@ -27,7 +27,7 @@ You need a free Cloudflare account. No card is needed: D1 and Workers are on the
    - `CLOUDFLARE_API_TOKEN`: the token from step 1
    - `CLOUDFLARE_ACCOUNT_ID`: the ID from step 2
    - `APP_PIN`: the PIN both partners will type to open the app. Use 6 or more digits.
-   - `ANTHROPIC_API_KEY` (optional): turns on AI reading of notes in the Master tab. Without it, notes are read by the simpler parser on the phone.
+   - `ANTHROPIC_API_KEY` (optional): uses Claude to read notes in the Master tab. Without it, notes are read by Cloudflare Workers AI, which is free within Cloudflare's daily allowance. If that is unavailable too, the phone's own simpler reader is used.
 4. Merge to `main`, or run the **Deploy to Cloudflare** workflow from the Actions tab.
 5. The app is served at `https://rimjhim-cafe.<your-subdomain>.workers.dev`.
 

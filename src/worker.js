@@ -231,22 +231,41 @@ async function handlePhotoGet(env, id) {
 }
 
 // ---- AI note reading ----
+// Uses Claude when ANTHROPIC_API_KEY is set; otherwise Cloudflare Workers AI,
+// which is free within the account's daily allowance and needs no key.
+const FREE_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+
+function aiAvailable(env) { return !!(env.ANTHROPIC_API_KEY || env.AI); }
+
 async function handleAi(req, env) {
-  if (!env.ANTHROPIC_API_KEY) return json({ error: "AI not configured" }, 503);
+  if (!aiAvailable(env)) return json({ error: "AI not configured" }, 503);
   let body;
   try { body = await req.json(); } catch (e) { return json({ error: "bad json" }, 400); }
   const prompt = String(body.prompt || "");
   if (!prompt || prompt.length > 20000) return json({ error: "bad prompt" }, 400);
-  const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
   try {
-    const msg = await client.messages.create({
-      model: env.AI_MODEL || "claude-opus-5",
-      max_tokens: 16000,
-      output_config: { effort: "low" },
-      messages: [{ role: "user", content: prompt }]
+    if (env.ANTHROPIC_API_KEY) {
+      const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
+      const msg = await client.messages.create({
+        model: env.AI_MODEL || "claude-opus-5",
+        max_tokens: 16000,
+        output_config: { effort: "low" },
+        messages: [{ role: "user", content: prompt }]
+      });
+      if (msg.stop_reason === "refusal") return json({ error: "refused" }, 502);
+      const text = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+      return json({ text });
+    }
+    const out = await env.AI.run(env.FREE_AI_MODEL || FREE_MODEL, {
+      messages: [
+        { role: "system", content: "You turn a cafe owner's short notes into data. Reply with only the JSON array asked for - no explanation, no markdown." },
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 4096,
+      temperature: 0
     });
-    if (msg.stop_reason === "refusal") return json({ error: "refused" }, 502);
-    const text = msg.content.filter((b) => b.type === "text").map((b) => b.text).join("\n");
+    const r = out && out.response;
+    const text = typeof r === "string" ? r : JSON.stringify(r);
     return json({ text });
   } catch (e) {
     return json({ error: "AI request failed" }, 502);
@@ -274,7 +293,7 @@ export default {
         return json({ ok: true }, 200, { "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
       }
       const authed = await isAuthed(req, env);
-      if (path === "/api/session") return json({ ok: authed, ai: !!env.ANTHROPIC_API_KEY }, authed ? 200 : 401);
+      if (path === "/api/session") return json({ ok: authed, ai: aiAvailable(env) }, authed ? 200 : 401);
       if (!authed) return json({ error: "login required" }, 401);
 
       if (path === "/api/data" || path.startsWith("/api/data/")) return await handleData(req, env, url, path);
