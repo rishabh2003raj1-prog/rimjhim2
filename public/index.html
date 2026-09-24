@@ -2284,57 +2284,102 @@ function openPasteRestore(){
     errEl.style.display = "none";
     var raw = document.getElementById("rs_text").value.trim();
     if(!raw){ errEl.textContent = "Paste your backup text first."; errEl.style.display="block"; return; }
-    var data;
-    try{ data = JSON.parse(raw); }
-    catch(e){ errEl.textContent = "That text isn't a valid backup - make sure you copied all of it."; errEl.style.display="block"; return; }
-    applyBackupData(data, errEl);
+    var parsed = parseBackupText(raw);
+    if(!parsed){ errEl.textContent = "That text isn't a valid backup - make sure you copied all of it."; errEl.style.display="block"; return; }
+    applyBackupData(parsed.data, errEl, parsed.partial);
   });
 }
 
-function applyBackupData(data, errEl){
+// A backup copied on a phone often gets cut off part-way (long text, bill photos).
+// Rather than rejecting it, keep every record that arrived complete.
+function salvageJson(text){
+  var stack = [], inStr = false, esc = false, cut = -1, cutStack = null;
+  for(var i=0;i<text.length;i++){
+    var c = text.charAt(i);
+    if(inStr){
+      if(esc) esc = false;
+      else if(c==="\\") esc = true;
+      else if(c==='"') inStr = false;
+      continue;
+    }
+    if(c==='"') inStr = true;
+    else if(c==="{" || c==="[") stack.push(c);
+    else if(c==="}" || c==="]"){
+      stack.pop();
+      cut = i+1; cutStack = stack.slice();
+      if(!stack.length) break;
+    }
+  }
+  if(cut<0) return null;
+  var tail = cutStack.reverse().map(function(o){ return o==="{" ? "}" : "]"; }).join("");
+  try{ return JSON.parse(text.slice(0, cut) + tail); }catch(e){ return null; }
+}
+
+function parseBackupText(raw){
+  try{ return { data: JSON.parse(raw), partial: false }; }
+  catch(e){
+    var d = salvageJson(String(raw||"").trim());
+    return d ? { data: d, partial: true } : null;
+  }
+}
+
+function backupSummary(data){
+  var names = { sales:"sales", purchases:"purchase lines", investments:"investments", expenses:"expenses", notes:"notes", staff:"staff",
+    cashDays:"cash days", menuItems:"menu items", ingredients:"ingredients", vendors:"vendors", customers:"customers", assets:"assets" };
+  return Object.keys(names).filter(function(k){ return Array.isArray(data[k]) && data[k].length; })
+    .map(function(k){ return data[k].length+" "+names[k]; }).join(", ");
+}
+
+function applyBackupData(data, errEl, partial){
   if(!data || (!Array.isArray(data.sales) && !Array.isArray(data.purchases))){
     if(errEl){ errEl.textContent = "That doesn't look like a "+OUTLET.name+" backup."; errEl.style.display="block"; }
     else { appAlert("That doesn't look like a "+OUTLET.name+" backup file."); }
     return;
   }
   var when = data.exportedAt ? new Date(data.exportedAt).toLocaleString("en-IN") : "the backup";
-  askConfirm("This will REPLACE everything currently on this device with "+when+". This can't be undone. Continue?", function(){
-  sales = Array.isArray(data.sales) ? data.sales : [];
-  purchases = Array.isArray(data.purchases) ? data.purchases : [];
-  investments = Array.isArray(data.investments) ? data.investments : [];
-  expenses = Array.isArray(data.expenses) ? data.expenses : [];
-  notes = Array.isArray(data.notes) ? data.notes : [];
-  PARTNERS = (Array.isArray(data.partners) && data.partners.length) ? data.partners : OUTLET.defaultPartners.slice();
-  bills = Array.isArray(data.bills) ? data.bills : [];
-  staff = Array.isArray(data.staff) ? data.staff : (staff||[]);
-  roster = Array.isArray(data.roster) ? data.roster : [];
-  attendance = Array.isArray(data.attendance) ? data.attendance : [];
-  tasks = Array.isArray(data.tasks) ? data.tasks : [];
-  conduct = Array.isArray(data.conduct) ? data.conduct : [];
-  cashDays = Array.isArray(data.cashDays) ? data.cashDays : [];
-  if(data.settings && typeof data.settings==="object") settings = data.settings;
-  if(Array.isArray(data.menuItems)) menuItems = data.menuItems;
-  if(Array.isArray(data.ingredients)) ingredients = data.ingredients;
-  dishLog = Array.isArray(data.dishLog) ? data.dishLog : [];
-  if(Array.isArray(data.vendors)) vendors = data.vendors;
-  assets = Array.isArray(data.assets) ? data.assets : [];
-  customers = Array.isArray(data.customers) ? data.customers : [];
-  creditPayments = Array.isArray(data.creditPayments) ? data.creditPayments : [];
-  wastage = Array.isArray(data.wastage) ? data.wastage : [];
-  prepBatches = Array.isArray(data.prepBatches) ? data.prepBatches : [];
-  stockAudits = Array.isArray(data.stockAudits) ? data.stockAudits : [];
-  retailItems = Array.isArray(data.retailItems) ? data.retailItems : [];
-  retailSales = Array.isArray(data.retailSales) ? data.retailSales : [];
-  cafeUse = Array.isArray(data.cafeUse) ? data.cafeUse : [];
-  customers = Array.isArray(data.customers) ? data.customers : [];
-  custPayments = Array.isArray(data.custPayments) ? data.custPayments : [];
-  offers = Array.isArray(data.offers) ? data.offers : [];
-  saveEverything();
-  closeForm();
-  renderAll();
-  appAlert("Backup restored.");
-});
-  }
+  var msg = partial
+    ? "This backup text was cut off before the end, but these complete records were recovered:\n\n"+backupSummary(data)+
+      "\n\nThey will be ADDED to what is already in the app (nothing is deleted). Lists that were cut off, like the rest of the purchases, expenses or staff, stay as they are - restore the full backup file later to bring those in.\n\nContinue?"
+    : "This will REPLACE everything currently in the app with "+when+" ("+backupSummary(data)+"). This can't be undone. Continue?";
+  askConfirm(msg, function(){
+    function list(key){ return Array.isArray(data[key]) ? data[key] : null; }
+    // Full backup: replace. Cut-off backup: merge by id, never remove anything.
+    function take(key, current){
+      var incoming = list(key);
+      if(!partial) return incoming || (current===staff||current===menuItems||current===ingredients||current===vendors ? (current||[]) : []);
+      if(!incoming) return current || [];
+      var out = (current||[]).slice(), at = {};
+      out.forEach(function(x, i){ if(x && x.id!==undefined) at[x.id] = i; });
+      incoming.forEach(function(x){
+        if(x && x.id!==undefined && at[x.id]!==undefined) out[at[x.id]] = x;
+        else out.push(x);
+      });
+      return out;
+    }
+    sales = take("sales", sales); purchases = take("purchases", purchases);
+    investments = take("investments", investments); expenses = take("expenses", expenses);
+    notes = take("notes", notes); bills = take("bills", bills);
+    staff = take("staff", staff); roster = take("roster", roster);
+    attendance = take("attendance", attendance); tasks = take("tasks", tasks);
+    conduct = take("conduct", conduct); cashDays = take("cashDays", cashDays);
+    menuItems = take("menuItems", menuItems); ingredients = take("ingredients", ingredients);
+    dishLog = take("dishLog", dishLog); vendors = take("vendors", vendors);
+    assets = take("assets", assets); customers = take("customers", customers);
+    creditPayments = take("creditPayments", creditPayments); wastage = take("wastage", wastage);
+    prepBatches = take("prepBatches", prepBatches); stockAudits = take("stockAudits", stockAudits);
+    retailItems = take("retailItems", retailItems); retailSales = take("retailSales", retailSales);
+    cafeUse = take("cafeUse", cafeUse); custPayments = take("custPayments", custPayments);
+    offers = take("offers", offers);
+    if(Array.isArray(data.partners) && data.partners.length){
+      PARTNERS = partial ? PARTNERS.concat(data.partners.filter(function(p){ return PARTNERS.indexOf(p)<0; })) : data.partners;
+    } else if(!partial){ PARTNERS = OUTLET.defaultPartners.slice(); }
+    if(data.settings && typeof data.settings==="object") settings = partial ? Object.assign({}, settings, data.settings) : data.settings;
+    saveEverything();
+    closeForm();
+    renderAll();
+    appAlert(partial ? "Recovered records added. They are uploading to the cloud now." : "Backup restored.");
+  });
+}
 
 function saveEverything(){
   saveSales(); savePurch(); saveInvest(); saveExpense(); saveNotes(); savePartners(); saveBills();
@@ -2346,10 +2391,9 @@ function saveEverything(){
 function importBackup(file){
   var reader = new FileReader();
   reader.onload = function(e){
-    var data;
-    try{ data = JSON.parse(e.target.result); }
-    catch(err){ appAlert("That doesn't look like a valid backup file."); return; }
-    applyBackupData(data, null);
+    var parsed = parseBackupText(e.target.result);
+    if(!parsed){ appAlert("That doesn't look like a valid backup file."); return; }
+    applyBackupData(parsed.data, null, parsed.partial);
   };
   reader.readAsText(file);
 }
