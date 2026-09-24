@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "node scripts/ensure-d1.mjs && wrangler deploy",
+    "deploy": "node scripts/ensure-d1.mjs && node scripts/ensure-subdomain.mjs && wrangler deploy",
     "db:create": "wrangler d1 create rimjhim-cafe"
   },
   "dependencies": {
