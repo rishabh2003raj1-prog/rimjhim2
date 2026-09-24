@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rimjhim Export Helper</title>
+<style>
+  :root{ --ink:#241A12; --soft:#5B5044; --paper:#F2EFE3; --panel:#fff; --line:#E2DCC8; --teal:#1F5C52; --brick:#A6402D; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;}
+  main{max-width:480px;margin:0 auto;padding:20px 16px 60px;}
+  h1{font-family:Georgia,serif;font-size:24px;margin:0 0 6px;}
+  p{font-size:14px;line-height:1.5;color:var(--soft);margin:0 0 12px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin:0 0 14px;}
+  .row{display:flex;justify-content:space-between;font-size:14px;padding:5px 0;border-bottom:1px solid var(--line);}
+  .row:last-child{border-bottom:0;}
+  .piece{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--line);}
+  .piece:last-child{border-bottom:0;}
+  .piece .info{flex:1;font-size:13.5px;line-height:1.4;}
+  .piece .info b{display:block;font-size:15px;}
+  button{font:inherit;font-weight:600;border-radius:11px;padding:11px 14px;border:0;background:var(--ink);color:#fff;min-width:96px;}
+  button.done{background:var(--teal);}
+  .warn{color:var(--brick);font-weight:600;}
+  ol{padding-left:20px;font-size:14px;line-height:1.6;color:var(--soft);margin:0;}
+  textarea{width:100%;height:90px;font-size:11px;margin-top:8px;display:none;}
+</style>
+</head>
+<body>
+<main>
+  <h1>Rimjhim export helper</h1>
+  <p>Moves the data saved by the old Rimjhim Cafe app into the new cloud app, in pieces small enough for the phone to copy completely.</p>
+  <div id="out"></div>
+</main>
+<script>
+(function(){
+  "use strict";
+  var LISTS = [["sales_v1","sales","sales"],["purchases_v1","purchases","purchase lines"],["expenses_v1","expenses","expenses"],
+    ["investments_v1","investments","investments"],["notes_v1","notes","notes"],["staff_v1","staff","staff"],
+    ["cashdays_v1","cashDays","cash counts"],["customers_v1","customers","customers"],["creditpayments_v1","creditPayments","udhaar payments"],
+    ["vendors_v1","vendors","vendors"],["menu_v1","menuItems","menu items"],["ingredients_v1","ingredients","ingredients"],
+    ["dishlog_v1","dishLog","dish counts"],["assets_v1","assets","assets"],["bills_v1","bills","bill records"],
+    ["roster_v1","roster","roster"],["attendance_v1","attendance","attendance"],["tasks_v1","tasks","tasks"],["conduct_v1","conduct","conduct notes"],
+    ["wastage_v1","wastage","wastage"],["prepbatches_v1","prepBatches","cooking batches"],["stockaudits_v1","stockAudits","stock counts"],
+    ["retail_v1","retailItems","drinks"],["retailsales_v1","retailSales","drink sales"],["cafeuse_v1","cafeUse","cafe use"],
+    ["custpayments_v1","custPayments","customer payments"],["offers_v1","offers","offers"]];
+  var PIECE_CHARS = 250000; // well under what an Android clipboard holds
+  var out = document.getElementById("out");
+
+  function read(k){ try{ var v = localStorage.getItem(k); return v===null ? null : JSON.parse(v); }catch(e){ return null; } }
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+
+  var found = {}, total = 0;
+  LISTS.forEach(function(l){ var v = read(l[0]); if(Array.isArray(v)){ found[l[1]] = v; total += v.length; } });
+  var partners = read("partners_v1"), settings = read("settings_v1");
+
+  if(!total){
+    var n = 0; try{ n = localStorage.length; }catch(e){}
+    out.innerHTML = '<div class="card"><p class="warn">No old Rimjhim data found here.</p>'+
+      '<p>Open this file exactly the way you open the old Rimjhim Cafe app (in the Claude app), so it can see the same saved data.</p>'+
+      '<p style="margin:0;font-size:12px;">Saved items visible here: '+n+'</p></div>';
+    return;
+  }
+
+  // Photos travel separately, so the records themselves stay small.
+  var photos = [];
+  function strip(field, list, key){
+    return list.map(function(x){
+      if(x && typeof x[key]==="string" && x[key].indexOf("data:")===0){
+        photos.push({ field: field, rec: x });
+        var c = {}; Object.keys(x).forEach(function(k){ c[k] = x[k]; }); c[key] = null; return c;
+      }
+      return x;
+    });
+  }
+  if(found.bills) found.bills = strip("bills", found.bills, "image");
+  if(found.assets) found.assets = strip("assets", found.assets, "photo");
+
+  // Split into self-contained pieces; each one can be restored on its own.
+  var pieces = [], cur = null, curSize = 0;
+  function start(){ cur = { mergeOnly: true, exportedAt: new Date().toISOString() }; curSize = 200; pieces.push(cur); }
+  function add(field, rec){
+    var sz = JSON.stringify(rec).length + 1;
+    if(!cur || (curSize + sz > PIECE_CHARS && curSize > 200)) start();
+    (cur[field] = cur[field] || []).push(rec); curSize += sz;
+  }
+  start();
+  if(Array.isArray(partners)) cur.partners = partners;
+  if(settings && typeof settings==="object") cur.settings = settings;
+  LISTS.forEach(function(l){ (found[l[1]]||[]).forEach(function(r){ add(l[1], r); }); });
+  var dataPieces = pieces.length;
+  cur = null;
+  photos.forEach(function(p){ add(p.field, p.rec); });
+  pieces.forEach(function(p, i){ p.part = i+1; p.parts = pieces.length; });
+
+  var html = '<div class="card">';
+  LISTS.forEach(function(l){ if(found[l[1]] && found[l[1]].length) html += '<div class="row"><span>'+l[2]+'</span><b>'+found[l[1]].length+'</b></div>'; });
+  html += '<div class="row"><span>photos</span><b>'+photos.length+'</b></div></div>';
+  html += '<div class="card"><ol>'+
+    '<li>Tap <b>Copy piece 1</b>.</li>'+
+    '<li>Open the new app → <b>Backup &amp; restore</b> → <b>Restore from copied text</b>, paste, tap <b>Restore</b>, then <b>Yes, continue</b>.</li>'+
+    '<li>Come back here and do the same for each piece, in order.</li></ol>'+
+    '<p style="margin:10px 0 0;">Pieces 1'+(dataPieces>1?'–'+dataPieces:'')+' are your records. '+(pieces.length>dataPieces?'The rest are bill/asset photos - if you only need the figures, you can stop after piece '+dataPieces+'.':'')+'</p></div>';
+  html += '<div class="card">';
+  pieces.forEach(function(p, i){
+    var bits = [];
+    Object.keys(p).forEach(function(k){ if(Array.isArray(p[k]) && k!=="partners") bits.push(p[k].length+" "+k); });
+    html += '<div class="piece"><div class="info"><b>Piece '+(i+1)+' of '+pieces.length+(i>=dataPieces?' · photos':'')+'</b>'+esc(bits.join(", ")||"settings")+
+            '<textarea readonly id="t'+i+'"></textarea></div><button data-i="'+i+'">Copy piece '+(i+1)+'</button></div>';
+  });
+  html += '</div>';
+  out.innerHTML = html;
+
+  Array.prototype.forEach.call(out.querySelectorAll("button[data-i]"), function(btn){
+    btn.addEventListener("click", function(){
+      var i = +btn.getAttribute("data-i");
+      var text = JSON.stringify(pieces[i]);
+      var ta = document.getElementById("t"+i);
+      ta.value = text;
+      function ok(){ btn.textContent = "Copied ✓"; btn.className = "done"; }
+      function manual(){
+        ta.style.display = "block"; ta.focus(); ta.select();
+        try{ if(document.execCommand("copy")){ ok(); return; } }catch(e){}
+        btn.textContent = "Select & copy the box";
+      }
+      try{
+        if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, manual);
+        else manual();
+      }catch(e){ manual(); }
+    });
+  });
+})();
+</script>
+</body>
+</html>

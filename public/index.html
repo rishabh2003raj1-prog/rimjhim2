@@ -2336,13 +2336,22 @@ function backupSummary(data){
 }
 
 function applyBackupData(data, errEl, partial){
-  if(!data || (!Array.isArray(data.sales) && !Array.isArray(data.purchases))){
+  // Pieces made by the export helper are always added, never replace.
+  if(data && data.mergeOnly) partial = true;
+  var hasList = data && Object.keys(data).some(function(k){ return Array.isArray(data[k]) && k!=="partners"; });
+  if(!data || (data.mergeOnly ? !hasList : (!Array.isArray(data.sales) && !Array.isArray(data.purchases)))){
     if(errEl){ errEl.textContent = "That doesn't look like a "+OUTLET.name+" backup."; errEl.style.display="block"; }
     else { appAlert("That doesn't look like a "+OUTLET.name+" backup file."); }
     return;
   }
   var when = data.exportedAt ? new Date(data.exportedAt).toLocaleString("en-IN") : "the backup";
-  var msg = partial
+  var photos = (Array.isArray(data.bills)?data.bills:[]).concat(Array.isArray(data.assets)?data.assets:[])
+    .filter(function(x){ return x && ((x.image||"").indexOf("data:")===0 || (x.photo||"").indexOf("data:")===0); }).length;
+  var what = [backupSummary(data), photos ? photos+" photo"+(photos!==1?"s":"") : ""].filter(Boolean).join(", ") || "settings";
+  var msg = data.mergeOnly
+    ? (data.part ? "Piece "+data.part+(data.parts?" of "+data.parts:"")+": " : "")+what+
+      "\n\nThese will be ADDED to what is already in the app. Nothing is deleted, and pieces already added are simply updated.\n\nContinue?"
+    : partial
     ? "This backup text was cut off before the end, but these complete records were recovered:\n\n"+backupSummary(data)+
       "\n\nThey will be ADDED to what is already in the app (nothing is deleted). Lists that were cut off, like the rest of the purchases, expenses or staff, stay as they are - restore the full backup file later to bring those in.\n\nContinue?"
     : "This will REPLACE everything currently in the app with "+when+" ("+backupSummary(data)+"). This can't be undone. Continue?";
@@ -2382,7 +2391,8 @@ function applyBackupData(data, errEl, partial){
     saveEverything();
     closeForm();
     renderAll();
-    appAlert(partial ? "Recovered records added. They are uploading to the cloud now." : "Backup restored.");
+    appAlert(data.mergeOnly ? ("Piece "+(data.part||"")+" added"+(data.parts&&data.part<data.parts?" - now copy piece "+(data.part+1)+".":". All done if that was the last piece.")) :
+             partial ? "Recovered records added. They are uploading to the cloud now." : "Backup restored.");
   });
 }
 
