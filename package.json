@@ -1,0 +1,16 @@
+{
+  "name": "rimjhim-cafe",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "node scripts/ensure-d1.mjs && wrangler deploy",
+    "db:create": "wrangler d1 create rimjhim-cafe"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.128.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.139.0"
+  }
+}
