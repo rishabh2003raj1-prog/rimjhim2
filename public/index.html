@@ -77,6 +77,13 @@
   .dlg{background:var(--panel);border-radius:16px;padding:18px;max-width:360px;width:100%;box-shadow:0 10px 30px rgba(0,0,0,.25);}
   .dlgmsg{font-size:14px;line-height:1.5;color:var(--ink);margin-bottom:16px;white-space:pre-wrap;}
   .dlgbtns{display:flex;gap:10px;}
+  .outletpick{cursor:pointer;}
+  .outletpick .caret{font-size:14px;color:var(--ink-soft);vertical-align:middle;}
+  .outletrow{display:flex;align-items:center;gap:10px;padding:12px;border:1px solid var(--line);border-radius:12px;background:var(--panel);margin-bottom:8px;}
+  .outletrow.cur{border-color:var(--teal);box-shadow:inset 3px 0 0 var(--teal);}
+  .outletrow .oname{flex:1;min-width:0;}
+  .outletrow .oname b{display:block;font-size:15px;}
+  .outletrow .oname span{font-size:12px;color:var(--ink-soft);}
   .loginbg{position:fixed;inset:0;background:var(--paper);z-index:70;display:none;align-items:center;justify-content:center;padding:24px;}
   .loginbg.on{display:flex;}
   .loginbox{max-width:360px;width:100%;}
@@ -305,7 +312,7 @@
   <div class="topbar">
     <div class="row">
       <div>
-        <h1 id="outletName">Rimjhim Cafe</h1>
+        <h1 id="outletName" class="outletpick" role="button" aria-label="Switch outlet">Rimjhim Cafe <span class="caret">▾</span></h1>
       </div>
       <div class="clock"><b id="clockTime">--:--</b><span id="clockDate">--</span></div>
     </div>
@@ -530,15 +537,22 @@
 (function(){
 "use strict";
 
-// ---- OUTLET ----
-// Each outlet's file differs only in this block. The id keeps each outlet's data
-// in its own storage space, so opening several outlets on one phone never mixes them.
-var OUTLET = {
-  id: "rimjhim",
-  name: "Rimjhim Cafe",
-  seedDemo: false,
-  defaultPartners: ["Rishabh", "Dashrath Bhaiya"]
-};
+// ---- OUTLETS ----
+// Every outlet has its own books on the server (sales, stock, staff, cash...).
+// The list of outlets is shared by everyone who signs in; which one this phone is
+// looking at is remembered on the phone. Switching reloads the app for that outlet.
+var MAIN_OUTLET = { id: "rimjhim", name: "Rimjhim Cafe" };
+var OUTLETS_CACHE = "outlets_cache_v1", CURRENT_OUTLET = "current_outlet_v1";
+function cachedOutlets(){
+  try{ var l = JSON.parse(localStorage.getItem(OUTLETS_CACHE) || "null"); if(Array.isArray(l) && l.length) return l; }catch(e){}
+  return [MAIN_OUTLET];
+}
+var OUTLET = (function(){
+  var cur = null;
+  try{ cur = localStorage.getItem(CURRENT_OUTLET); }catch(e){}
+  var o = cachedOutlets().filter(function(x){ return x.id===cur; })[0] || MAIN_OUTLET;
+  return { id: o.id, name: o.name, seedDemo: false, defaultPartners: ["Rishabh", "Dashrath Bhaiya"] };
+})();
 // In-app dialogs. Browser pop-ups (confirm/alert) are silently blocked when the
 // app runs inside a viewer such as the Claude app, which made deletes do nothing.
 var __dlgQueue = [];
@@ -1050,8 +1064,151 @@ function photoBytes(){
   return n;
 }
 function fmtMB(b){ return (b/1048576).toFixed(1)+" MB"; }
+// ---- outlet switching ----
+var OUTLETS_KEY = "outlets_v1", GLOBAL_Q = "?outlet=_global";
+var outletList = cachedOutlets(), outletRev = 0;
+
+function showOutletName(){
+  var h = document.getElementById("outletName");
+  if(h) h.innerHTML = esc(OUTLET.name) + ' <span class="caret">▾</span>';
+  document.title = OUTLET.name;
+}
+function loadOutlets(){
+  return api("GET", "/api/data"+GLOBAL_Q).then(function(r){
+    if(!r.ok || !r.data) return;
+    var it = (r.data.items||{})[OUTLETS_KEY];
+    if(it && Array.isArray(it.value) && it.value.length){ outletList = it.value; outletRev = it.rev; }
+    else { outletList = [MAIN_OUTLET]; outletRev = it ? it.rev : 0; }
+    try{ localStorage.setItem(OUTLETS_CACHE, JSON.stringify(outletList)); }catch(e){}
+    var me = outletList.filter(function(o){ return o.id===OUTLET.id; })[0];
+    if(me && me.name!==OUTLET.name){ OUTLET.name = me.name; showOutletName(); }
+  }).catch(function(){});
+}
+// Change the shared list; retries on top of whatever another phone just saved.
+function saveOutlets(change){
+  return api("GET", "/api/data"+GLOBAL_Q).then(function(r){
+    if(!r.ok) throw new Error("load");
+    var it = (r.data.items||{})[OUTLETS_KEY];
+    var list = (it && Array.isArray(it.value) && it.value.length) ? it.value : [MAIN_OUTLET];
+    list = change(list.slice());
+    return api("PUT", "/api/data/"+OUTLETS_KEY+GLOBAL_Q, { value:list, baseRev: it ? it.rev : 0 }).then(function(w){
+      if(w.status===409) return saveOutlets(change);
+      if(!w.ok) throw new Error("save");
+      outletList = list; outletRev = w.data.rev;
+      try{ localStorage.setItem(OUTLETS_CACHE, JSON.stringify(outletList)); }catch(e){}
+      return list;
+    });
+  });
+}
+
+function switchOutlet(id){
+  if(id===OUTLET.id){ closeForm(); return; }
+  function go(){
+    try{ localStorage.setItem(CURRENT_OUTLET, id); }catch(e){}
+    location.reload();
+  }
+  // Finish uploading this outlet's changes first, so nothing waits on the phone.
+  if(pendingCount() && cloud.state==="ok"){
+    flushNow();
+    var tries = 0, t = setInterval(function(){
+      if(!pendingCount() || ++tries > 20){ clearInterval(t); go(); }
+    }, 250);
+  } else go();
+}
+
+function monthTotalsFor(items){
+  var mk = fmtDate(new Date()).slice(0,7);
+  function val(k){ var it = items[k]; return (it && Array.isArray(it.value)) ? it.value : []; }
+  var s = val(SALES_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+saleTotal(x); },0);
+  var p = val(PURCH_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+purchTotal(x); },0);
+  var e = val(EXPENSE_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+expAmt(x); },0);
+  return { sales:s, costs:p+e, net:s-p-e };
+}
+
+function openOutletSheet(){
+  var sheet = document.getElementById("sheet");
+  var monthName = new Date().toLocaleDateString("en-IN",{month:"long"});
+  var html = '<h2 class="serif">Outlets</h2>';
+  html += '<div class="backupnote">Each outlet keeps its own books — sales, purchases, stock, staff and cash. Tap one to open it. Figures are for '+monthName+'.</div>';
+  html += outletList.map(function(o){
+    return '<div class="outletrow'+(o.id===OUTLET.id?' cur':'')+'" data-outlet="'+esc(o.id)+'">'+
+      '<div class="oname"><b>'+esc(o.name)+(o.id===OUTLET.id?' <span class="pill ok">open</span>':'')+'</b><span id="osum_'+esc(o.id)+'">…</span></div>'+
+      '<div class="amt sale" id="onet_'+esc(o.id)+'"></div></div>';
+  }).join("");
+  html += '<div class="card" id="oall" style="margin:4px 0 12px;display:none;"></div>';
+  html += '<div class="addrow"><button class="sale" id="out_add">+ Add outlet</button><button class="expense" id="out_rename">Rename this outlet</button></div>';
+  html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="out_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("out_close").addEventListener("click", closeForm);
+  document.getElementById("out_add").addEventListener("click", function(){ openOutletForm(null); });
+  document.getElementById("out_rename").addEventListener("click", function(){ openOutletForm(OUTLET.id); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-outlet]"), function(r){
+    r.addEventListener("click", function(){ switchOutlet(r.getAttribute("data-outlet")); });
+  });
+  // Month figures for every outlet, side by side.
+  var all = { sales:0, costs:0, net:0 }, done = 0;
+  outletList.forEach(function(o){
+    api("GET", "/api/data?outlet="+encodeURIComponent(o.id)).then(function(r){
+      var t = monthTotalsFor((r.data && r.data.items) || {});
+      all.sales += t.sales; all.costs += t.costs; all.net += t.net;
+      var a = document.getElementById("osum_"+o.id), b = document.getElementById("onet_"+o.id);
+      if(a) a.textContent = "Sales "+rupee(t.sales)+" · costs "+rupee(t.costs);
+      if(b){ b.textContent = rupeeSigned(t.net); b.className = "amt "+(t.net>=0?"sale":"purch"); }
+    }).catch(function(){
+      var a = document.getElementById("osum_"+o.id); if(a) a.textContent = "Figures need internet";
+    }).then(function(){
+      if(++done===outletList.length && outletList.length>1){
+        var box = document.getElementById("oall");
+        if(!box) return;
+        box.style.display = "";
+        box.innerHTML = '<div class="psrow"><span><b>All outlets · '+monthName+'</b></span><b></b></div>'+
+          '<div class="psrow"><span>Sales</span><b>'+rupee(all.sales)+'</b></div>'+
+          '<div class="psrow"><span>Purchases + expenses</span><b>'+rupee(all.costs)+'</b></div>'+
+          '<div class="psrow"><span>Net</span><b class="'+(all.net>=0?"ok":"bad")+'">'+rupeeSigned(all.net)+'</b></div>';
+      }
+    });
+  });
+}
+
+function openOutletForm(editId){
+  var o = editId ? outletList.filter(function(x){ return x.id===editId; })[0] : null;
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+(o?"Rename outlet":"Add outlet")+'</h2>';
+  if(!o) html += '<div class="backupnote">A new outlet starts with empty books. Partners, staff, menu and stock are set up separately for each outlet.</div>';
+  html += '<div class="field"><label>Outlet name</label><input type="text" id="on_name" placeholder="e.g. Rimjhim Cafe - Station Road" value="'+esc(o?o.name:"")+'"></div>';
+  html += '<div class="err" id="on_err"></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="on_back">Back</button><button class="btn-save" id="on_save">'+(o?"Save":"Create & open")+'</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("on_back").addEventListener("click", openOutletSheet);
+  document.getElementById("on_save").addEventListener("click", function(){
+    var err = document.getElementById("on_err"); err.style.display = "none";
+    var name = document.getElementById("on_name").value.trim();
+    if(!name){ err.textContent = "Enter a name."; err.style.display = "block"; return; }
+    var clash = outletList.some(function(x){ return x.name.toLowerCase()===name.toLowerCase() && (!o || x.id!==o.id); });
+    if(clash){ err.textContent = "There is already an outlet with that name."; err.style.display = "block"; return; }
+    var btn = document.getElementById("on_save"); btn.disabled = true;
+    var newId = o ? o.id : ("o-" + uid()).toLowerCase().replace(/[^a-z0-9_-]/g,"").slice(0,40);
+    saveOutlets(function(list){
+      if(o) return list.map(function(x){ return x.id===o.id ? { id:x.id, name:name } : x; });
+      return list.concat([{ id:newId, name:name }]);
+    }).then(function(){
+      if(o){
+        if(o.id===OUTLET.id){ OUTLET.name = name; showOutletName(); }
+        openOutletSheet();
+      } else {
+        switchOutlet(newId);
+      }
+    }).catch(function(){
+      btn.disabled = false;
+      err.textContent = "Couldn't save - you need internet to add or rename outlets."; err.style.display = "block";
+    });
+  });
+}
+
 function loadData(cb){
-  startCloud(function(){ readLists(); cb(); setTimeout(importFromLink, 300); window.addEventListener("hashchange", importFromLink); });
+  showOutletName();
+  startCloud(function(){ readLists(); cb(); loadOutlets(); setTimeout(importFromLink, 300); window.addEventListener("hashchange", importFromLink); });
 }
 
 // ---- data arriving in a link from the old app ----
@@ -7370,6 +7527,7 @@ document.addEventListener("DOMContentLoaded", function(){
   });
 
   document.getElementById("backupBtn").addEventListener("click", openBackupSheet);
+  document.getElementById("outletName").addEventListener("click", openOutletSheet);
   document.getElementById("loginGo").addEventListener("click", submitLogin);
   document.getElementById("loginPin").addEventListener("keydown", function(e){ if(e.key==="Enter") submitLogin(); });
   document.getElementById("assetPhotoFile").addEventListener("change", function(e){

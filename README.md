@@ -56,6 +56,10 @@ echo "APP_PIN=1234" > .dev.vars
 npm run dev     # http://localhost:8787
 ```
 
+## Outlets
+
+Tap the outlet name at the top of the app to switch outlets, add a new one, or rename the current one. Each outlet keeps its own books: sales, purchases, expenses, stock, staff, cash and reports. The outlet list is shared, so both phones see the same outlets. The switcher also shows each outlet's figures for the current month, and a total across all outlets.
+
 ## How saving works
 
 - Each list (sales, purchases, …) is saved to the server a moment after every change. The top bar shows **Saved to cloud hh:mm**, **Saving…**, or **Offline — N changes will upload**.
