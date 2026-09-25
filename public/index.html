@@ -1841,7 +1841,8 @@ function rupeeP(n){
 }
 function plannedStaffCost(mKey){
   mKey = mKey || fmtDate(new Date()).slice(0,7);
-  return staff.reduce(function(a,st){ return a + staffPlanFor(st, mKey); }, 0);
+  // Same figure as the Salary tab: days employed, less unpaid leave, plus unused leave.
+  return r2(staff.reduce(function(a,st){ return staffMonthShare(st, mKey).days > 0 ? a + salaryFor(st, mKey).net : a; }, 0));
 }
 // Which month a payment is FOR. "Rent - September 2026" paid on 3 Oct belongs to
 // September; without a month in the description, the payment date decides.
@@ -1872,12 +1873,12 @@ function renderFixedCosts(dateList){
   document.getElementById("fcMonthLbl").textContent = "· "+monthName;
 
   var planned = plannedFixed(mKey);
-  var rows = "", plannedTotal = 0, actualTotal = 0;
+  var rows = "", plannedTotal = 0, actualTotal = 0, stillDue = 0;
 
   FIXED_CATS.forEach(function(c){
     var plan = planned[c];
     var act = actualInMonth([c], mKey);
-    plannedTotal += plan; actualTotal += act;
+    plannedTotal += plan; actualTotal += act; stillDue += Math.max(0, plan-act);
     if(plan===0 && act===0) return;
     var over = plan>0 && act>plan*1.1;
     rows += '<div class="psrow"><span>'+esc(c)+'</span><b class="'+(over?"bad":"")+'">'+
@@ -1889,6 +1890,7 @@ function renderFixedCosts(dateList){
   var staffAct = actualInMonth(STAFF_CATS, mKey);
   var mealCost = staffMealCost(mKey, null);
   plannedTotal += staffPlan; actualTotal += staffAct;
+  staff.forEach(function(st){ if(staffMonthShare(st, mKey).days > 0) stillDue += Math.max(0, salaryFor(st, mKey).balance); });
   rows += '<div class="psrow"><span>Staff (salary + allowances)</span><b>'+
           (staffAct>0 ? rupee(staffAct) : '<span style="opacity:.6">not paid yet</span>')+
           ' <span style="font-size:10px;opacity:.65">of '+rupee(staffPlan)+'</span></b></div>';
@@ -1899,8 +1901,8 @@ function renderFixedCosts(dateList){
   rows += '<div class="psrow"><span><b>Fixed cost this month</b></span><b>'+rupee(plannedTotal+mealCost)+'</b></div>';
   if(actualTotal>0){
     rows += '<div class="psrow"><span>Paid so far</span><b>'+rupee(actualTotal)+'</b></div>';
-    var left = Math.max(0, plannedTotal - actualTotal);
-    if(left>0) rows += '<div class="psrow"><span>Still to pay this month</span><b class="warnamt">'+rupee(left)+'</b></div>';
+    var left = r2(stillDue);
+    if(left>=1) rows += '<div class="psrow"><span>Still to pay this month</span><b class="warnamt">'+rupee(left)+'</b></div>';
   }
 
   // Break-even: how much you must sell just to cover the fixed cost.
@@ -1962,7 +1964,7 @@ function fixedMonthSummary(mKey){
     // plus unused paid leave once the month is over (unless waived).
     var plan = sal.net;
     var paid = staffPaidFor(st, mKey).total;
-    staffRows.push({ st:st, planned:plan, full:fixedPart, paid:paid, due:Math.max(0, plan-paid), earnedSoFar: earned.earned + allowanceTotal(st),
+    staffRows.push({ st:st, planned:plan, full:fixedPart, paid:paid, due:Math.max(0, sal.balance), earnedSoFar: earned.earned + allowanceTotal(st),
                      basis: (sh.days < daysInMonthOf(mKey) && sh.days>0 ? "employed "+sh.days+" of "+daysInMonthOf(mKey)+" days ("+(sh.from>mKey+"-01"?"joined "+parseDate(sh.from).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"left "+parseDate(sh.to).toLocaleDateString("en-IN",{day:"numeric",month:"short"}))+") · " : "") +
                             (a.marked>0 ? (a.present+" days present"+(isCur?" so far · earned "+rupee(earned.earned)+" + allowances":"")) : "attendance not marked") });
   });
@@ -1971,7 +1973,8 @@ function fixedMonthSummary(mKey){
   var partner = expenses.filter(function(x){
     return (FIXED_CATS.indexOf(x.category)>=0 || STAFF_CATS.indexOf(x.category)>=0) && expenseMonth(x)===mKey && payerIsPersonal(x.paidBy);
   }).reduce(function(t,x){ return t+expAmt(x); },0);
-  return { rows:rows, staffRows:staffRows, planned:planTot, paid:paidTot, due:Math.max(0, planTot-paidTot), partner:partner };
+  var dueTot = rows.concat(staffRows).reduce(function(t,r){ return t+r.due; },0);
+  return { rows:rows, staffRows:staffRows, planned:planTot, paid:paidTot, due:r2(dueTot), partner:partner };
 }
 
 function renderFixedView(){
@@ -6724,7 +6727,10 @@ function renderSalaryView(){
     html += '<div class="salcard"><div class="salhead"><div><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+' · '+rupeeP(st.salary||0)+'/month</span></div>'+pill+'</div>';
     html += '<div class="psrow"><span>Days employed</span><b>'+s.employedDays+' of '+s.days+'</b></div>';
     html += '<div class="psrow"><span>Salary</span><b>'+(s.fullMonth ? rupeeP(s.base)+' <span class="muted">full month</span>' : s.employedDays+' days × '+rupeeP(s.rate)+' = '+rupeeP(s.base))+'</b></div>';
-    html += '<div class="psrow"><span>Leave taken</span><b>'+fmtQty(s.offDays)+' of '+fmtQty(s.allowedLeave)+' paid'+(s.unpaidDays?' · <span class="bad">'+fmtQty(s.unpaidDays)+' unpaid</span>':'')+'</b></div>';
+    html += '<div class="psrow"><span>Leave / absent</span><b>'+fmtQty(s.offDays)+' day'+(s.offDays!==1?'s':'')+
+            (s.fullMonth ? ' · '+fmtQty(s.allowedLeave)+' paid allowed' : s.offDays ? ' <span class="muted">(no paid leave in a part month)</span>' : '')+'</b></div>';
+    if(s.deduction) html += '<div class="psrow"><span>Less unpaid leave</span><b class="bad">'+fmtQty(s.unpaidDays)+' × '+rupeeP(s.rate)+' = −'+rupeeP(s.deduction)+'</b></div>';
+    if(s.allowances) html += '<div class="psrow"><span>Allowances</span><b>+'+rupeeP(s.allowances)+'</b></div>';
     if(s.unusedLeave>0){
       html += '<div class="psrow"><span>Unused leave</span><b>'+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupeeP(s.extraLeave)+
               (s.current ? ' <span class="muted">(final at month end)</span>' : s.choice==="waived" ? ' <span class="pill">waived · goodwill</span>' : ' <span class="pill ok">paid extra</span>')+'</b></div>';
