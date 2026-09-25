@@ -43,7 +43,8 @@
     ["wastage_v1","wastage","wastage"],["prepbatches_v1","prepBatches","cooking batches"],["stockaudits_v1","stockAudits","stock counts"],
     ["retail_v1","retailItems","drinks"],["retailsales_v1","retailSales","drink sales"],["cafeuse_v1","cafeUse","cafe use"],
     ["custpayments_v1","custPayments","customer payments"],["offers_v1","offers","offers"]];
-  var PIECE_CHARS = 250000; // well under what an Android clipboard holds
+  var PIECE_CHARS = 150000; // small enough for a link and for the phone clipboard
+  var APP_URL = "https://rimjhim-cafe.rishabh2003raj.workers.dev/";
   var out = document.getElementById("out");
 
   function read(k){ try{ var v = localStorage.getItem(k); return v===null ? null : JSON.parse(v); }catch(e){ return null; } }
@@ -96,19 +97,43 @@
   LISTS.forEach(function(l){ if(found[l[1]] && found[l[1]].length) html += '<div class="row"><span>'+l[2]+'</span><b>'+found[l[1]].length+'</b></div>'; });
   html += '<div class="row"><span>photos</span><b>'+photos.length+'</b></div></div>';
   html += '<div class="card"><ol>'+
-    '<li>Tap <b>Copy piece 1</b>.</li>'+
-    '<li>Open the new app → <b>Backup &amp; restore</b> → <b>Restore from copied text</b>, paste, tap <b>Restore</b>, then <b>Yes, continue</b>.</li>'+
-    '<li>Come back here and do the same for each piece, in order.</li></ol>'+
+    '<li>Tap <b>Open piece 1 in new app</b>. The new app opens in your browser - sign in with the PIN if asked, then tap <b>Yes, continue</b>.</li>'+
+    '<li>Come back here and do the same for each piece, in order.</li>'+
+    '<li>If a link does not open, use <b>Copy</b> instead and paste it in the new app under <b>Backup &amp; restore → Restore from copied text</b>.</li></ol>'+
     '<p style="margin:10px 0 0;">Pieces 1'+(dataPieces>1?'–'+dataPieces:'')+' are your records. '+(pieces.length>dataPieces?'The rest are bill/asset photos - if you only need the figures, you can stop after piece '+dataPieces+'.':'')+'</p></div>';
   html += '<div class="card">';
   pieces.forEach(function(p, i){
     var bits = [];
     Object.keys(p).forEach(function(k){ if(Array.isArray(p[k]) && k!=="partners") bits.push(p[k].length+" "+k); });
     html += '<div class="piece"><div class="info"><b>Piece '+(i+1)+' of '+pieces.length+(i>=dataPieces?' · photos':'')+'</b>'+esc(bits.join(", ")||"settings")+
-            '<textarea readonly id="t'+i+'"></textarea></div><button data-i="'+i+'">Copy piece '+(i+1)+'</button></div>';
+            '<textarea readonly id="t'+i+'"></textarea></div>'+
+            '<div style="display:flex;flex-direction:column;gap:6px;"><a class="golink" id="l'+i+'" target="_blank" rel="noopener" '+
+            'style="display:inline-block;text-align:center;text-decoration:none;font-weight:600;border-radius:11px;padding:11px 14px;background:#1F5C52;color:#fff;opacity:.5;">Preparing…</a>'+
+            '<button data-i="'+i+'" style="background:#fff;color:#241A12;border:1px solid #E2DCC8;">Copy</button></div></div>';
   });
   html += '</div>';
   out.innerHTML = html;
+
+  // Pack each piece into a link: deflate + base64url in the #fragment.
+  function b64url(bytes){
+    var bin = "", CH = 0x8000;
+    for(var k=0;k<bytes.length;k+=CH) bin += String.fromCharCode.apply(null, bytes.subarray(k, k+CH));
+    return btoa(bin).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  }
+  function packPiece(obj){
+    var bytes = new TextEncoder().encode(JSON.stringify(obj));
+    if(typeof CompressionStream==="undefined") return Promise.resolve("j." + b64url(bytes));
+    var stream = new Blob([bytes]).stream().pipeThrough(new CompressionStream("deflate-raw"));
+    return new Response(stream).arrayBuffer().then(function(buf){ return "z." + b64url(new Uint8Array(buf)); });
+  }
+  pieces.reduce(function(p, piece, i){
+    return p.then(function(){ return packPiece(piece); }).then(function(packed){
+      var a = document.getElementById("l"+i);
+      a.href = APP_URL + "#import=" + packed;
+      a.textContent = "Open piece "+(i+1)+" in new app";
+      a.style.opacity = "1";
+    });
+  }, Promise.resolve()).catch(function(){});
 
   Array.prototype.forEach.call(out.querySelectorAll("button[data-i]"), function(btn){
     btn.addEventListener("click", function(){
@@ -116,7 +141,7 @@
       var text = JSON.stringify(pieces[i]);
       var ta = document.getElementById("t"+i);
       ta.value = text;
-      function ok(){ btn.textContent = "Copied ✓"; btn.className = "done"; }
+      function ok(){ btn.textContent = "Copied ✓"; btn.style.background = "#E4EEEB"; }
       function manual(){
         ta.style.display = "block"; ta.focus(); ta.select();
         try{ if(document.execCommand("copy")){ ok(); return; } }catch(e){}

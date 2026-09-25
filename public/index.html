@@ -1051,7 +1051,40 @@ function photoBytes(){
 }
 function fmtMB(b){ return (b/1048576).toFixed(1)+" MB"; }
 function loadData(cb){
-  startCloud(function(){ readLists(); cb(); });
+  startCloud(function(){ readLists(); cb(); setTimeout(importFromLink, 300); window.addEventListener("hashchange", importFromLink); });
+}
+
+// ---- data arriving in a link from the old app ----
+// The old app runs inside a viewer that blocks it from contacting any server,
+// but it can still open a link. It packs a piece of its data into the link's
+// #fragment (never sent to any server) and this picks it up after sign-in.
+function b64urlBytes(s){
+  s = s.replace(/-/g,"+").replace(/_/g,"/");
+  while(s.length % 4) s += "=";
+  var bin = atob(s), out = new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function decodeImportLink(hash){
+  var m = /^#import=([zj])\.([A-Za-z0-9_-]+)$/.exec(hash||"");
+  if(!m) return Promise.resolve(null);
+  var bytes = b64urlBytes(m[2]);
+  if(m[1]==="j") return Promise.resolve(JSON.parse(new TextDecoder().decode(bytes)));
+  if(typeof DecompressionStream==="undefined") return Promise.reject(new Error("This browser can't unpack the link. Open it in Chrome."));
+  var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+  return new Response(stream).text().then(function(t){ return JSON.parse(t); });
+}
+function importFromLink(){
+  var hash = location.hash;
+  if(hash.indexOf("#import=")!==0) return;
+  try{ history.replaceState(null, "", location.pathname + location.search); }catch(e){}
+  decodeImportLink(hash).then(function(data){
+    if(!data) return;
+    data.mergeOnly = true;
+    applyBackupData(data, null, true);
+  }).catch(function(err){
+    appAlert("Couldn't read the data in that link"+(err && err.message ? ": "+err.message : "")+". Try opening the piece again.");
+  });
 }
 
 function readLists(){
