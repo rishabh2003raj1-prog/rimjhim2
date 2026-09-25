@@ -60,6 +60,13 @@ npm run dev     # http://localhost:8787
 
 Tap the outlet name at the top of the app to switch outlets, add a new one, or rename the current one. Each outlet keeps its own books: sales, purchases, expenses, stock, staff, cash and reports. The outlet list is shared, so both phones see the same outlets. The switcher also shows each outlet's figures for the current month, and a total across all outlets.
 
+## Monthly bills
+
+Records → **Bills** shows one month's rent, electricity, other monthly costs and each person's salary: the amount for that month, every payment made for it (tap one to edit it, 📅 to see that day on the calendar), and what is still to pay.
+- **Edit amount** changes a bill for that month only (e.g. this month's electricity bill) or from that month onward (e.g. a new rent).
+- **Edit salary** changes a salary for that month only or from that month onward (a raise), plus the joining and leaving dates. Earlier months keep their old salary. A salary changed in the staff profile applies from the current month.
+- The Calendar and the Bills tab always show the same month. Under the calendar is a summary of that month's bills; purple dots mark days a bill or salary was paid. The Dashboard's fixed cost card has a button to open that month's bills.
+
 ## Staff salary
 
 Staff → **Salary** shows each person's salary for a month:

@@ -176,6 +176,26 @@
   .attbtn.on.present{background:var(--teal-dk);color:#fff;border-color:var(--teal-dk);}
   .attbtn.on.half{background:var(--mustard);color:#fff;border-color:var(--mustard);}
   .attbtn.on.absent{background:var(--brick);color:#fff;border-color:var(--brick);}
+  .billitem{padding:10px 0 12px;border-bottom:1px solid var(--line);}
+  .billitem:last-of-type{border-bottom:0;}
+  .billtop{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;}
+  .billtop>div{min-width:0;}
+  .billtop>div>b{font-size:15px;}
+  .billtop span{display:block;font-size:12.5px;color:var(--soft);margin-top:3px;line-height:1.4;}
+  .billtop i{font-style:normal;color:var(--brick);}
+  .billtop span.pill{display:inline-block;margin:0 0 0 6px;vertical-align:2px;}
+  .bpamt{flex:0 0 auto;font:inherit;font-size:12.5px;font-weight:600;padding:7px 11px;border-radius:9px;border:1px solid var(--line);background:#fff;color:var(--ink);}
+  .billpays{margin:8px 0 6px;border-left:3px solid var(--line);padding-left:8px;}
+  .billpay{display:flex;gap:6px;align-items:stretch;margin:4px 0;}
+  .bpedit{flex:1;text-align:left;font:inherit;font-size:12.5px;padding:7px 9px;border-radius:9px;border:1px solid var(--line);background:#FBFAF4;color:var(--ink);display:flex;flex-wrap:wrap;gap:2px 4px;align-items:center;}
+  .bphint{margin-left:auto;font-size:11px;color:var(--teal);font-weight:600;}
+  .bpcal{flex:0 0 40px;font-size:15px;border-radius:9px;border:1px solid var(--line);background:#fff;}
+  .billnone{font-size:12.5px;color:var(--soft);margin:8px 0 6px;}
+  .billbtns{display:flex;gap:8px;}
+  .billbtns .btn-additem{flex:1;margin-top:0;}
+  .bpadd{margin-top:4px;}
+  .calbills{margin:12px 0 4px;}
+  .calbills .psrow{cursor:pointer;}
   .fcrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
   .fcrow:last-of-type{border-bottom:0;}
   .fcname{flex:1;min-width:0;} .fcname b{display:block;font-size:14px;}
@@ -426,7 +446,7 @@
       </div>
 
       <div class="card">
-        <h3>Expenses breakdown</h3>
+        <h3>Expenses breakdown <span class="muted">· paid in this range · % of sales</span></h3>
         <div id="expBreak"></div>
       </div>
 
@@ -458,6 +478,7 @@
         <button id="calNext">›</button>
       </div>
       <div class="calgrid" id="calGrid"></div>
+      <div class="card calbills" id="calBills"></div>
       <div class="daypanel" id="dayPanel"></div>
     </div>
 
@@ -471,7 +492,7 @@
         <button data-r="purchases">Purch.</button>
         <button data-r="investments">Invest</button>
         <button data-r="expenses">Expense</button>
-        <button data-r="fixed">Fixed cost</button>
+        <button data-r="fixed">Bills</button>
         <button data-r="customers">Customers</button>
         <button data-r="assets">Assets</button>
         <button data-r="vendors">Vendors</button>
@@ -1806,9 +1827,38 @@ function fixedPlanFor(mKey){
 function plannedFixed(mKey){
   mKey = mKey || fmtDate(new Date()).slice(0,7);
   var plan = fixedPlanFor(mKey), pf = plan ? plan.costs : {};
+  var one = (settings.fixedCostMonths && settings.fixedCostMonths[mKey]) || {};
   var out = {};
-  FIXED_CATS.forEach(function(c){ out[c] = +pf[c] || 0; });
+  FIXED_CATS.forEach(function(c){ out[c] = one[c]!==undefined && one[c]!==null ? (+one[c] || 0) : (+pf[c] || 0); });
   return out;
+}
+// A different amount for one month only (e.g. a bigger electricity bill in May).
+function fixedIsOneOff(mKey, cat){
+  var one = settings.fixedCostMonths && settings.fixedCostMonths[mKey];
+  return !!(one && one[cat]!==undefined && one[cat]!==null);
+}
+
+// Salary can change over time: a raise from a month onward (salaryHistory) or a
+// different amount for one month only (salaryMonths). Without either, st.salary.
+function salaryAt(st, mKey){
+  if(st.salaryMonths && st.salaryMonths[mKey]!==undefined && st.salaryMonths[mKey]!==null) return +st.salaryMonths[mKey] || 0;
+  var h = Array.isArray(st.salaryHistory) ? st.salaryHistory : [];
+  if(!h.length) return +st.salary || 0;
+  var v = null;
+  h.slice().sort(function(a,b){ return a.from.localeCompare(b.from); }).forEach(function(e){ if(e.from <= mKey) v = +e.salary || 0; });
+  if(v===null) v = +h.slice().sort(function(a,b){ return a.from.localeCompare(b.from); })[0].salary || 0;
+  return v;
+}
+function salaryIsOneOff(st, mKey){ return !!(st.salaryMonths && st.salaryMonths[mKey]!==undefined && st.salaryMonths[mKey]!==null); }
+// Record a salary for mKey onward (keeps earlier months at their old salary).
+function setSalaryFrom(st, mKey, amount){
+  var h = Array.isArray(st.salaryHistory) ? st.salaryHistory.slice() : [];
+  if(!h.length) h.push({ from: "0000-00", salary: +st.salary || 0 });
+  h = h.filter(function(e){ return e.from !== mKey; });
+  h.push({ from: mKey, salary: amount });
+  st.salaryHistory = h.sort(function(a,b){ return a.from.localeCompare(b.from); });
+  if(st.salaryMonths) delete st.salaryMonths[mKey];
+  st.salary = salaryAt(st, fmtDate(new Date()).slice(0,7));
 }
 
 // Share of a month a staff member was employed: nothing before joining or after
@@ -1832,7 +1882,7 @@ function payFactor(st, mKey){
   return Math.min(1, sh.days / 30);
 }
 function staffPlanFor(st, mKey){
-  return r2(((+st.salary||0) + allowanceTotal(st)) * payFactor(st, mKey));
+  return r2((salaryAt(st, mKey) + allowanceTotal(st)) * payFactor(st, mKey));
 }
 function rupeeP(n){
   n = r2(n);
@@ -1927,9 +1977,9 @@ function renderFixedCosts(dateList){
     }
   }
 
-  rows += '<button class="btn-additem" id="fc_edit" style="margin-top:10px;">Set monthly fixed costs</button>';
+  rows += '<button class="btn-additem" id="fc_edit" style="margin-top:10px;">Edit bills &amp; salary for '+esc(monthLabel(mKey))+'</button>';
   el.innerHTML = rows;
-  document.getElementById("fc_edit").addEventListener("click", openFixedCostForm);
+  document.getElementById("fc_edit").addEventListener("click", function(){ openBills(mKey); });
 }
 
 var fcMonth = fmtDate(new Date()).slice(0,7);
@@ -1991,26 +2041,46 @@ function renderFixedView(){
     '<div class="kpi"><div class="lbl">Still to pay</div><div class="val '+(sm.due>0?"neg":"pos")+'">'+rupee(sm.due)+'</div><div class="sub2">&nbsp;</div></div>'+
     '</div>';
 
+  // Each payment made FOR this month; tap to edit it, 📅 to see that day on the calendar.
+  function payRows(list){
+    return list.length ? '<div class="billpays">'+list.map(function(x){
+      var pp = payerIsPersonal(x.paidBy);
+      return '<div class="billpay"><button class="bpedit" data-bpx="'+esc(x.id)+'"><b>'+rupeeP(expAmt(x))+'</b> · '+fmtD(x.date)+' · '+esc(x.mode||"")+
+             (pp?' · '+esc(payerPartner(x.paidBy))+' (own)':'')+(x.date.slice(0,7)!==fcMonth?' <span class="pill">paid in '+esc(monthLabel(x.date.slice(0,7)))+'</span>':'')+
+             '<span class="bphint">Edit</span></button><button class="bpcal" data-bpcal="'+esc(x.date)+'" aria-label="Show on calendar">📅</button></div>';
+    }).join("")+'</div>' : '<div class="billnone">No payment recorded for '+esc(monthLabel(fcMonth))+'.</div>';
+  }
+  function billPill(planned, paid, due){
+    return planned===0 && paid===0 ? '<span class="pill">not set</span>' : due<=0 ? '<span class="pill ok">paid</span>'
+         : paid>0 ? '<span class="pill bad">part paid</span>' : '<span class="pill bad">due</span>';
+  }
+
   html += '<div class="card" style="margin-bottom:12px;"><h3>Rent, bills &amp; overheads</h3>';
   sm.rows.forEach(function(r){
-    var st = r.planned===0 && r.paid===0 ? '<span class="pill">not set</span>'
-           : r.due<=0 ? '<span class="pill ok">paid</span>'
-           : r.paid>0 ? '<span class="pill bad">part paid</span>' : '<span class="pill bad">due</span>';
-    html += '<div class="fcrow"><div class="fcname"><b>'+esc(r.name)+'</b><span>'+rupee(r.paid)+' paid of '+rupee(r.planned)+' '+st+'</span></div>'+
-            (r.due>0 ? '<button class="btn-additem fcpay" data-fcpay="'+esc(r.name)+'" data-amt="'+Math.round(r.due)+'">Pay '+rupee(r.due)+'</button>' : '')+'</div>';
+    var pays = expenses.filter(function(x){ return x.category===r.name && expenseMonth(x)===fcMonth; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+    if(r.planned===0 && r.paid===0 && r.name!=="Rent" && r.name!=="Electricity") return;
+    html += '<div class="billitem"><div class="billtop"><div><b>'+esc(r.name)+'</b> '+billPill(r.planned, r.paid, r.due)+
+            '<span>'+rupee(r.planned)+' for '+esc(monthLabel(fcMonth))+(fixedIsOneOff(fcMonth, r.name)?' <i>(this month only)</i>':'')+' · '+rupee(r.paid)+' paid</span></div>'+
+            '<button class="bpamt" data-bamt="'+esc(r.name)+'">Edit amount</button></div>'+
+            payRows(pays)+
+            '<button class="btn-additem bpadd" data-fcpay="'+esc(r.name)+'" data-amt="'+Math.round(Math.max(0,r.due))+'">+ '+(r.due>0?'Pay '+rupee(r.due):'Add payment')+'</button></div>';
   });
   var pl = fixedPlanFor(fcMonth);
   html += '<div class="backupnote" style="margin:8px 0 0;">'+(pl ? 'Amounts in use since '+parseDate(pl.from+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'.' : 'No amounts set for this month yet.')+'</div>';
-  html += '<button class="btn-additem" id="fc_setup" style="margin-top:10px;">Change amounts from this month / add an item</button></div>';
+  html += '<button class="btn-additem" id="fc_setup" style="margin-top:10px;">Change all amounts / add an item</button></div>';
 
   html += '<div class="card" style="margin-bottom:12px;"><h3>Staff salary &amp; allowances</h3>';
   if(!sm.staffRows.length) html += '<div class="backupnote" style="margin:0;">'+(staff.length ? 'Nobody was employed this month (going by joining dates in the Staff tab).' : 'No staff added yet (Staff tab).')+'</div>';
   sm.staffRows.forEach(function(r){
-    var st = r.planned===0 && r.paid===0 ? '<span class="pill">no salary set</span>' : r.due<=0 ? '<span class="pill ok">paid</span>' : r.paid>0 ? '<span class="pill bad">part paid</span>' : '<span class="pill bad">due</span>';
-    html += '<div class="fcrow"><div class="fcname"><b>'+esc(r.st.name)+'</b>'+
-            '<span>'+rupee(r.paid)+' paid of '+rupee(r.planned)+' '+st+'</span>'+
-            '<span>Salary '+rupee(r.st.salary||0)+(allowanceTotal(r.st)?' + '+rupee(allowanceTotal(r.st))+' allowances':'')+' · '+esc(r.basis)+'</span></div>'+
-            (r.due>0 ? '<button class="btn-additem fcpay" data-fcstaff="'+r.st.id+'">Pay '+rupee(r.due)+'</button>' : '')+'</div>';
+    var sal = salaryFor(r.st, fcMonth);
+    html += '<div class="billitem"><div class="billtop"><div><b>'+esc(r.st.name)+'</b> '+billPill(r.planned, r.paid, r.due)+
+            '<span>Salary '+rupeeP(sal.monthly)+'/month'+(salaryIsOneOff(r.st, fcMonth)?' <i>(this month only)</i>':'')+(allowanceTotal(r.st)?' + '+rupee(allowanceTotal(r.st))+' allowances':'')+'</span>'+
+            '<span>'+esc(r.basis)+'</span>'+
+            '<span>Due '+rupeeP(r.planned)+' · paid '+rupeeP(r.paid)+(r.due>0?' · <b class="bad">'+rupeeP(r.due)+' left</b>':'')+'</span></div>'+
+            '<button class="bpamt" data-bsal="'+r.st.id+'">Edit salary</button></div>'+
+            payRows(sal.pays)+
+            '<div class="billbtns"><button class="btn-additem" data-fcstaff="'+r.st.id+'">+ '+(r.due>0?'Pay '+rupeeP(r.due):'Add payment')+'</button>'+
+            '<button class="btn-additem" data-bsalview="'+r.st.id+'">Salary details</button></div></div>';
   });
   html += '</div>';
 
@@ -2037,14 +2107,34 @@ function renderFixedView(){
   html += '</tbody></table></div></div>';
 
   el.innerHTML = html;
-  function shift(n){ fcMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderFixedView(); updateRecordsTotal(); }
+  function shift(n){ setBillsMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderFixedView(); renderCalendar(); updateRecordsTotal(); }
   document.getElementById("fcPrev").addEventListener("click", function(){ shift(-1); });
   document.getElementById("fcNext").addEventListener("click", function(){ shift(1); });
   document.getElementById("fc_setup").addEventListener("click", openFixedCostForm);
+  Array.prototype.forEach.call(el.querySelectorAll("[data-bpx]"), function(b){
+    b.addEventListener("click", function(){
+      var x = expenses.find(function(e){ return e.id===b.getAttribute("data-bpx"); });
+      if(x) openForm("expense", x, x.date);
+    });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-bpcal]"), function(b){
+    b.addEventListener("click", function(){ openCalendarOn(b.getAttribute("data-bpcal")); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-bamt]"), function(b){
+    b.addEventListener("click", function(){ openBillAmount(b.getAttribute("data-bamt"), fcMonth); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-bsal]"), function(b){
+    b.addEventListener("click", function(){ var st = staffById(b.getAttribute("data-bsal")); if(st) openSalaryAmount(st, fcMonth); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-bsalview]"), function(b){
+    b.addEventListener("click", function(){
+      salMonth = fcMonth; showView("staff"); switchStaffSub("salary");
+    });
+  });
   Array.prototype.forEach.call(el.querySelectorAll("[data-fcpay]"), function(b){
     b.addEventListener("click", function(){
       var cat = b.getAttribute("data-fcpay");
-      openForm("expense", null, fmtDate(new Date()), { category:cat, amount:+b.getAttribute("data-amt"), description: cat+" - "+monthLabel(fcMonth) });
+      openForm("expense", null, billDefaultDate(fcMonth), { category:cat, amount:+b.getAttribute("data-amt")||"", description: cat+" - "+monthLabel(fcMonth) });
     });
   });
   Array.prototype.forEach.call(el.querySelectorAll("[data-fcstaff]"), function(b){
@@ -2054,6 +2144,99 @@ function renderFixedView(){
     });
   });
   if(recSub==="fixed") updateRecordsTotal();
+}
+
+// The Monthly bills tab and the Calendar always show the same month.
+function setBillsMonth(mKey){
+  fcMonth = mKey;
+  calCursor = new Date(+mKey.slice(0,4), +mKey.slice(5,7)-1, 1);
+  if(selectedDate.slice(0,7)!==mKey) selectedDate = billDefaultDate(mKey);
+}
+function billDefaultDate(mKey){
+  var today = fmtDate(new Date());
+  if(today.slice(0,7)===mKey) return today;
+  if(today.slice(0,7) < mKey) return mKey+"-01";
+  return mKey+"-"+String(daysInMonthOf(mKey)).padStart(2,"0");
+}
+function openBills(mKey){
+  setBillsMonth(mKey || fmtDate(new Date()).slice(0,7));
+  showView("records"); switchRecordsSub("fixed"); renderFixedView(); renderCalendar();
+  window.scrollTo(0,0);
+}
+function openCalendarOn(dateStr){
+  selectedDate = dateStr; calCursor = parseDate(dateStr.slice(0,7)+"-01"); fcMonth = dateStr.slice(0,7);
+  showView("calendar"); renderCalendar(); renderDayPanel();
+  window.scrollTo(0,0);
+}
+
+// Change one bill's amount: for this month only, or from this month onward.
+function openBillAmount(cat, mKey){
+  var cur = plannedFixed(mKey)[cat] || 0, oneOff = fixedIsOneOff(mKey, cat);
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+esc(cat)+' · '+esc(monthLabel(mKey))+'</h2>';
+  html += '<div class="field"><label>Amount (₹)</label><input type="number" inputmode="decimal" id="ba_amt" value="'+(cur||"")+'"></div>';
+  html += '<div class="field"><label>Applies to</label><select id="ba_scope">'+
+          '<option value="on"'+(oneOff?'':' selected')+'>'+esc(monthLabel(mKey))+' and the months after</option>'+
+          '<option value="one"'+(oneOff?' selected':'')+'>Only '+esc(monthLabel(mKey))+'</option></select></div>';
+  html += '<div class="backupnote">Earlier months keep their own amounts. Use "only this month" for a bill that changes every month, like electricity.</div>';
+  html += '<div class="err" id="ba_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ba_cancel">Cancel</button><button class="btn-save" id="ba_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("ba_cancel").addEventListener("click", closeForm);
+  document.getElementById("ba_save").addEventListener("click", function(){
+    var raw = document.getElementById("ba_amt").value, v = raw==="" ? 0 : parseFloat(raw);
+    if(isNaN(v) || v<0){ var e = document.getElementById("ba_err"); e.textContent = "Enter a valid amount."; e.style.display = "block"; return; }
+    var months = Object.assign({}, settings.fixedCostMonths || {});
+    if(document.getElementById("ba_scope").value==="one"){
+      months[mKey] = Object.assign({}, months[mKey] || {}); months[mKey][cat] = v;
+    } else {
+      if(months[mKey]){ months[mKey] = Object.assign({}, months[mKey]); delete months[mKey][cat]; if(!Object.keys(months[mKey]).length) delete months[mKey]; }
+      var plan = fixedPlanFor(mKey), costs = Object.assign({}, plan ? plan.costs : {});
+      if(v>0) costs[cat] = v; else delete costs[cat];
+      var hist = fixedCostPlans().filter(function(p){ return p.from!==mKey; }).map(function(p){ return { from:p.from, costs:p.costs }; });
+      hist.push({ from:mKey, costs:costs });
+      settings.fixedCostHistory = hist.sort(function(a,b){ return a.from.localeCompare(b.from); });
+    }
+    settings.fixedCostMonths = months;
+    settings.fixedCosts = plannedFixed(fmtDate(new Date()).slice(0,7));
+    saveSettings(); closeForm(); renderAll();
+  });
+}
+
+// Change a person's salary: for this month only, or from this month onward.
+function openSalaryAmount(st, mKey){
+  var cur = salaryAt(st, mKey), oneOff = salaryIsOneOff(st, mKey);
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+esc(st.name)+' · '+esc(monthLabel(mKey))+'</h2>';
+  html += '<div class="field"><label>Monthly salary (₹, for 30 days)</label><input type="number" inputmode="decimal" id="sa_amt" value="'+(cur||"")+'"></div>';
+  html += '<div class="field"><label>Applies to</label><select id="sa_scope">'+
+          '<option value="on"'+(oneOff?'':' selected')+'>'+esc(monthLabel(mKey))+' and the months after</option>'+
+          '<option value="one"'+(oneOff?' selected':'')+'>Only '+esc(monthLabel(mKey))+'</option></select></div>';
+  html += '<div class="field two"><div><label>Joined on</label><input type="date" id="sa_join" value="'+esc(st.joinDate||"")+'"></div>'+
+          '<div><label>Left on (if left)</label><input type="date" id="sa_left" value="'+esc(st.status==="Left"?(st.leftDate||""):"")+'"></div></div>';
+  html += '<div class="backupnote">Salary is counted only from the joining date. Earlier months keep their own salary. Leave and absences come from the attendance calendar (Staff → Attend.).</div>';
+  html += '<div class="err" id="sa_err"></div><div class="sheetbtns"><button class="btn-cancel" id="sa_cancel">Cancel</button><button class="btn-save" id="sa_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("sa_cancel").addEventListener("click", closeForm);
+  document.getElementById("sa_save").addEventListener("click", function(){
+    var v = parseFloat(document.getElementById("sa_amt").value);
+    if(isNaN(v) || v<0){ var e = document.getElementById("sa_err"); e.textContent = "Enter the monthly salary."; e.style.display = "block"; return; }
+    var idx = staff.findIndex(function(x){ return x.id===st.id; });
+    if(idx<0){ closeForm(); return; }
+    var rec = Object.assign({}, staff[idx]);
+    if(document.getElementById("sa_scope").value==="one"){
+      rec.salaryMonths = Object.assign({}, rec.salaryMonths || {}); rec.salaryMonths[mKey] = v;
+    } else {
+      if(rec.salaryMonths){ rec.salaryMonths = Object.assign({}, rec.salaryMonths); }
+      setSalaryFrom(rec, mKey, v);
+    }
+    var j = document.getElementById("sa_join").value; if(j) rec.joinDate = j;
+    var l = document.getElementById("sa_left").value;
+    if(l){ rec.status = "Left"; rec.leftDate = l; } else if(rec.status==="Left" && !l){ rec.status = "Active"; rec.leftDate = ""; }
+    staff[idx] = rec;
+    saveStaff(); closeForm(); renderAll();
+  });
 }
 
 function openFixedCostForm(){
@@ -2240,7 +2423,10 @@ function renderCalendar(){
   var salesByDate = {}, purchByDate = {}, otherByDate = {};
   sales.forEach(function(s){ salesByDate[s.date]=true; });
   purchases.forEach(function(p){ purchByDate[p.date]=true; });
-  expenses.forEach(function(x){ otherByDate[x.date]=true; });
+  var billByDate = {};
+  expenses.forEach(function(x){
+    if(FIXED_CATS.indexOf(x.category)>=0 || STAFF_CATS.indexOf(x.category)>=0) billByDate[x.date]=true; else otherByDate[x.date]=true;
+  });
   var serviceByDate = {};
   assets.forEach(function(a){ if(a.nextService) serviceByDate[a.nextService] = true; });
   var cashByDate = {};
@@ -2257,14 +2443,36 @@ function renderCalendar(){
     if(salesByDate[ds]) dots += '<i style="background:#1F5C52"></i>';
     if(purchByDate[ds]) dots += '<i style="background:#A6402D"></i>';
     if(otherByDate[ds]) dots += '<i style="background:#CE9A2E"></i>';
+    if(billByDate[ds]) dots += '<i style="background:#6A4C93"></i>';
     if(cashByDate[ds]) dots += '<i style="background:#546E7A"></i>';
     if(serviceByDate[ds]) dots += '<i style="background:#EF6C00"></i>';
     html += '<div class="'+cls+'" data-date="'+ds+'">'+day+'<span class="dots">'+dots+'</span></div>';
   }
   grid.innerHTML = html;
+  renderCalBills(fmtDate(new Date(y,m,1)).slice(0,7));
   Array.prototype.forEach.call(grid.querySelectorAll(".daycell[data-date]"), function(cell){
     cell.addEventListener("click", function(){ selectedDate = cell.getAttribute("data-date"); renderCalendar(); renderDayPanel(); });
   });
+}
+
+// This month's rent, bills and salaries under the calendar (purple dots = bill payments).
+function renderCalBills(mKey){
+  var el = document.getElementById("calBills");
+  if(!el) return;
+  var sm = fixedMonthSummary(mKey), rows = "";
+  sm.rows.forEach(function(r){
+    if(r.planned===0 && r.paid===0) return;
+    rows += '<div class="psrow" data-cbm="1"><span>'+esc(r.name)+'</span><b class="'+(r.due>0?"bad":"ok")+'">'+rupee(r.paid)+' of '+rupee(r.planned)+'</b></div>';
+  });
+  sm.staffRows.forEach(function(r){
+    rows += '<div class="psrow" data-cbm="1"><span>'+esc(r.st.name)+' (salary)</span><b class="'+(r.due>0?"bad":"ok")+'">'+rupeeP(r.paid)+' of '+rupeeP(r.planned)+'</b></div>';
+  });
+  el.innerHTML = '<h3><i style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#6A4C93;margin-right:6px;"></i>Bills &amp; salary · '+esc(monthLabel(mKey))+'</h3>'+
+    (rows || '<div class="backupnote" style="margin:0;">Nothing set for this month.</div>')+
+    '<div class="psrow"><span><b>Still to pay</b></span><b class="'+(sm.due>0?"bad":"ok")+'">'+rupee(sm.due)+'</b></div>'+
+    '<button class="btn-additem" id="cb_open" style="margin-top:8px;">Edit bills &amp; salary for '+esc(monthLabel(mKey))+'</button>';
+  document.getElementById("cb_open").addEventListener("click", function(){ openBills(mKey); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-cbm]"), function(r){ r.addEventListener("click", function(){ openBills(mKey); }); });
 }
 
 function renderDayPanel(){
@@ -2405,7 +2613,7 @@ function switchRecordsSub(name){
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
   var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Fixed cost per month", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -6541,7 +6749,7 @@ function roundHalf(n){ return Math.round(n*2)/2; }
 function salaryFor(st, mKey){
   var days = daysInMonthOf(mKey), sh = staffMonthShare(st, mKey);
   var today = fmtDate(new Date()), cur = mKey === today.slice(0,7), future = mKey > today.slice(0,7);
-  var rate = (+st.salary||0) / 30;
+  var monthly = salaryAt(st, mKey), rate = monthly / 30;
   var fullMonth = sh.days >= days, factor = payFactor(st, mKey);
   var absent = 0, leave = 0, half = 0, present = 0, marked = 0;
   attendance.forEach(function(a){
@@ -6558,7 +6766,7 @@ function salaryFor(st, mKey){
   var allowedLeave = fullMonth ? paidLeavePerMonth() : 0;
   var unpaidDays = Math.max(0, offDays - allowedLeave);
   var unusedLeave = Math.max(0, allowedLeave - offDays);
-  var base = r2((+st.salary||0) * factor);
+  var base = r2(monthly * factor);
   var deduction = r2(unpaidDays * rate);
   var extraLeave = r2(unusedLeave * rate);
   var rec = payrollFor(st.id, mKey);
@@ -6587,7 +6795,7 @@ function salaryFor(st, mKey){
   var balance = r2(net - paid);
   if(Math.abs(balance) < 0.5) balance = 0;   // paise left over from rounding a payment
   var status = sh.days===0 ? "none" : (rec && rec.settled) ? "settled" : balance<=0 && paid>0 ? "paid" : paid>0 ? "part" : "due";
-  return { st:st, month:mKey, days:days, share:sh, employedDays:sh.days, rate:r2(rate), factor:factor, fullMonth:fullMonth,
+  return { st:st, month:mKey, monthly:monthly, days:days, share:sh, employedDays:sh.days, rate:r2(rate), factor:factor, fullMonth:fullMonth,
            present:present, half:half, absent:absent, leave:leave, marked:marked, unmarked: Math.max(0, sh.days - marked),
            offDays:offDays, allowedLeave:allowedLeave, unpaidDays:unpaidDays, unusedLeave:unusedLeave,
            base:base, deduction:deduction, extraLeave:extraLeave, extraPaid:extraPaid, waived:waived, choice:choice,
@@ -6724,7 +6932,7 @@ function renderSalaryView(){
     var st = s.st, gw = goodwillFor(st);
     var pill = s.status==="settled" ? '<span class="pill ok">settled</span>' : s.status==="paid" ? '<span class="pill ok">paid</span>' :
                s.status==="part" ? '<span class="pill bad">part paid</span>' : s.net>0 ? '<span class="pill bad">due</span>' : '';
-    html += '<div class="salcard"><div class="salhead"><div><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+' · '+rupeeP(st.salary||0)+'/month</span></div>'+pill+'</div>';
+    html += '<div class="salcard"><div class="salhead"><div><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+' · '+rupeeP(s.monthly)+'/month</span></div>'+pill+'</div>';
     html += '<div class="psrow"><span>Days employed</span><b>'+s.employedDays+' of '+s.days+'</b></div>';
     html += '<div class="psrow"><span>Salary</span><b>'+(s.fullMonth ? rupeeP(s.base)+' <span class="muted">full month</span>' : s.employedDays+' days × '+rupeeP(s.rate)+' = '+rupeeP(s.base))+'</b></div>';
     html += '<div class="psrow"><span>Leave / absent</span><b>'+fmtQty(s.offDays)+' day'+(s.offDays!==1?'s':'')+
@@ -6932,7 +7140,7 @@ function openBonusForm(st){
 // ---- salary slip ----
 function slipLines(s){
   var st = s.st, L = [];
-  L.push(["Monthly salary", rupeeP(st.salary||0)]);
+  L.push(["Monthly salary", rupeeP(s.monthly)]);
   L.push(["Daily rate (salary ÷ 30)", rupeeP(s.rate)]);
   L.push(["Days in month", String(s.days)]);
   L.push(["Days employed", String(s.employedDays)+(s.share.from && s.share.from>s.month+"-01" ? " (joined "+fmtD(s.share.from)+")" : "")]);
@@ -7434,7 +7642,7 @@ function openStaffForm(staffId){
   html += '<div class="field two"><div><label>Joined on</label><input type="date" id="s_join" value="'+(s&&s.joinDate?s.joinDate:fmtDate(new Date()))+'"></div>';
   html += '<div><label>Status</label><select id="s_status"><option '+(s&&s.status==="Active"?"selected":"")+'>Active</option><option '+(s&&s.status==="Left"?"selected":"")+'>Left</option></select></div></div>';
   html += '<div class="field" id="s_leftwrap" style="display:'+(s&&s.status==="Left"?"block":"none")+';"><label>Left on</label><input type="date" id="s_left" value="'+(s&&s.leftDate?s.leftDate:fmtDate(new Date()))+'"></div>';
-  html += '<div class="backupnote" style="margin-top:-4px;">Salary is only counted from the joining date (and up to the leaving date) in the Fixed cost tab.</div>';
+  html += '<div class="backupnote" style="margin-top:-4px;">Salary is only counted from the joining date (and up to the leaving date).'+(s?' A new salary typed here applies from this month on; earlier months keep the old one. To change a past month, use Records → Bills.':'')+'</div>';
   html += '<div class="field"><label>UPI / bank (optional)</label><input type="text" id="s_upi" value="'+esc(s?s.upi:"")+'"></div>';
   html += '<div class="err" id="s_err"></div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="s_cancel">Cancel</button>';
@@ -7476,7 +7684,11 @@ function openStaffForm(staffId){
                 status:document.getElementById("s_status").value,
                 leftDate: document.getElementById("s_status").value==="Left" ? (document.getElementById("s_left").value || fmtDate(new Date())) : "",
                 upi:document.getElementById("s_upi").value.trim() };
-    if(s){ staff[staff.findIndex(function(x){return x.id===s.id;})] = rec; }
+    if(s){
+      var merged = Object.assign({}, s, rec);
+      if(sal !== (+s.salary||0)){ merged.salary = s.salary; setSalaryFrom(merged, fmtDate(new Date()).slice(0,7), sal); }
+      staff[staff.findIndex(function(x){return x.id===s.id;})] = merged;
+    }
     else { staff.push(rec); }
     saveStaff(); closeForm(); renderAll();
   });
@@ -8386,8 +8598,9 @@ document.addEventListener("DOMContentLoaded", function(){
   document.getElementById("fabAdd").addEventListener("click", openAddChooser);
   document.getElementById("sheetBg").addEventListener("click", function(e){ if(e.target===document.getElementById("sheetBg")) closeForm(); });
 
-  document.getElementById("calPrev").addEventListener("click", function(){ calCursor.setMonth(calCursor.getMonth()-1); renderCalendar(); });
-  document.getElementById("calNext").addEventListener("click", function(){ calCursor.setMonth(calCursor.getMonth()+1); renderCalendar(); });
+  function calShift(n){ calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()+n, 1); fcMonth = fmtDate(calCursor).slice(0,7); renderCalendar(); renderFixedView(); }
+  document.getElementById("calPrev").addEventListener("click", function(){ calShift(-1); });
+  document.getElementById("calNext").addEventListener("click", function(){ calShift(1); });
 
   document.getElementById("noteAddBtn").addEventListener("click", addNoteLines);
   document.getElementById("noteProcessBtn").addEventListener("click", processNotes);
