@@ -173,6 +173,32 @@
   .attbtn.on.present{background:var(--teal-dk);color:#fff;border-color:var(--teal-dk);}
   .attbtn.on.half{background:var(--mustard);color:#fff;border-color:var(--mustard);}
   .attbtn.on.absent{background:var(--brick);color:#fff;border-color:var(--brick);}
+  .fcrow{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);}
+  .fcrow:last-of-type{border-bottom:0;}
+  .fcname{flex:1;min-width:0;} .fcname b{display:block;font-size:14px;}
+  .fcname > span{display:block;font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .fcname .pill{margin-left:4px;}
+  .fckpis{grid-template-columns:repeat(3,1fr) !important;}
+  .fckpis .kpi{padding:10px;} .fckpis .val{font-size:17px !important;}
+  .fcpay{width:auto !important;padding:8px 10px !important;margin:0 !important;white-space:nowrap;}
+  .attlegend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11px;color:var(--ink-soft);margin:0 0 8px;}
+  .attlegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;border:1px solid var(--line);}
+  .attmonth{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;}
+  .attmhead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;}
+  .attmhead b{font-size:15px;} .attmhead span{font-size:12px;color:var(--ink-soft);}
+  .attmstats{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:12px;color:var(--ink-soft);margin-bottom:8px;}
+  .attmstats .ok{color:var(--teal);font-weight:600;} .attmstats .bad{color:var(--brick);font-weight:600;}
+  .attcal{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;}
+  .acdow{text-align:center;font-size:10px;font-weight:600;color:var(--ink-soft);}
+  .ac{aspect-ratio:1;border:1px solid var(--line);border-radius:7px;background:var(--paper);font-family:inherit;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1;color:var(--ink);}
+  .ac span{font-size:10px;opacity:.75;} .ac b{font-size:11px;margin-top:1px;}
+  .ac-p,.attlegend .ac-p{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .ac-h,.attlegend .ac-h{background:var(--mustard);border-color:var(--mustard);color:#fff;}
+  .ac-a,.attlegend .ac-a{background:var(--brick);border-color:var(--brick);color:#fff;}
+  .ac-l,.attlegend .ac-l{background:var(--ink-soft);border-color:var(--ink-soft);color:#fff;}
+  .ac-r,.attlegend .ac-r{border:1.5px dashed var(--teal);}
+  .ac-today{outline:2px solid var(--ink);outline-offset:-1px;}
+  .ac-future{opacity:.45;}
   .attbtn.on.leave{background:var(--ink-soft);color:#fff;border-color:var(--ink-soft);}
   .taskcard{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}
   .taskcard.done{opacity:.55;}
@@ -428,6 +454,7 @@
         <button data-r="purchases">Purch.</button>
         <button data-r="investments">Invest</button>
         <button data-r="expenses">Expense</button>
+        <button data-r="fixed">Fixed cost</button>
         <button data-r="customers">Customers</button>
         <button data-r="assets">Assets</button>
         <button data-r="vendors">Vendors</button>
@@ -440,6 +467,7 @@
       <div id="purchList" class="reclist" style="display:none;"></div>
       <div id="investList" class="reclist" style="display:none;"></div>
       <div id="expenseList" class="reclist" style="display:none;"></div>
+      <div id="fixedView" class="reclist" style="display:none;"></div>
       <div id="customersView" class="reclist" style="display:none;"></div>
       <div id="assetsView" class="reclist" style="display:none;"></div>
       <div id="vendorsView" class="reclist" style="display:none;"></div>
@@ -627,7 +655,16 @@ var PARTNERS = [];
 var INVEST_PURPOSES = ["Cafe purchase price","Renovation / interiors","Equipment / furniture","Rent deposit","Working capital","Profit withdrawal","Personal use","Other"];
 var EXP_CATS = ["Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance","Rent","Electricity","Wifi / Internet","Mobile recharge","Maintenance","Other"];
 // Overheads that land every month whether or not a single cup is sold.
-var FIXED_CATS = ["Rent","Electricity","Wifi / Internet","Mobile recharge"];
+var BASE_FIXED_CATS = ["Rent","Electricity","Wifi / Internet","Mobile recharge"];
+var BASE_EXP_CATS = EXP_CATS.slice();
+var FIXED_CATS = BASE_FIXED_CATS.slice();
+// Extra monthly overheads the owner adds (gas cylinder, water, security...) behave
+// like rent: planned each month, and recorded as an expense of that name.
+function refreshCats(){
+  var extra = (settings && Array.isArray(settings.fixedExtra)) ? settings.fixedExtra.filter(function(n){ return n && BASE_EXP_CATS.indexOf(n)<0; }) : [];
+  FIXED_CATS = BASE_FIXED_CATS.concat(extra);
+  EXP_CATS = BASE_EXP_CATS.slice(0, -1).concat(extra, ["Other"]);
+}
 var STAFF_CATS = ["Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance"];
 
 function fmtDate(d){ var y=d.getFullYear(), m=String(d.getMonth()+1).padStart(2,"0"), dd=String(d.getDate()).padStart(2,"0"); return y+"-"+m+"-"+dd; }
@@ -1048,7 +1085,7 @@ function startCloud(done){
     done();
     updateSaveIndicator();
     if(pendingCount()) scheduleFlush(0);
-    setInterval(pollRemote, 20000);
+    setInterval(pollRemote, 4000); // near real time: the other phone's changes show within seconds
     document.addEventListener("visibilitychange", function(){ if(!document.hidden){ pollRemote(); if(pendingCount()) scheduleFlush(0); } });
     window.addEventListener("online", function(){ pollRemote(); scheduleFlush(0); });
     window.addEventListener("beforeunload", function(e){
@@ -1399,6 +1436,7 @@ function renderClock(){
 }
 
 function renderAll(){
+  refreshCats();
   renderDashboard();
   renderCalendar();
   renderDayPanel();
@@ -1406,6 +1444,7 @@ function renderAll(){
   renderPurchList();
   renderInvestList();
   renderExpenseList();
+  renderFixedView();
   renderCustomersView();
   renderAssetsView();
   renderVendorsView();
@@ -1674,9 +1713,19 @@ function plannedFixed(){
 function plannedStaffCost(){
   return activeStaff().reduce(function(a,st){ return a + (+st.salary||0) + allowanceTotal(st); }, 0);
 }
+// Which month a payment is FOR. "Rent - September 2026" paid on 3 Oct belongs to
+// September; without a month in the description, the payment date decides.
+var MONTH_RE = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/;
+var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+function expenseMonth(x){
+  var m = MONTH_RE.exec(x.description||"");
+  if(m) return m[2] + "-" + String(MONTH_NAMES.indexOf(m[1])+1).padStart(2,"0");
+  return monthKey(x.date||"");
+}
+function monthLabel(mKey){ return MONTH_NAMES[+mKey.slice(5,7)-1] + " " + mKey.slice(0,4); }
 function actualInMonth(cats, mKey){
   return expenses.filter(function(x){
-    return cats.indexOf(x.category)>=0 && monthKey(x.date)===mKey;
+    return cats.indexOf(x.category)>=0 && expenseMonth(x)===mKey;
   }).reduce(function(a,x){ return a+expAmt(x); },0);
 }
 function monthlyFixedTotal(){
@@ -1751,6 +1800,136 @@ function renderFixedCosts(dateList){
   document.getElementById("fc_edit").addEventListener("click", openFixedCostForm);
 }
 
+var fcMonth = fmtDate(new Date()).slice(0,7);
+
+// Everything that is due every month, for one month: planned vs paid.
+function staffPaidFor(st, mKey){
+  var byCat = {}, total = 0;
+  expenses.forEach(function(x){
+    if(STAFF_CATS.indexOf(x.category)<0) return;
+    if((x.description||"").toLowerCase().indexOf(st.name.toLowerCase())!==0) return;
+    if(expenseMonth(x)!==mKey) return;
+    byCat[x.category] = (byCat[x.category]||0) + expAmt(x); total += expAmt(x);
+  });
+  return { total: total, byCat: byCat };
+}
+function fixedMonthSummary(mKey){
+  var planned = plannedFixed(), rows = [], staffRows = [];
+  FIXED_CATS.forEach(function(c){
+    var plan = +planned[c] || 0, paid = actualInMonth([c], mKey);
+    rows.push({ name:c, planned:plan, paid:paid, due:Math.max(0, plan-paid) });
+  });
+  var isCur = mKey===fmtDate(new Date()).slice(0,7);
+  staff.filter(function(st){
+    if(st.status!=="Left") return true;
+    return staffPaidFor(st, mKey).total > 0;   // people who left still show for months they were paid
+  }).forEach(function(st){
+    var fixedPart = (+st.salary||0) + allowanceTotal(st);
+    var earned = earnedSalary(st, mKey);
+    var a = earned.a;
+    var past = mKey < fmtDate(new Date()).slice(0,7);
+    // The month's fixed cost is the full salary + allowances. Once a month is over
+    // and attendance was marked, what is owed is the salary actually earned.
+    var plan = (past && a.marked>0) ? earned.earned + allowanceTotal(st) : fixedPart;
+    var paid = staffPaidFor(st, mKey).total;
+    staffRows.push({ st:st, planned:plan, full:fixedPart, paid:paid, due:Math.max(0, plan-paid), earnedSoFar: earned.earned + allowanceTotal(st),
+                     basis: a.marked>0 ? (a.present+" of "+daysInMonthOf(mKey)+" days present"+(isCur?" so far · earned "+rupee(earned.earned)+" + allowances":"")) : "attendance not marked" });
+  });
+  var planTot = rows.reduce(function(t,r){ return t+r.planned; },0) + staffRows.reduce(function(t,r){ return t+r.planned; },0);
+  var paidTot = rows.reduce(function(t,r){ return t+r.paid; },0) + staffRows.reduce(function(t,r){ return t+r.paid; },0);
+  var partner = expenses.filter(function(x){
+    return (FIXED_CATS.indexOf(x.category)>=0 || STAFF_CATS.indexOf(x.category)>=0) && expenseMonth(x)===mKey && payerIsPersonal(x.paidBy);
+  }).reduce(function(t,x){ return t+expAmt(x); },0);
+  return { rows:rows, staffRows:staffRows, planned:planTot, paid:paidTot, due:Math.max(0, planTot-paidTot), partner:partner };
+}
+
+function renderFixedView(){
+  var el = document.getElementById("fixedView");
+  if(!el) return;
+  var sm = fixedMonthSummary(fcMonth);
+  var first = parseDate(fcMonth+"-01");
+  var html = '<div class="calhead" style="margin-bottom:10px;"><button id="fcPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
+             first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="fcNext">›</button></div>';
+
+  html += '<div class="kpis fckpis" style="margin-bottom:12px;">'+
+    '<div class="kpi"><div class="lbl">Fixed cost</div><div class="val">'+rupee(sm.planned)+'</div><div class="sub2">'+rupee(sm.planned/daysInMonthOf(fcMonth))+' a day</div></div>'+
+    '<div class="kpi"><div class="lbl">Paid</div><div class="val pos">'+rupee(sm.paid)+'</div><div class="sub2">'+(sm.partner>0?rupee(sm.partner)+' by partners':'&nbsp;')+'</div></div>'+
+    '<div class="kpi"><div class="lbl">Still to pay</div><div class="val '+(sm.due>0?"neg":"pos")+'">'+rupee(sm.due)+'</div><div class="sub2">&nbsp;</div></div>'+
+    '</div>';
+
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Rent, bills &amp; overheads</h3>';
+  sm.rows.forEach(function(r){
+    var st = r.planned===0 && r.paid===0 ? '<span class="pill">not set</span>'
+           : r.due<=0 ? '<span class="pill ok">paid</span>'
+           : r.paid>0 ? '<span class="pill bad">part paid</span>' : '<span class="pill bad">due</span>';
+    html += '<div class="fcrow"><div class="fcname"><b>'+esc(r.name)+'</b><span>'+rupee(r.paid)+' paid of '+rupee(r.planned)+' '+st+'</span></div>'+
+            (r.due>0 ? '<button class="btn-additem fcpay" data-fcpay="'+esc(r.name)+'" data-amt="'+Math.round(r.due)+'">Pay '+rupee(r.due)+'</button>' : '')+'</div>';
+  });
+  html += '<button class="btn-additem" id="fc_setup" style="margin-top:10px;">Set monthly amounts / add an item</button></div>';
+
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Staff salary &amp; allowances</h3>';
+  if(!sm.staffRows.length) html += '<div class="backupnote" style="margin:0;">No staff added yet (Staff tab).</div>';
+  sm.staffRows.forEach(function(r){
+    var st = r.planned===0 && r.paid===0 ? '<span class="pill">no salary set</span>' : r.due<=0 ? '<span class="pill ok">paid</span>' : r.paid>0 ? '<span class="pill bad">part paid</span>' : '<span class="pill bad">due</span>';
+    html += '<div class="fcrow"><div class="fcname"><b>'+esc(r.st.name)+'</b>'+
+            '<span>'+rupee(r.paid)+' paid of '+rupee(r.planned)+' '+st+'</span>'+
+            '<span>Salary '+rupee(r.st.salary||0)+(allowanceTotal(r.st)?' + '+rupee(allowanceTotal(r.st))+' allowances':'')+' · '+esc(r.basis)+'</span></div>'+
+            (r.due>0 ? '<button class="btn-additem fcpay" data-fcstaff="'+r.st.id+'">Pay '+rupee(r.due)+'</button>' : '')+'</div>';
+  });
+  html += '</div>';
+
+  // Break-even for the month
+  var mDates = datesBetween(fcMonth+"-01", fmtDate(new Date(first.getFullYear(), first.getMonth()+1, 0)));
+  var mSet = {}; mDates.forEach(function(d){ mSet[d]=true; });
+  var mSales = sales.filter(function(x){ return mSet[x.date]; }).reduce(function(a,x){ return a+saleTotal(x); },0);
+  var mPurch = purchases.filter(function(x){ return mSet[x.date]; }).reduce(function(a,x){ return a+purchTotal(x); },0);
+  var gm = mSales>0 ? (mSales-mPurch)/mSales : 0;
+  if(sm.planned>0 && gm>0.05){
+    var need = sm.planned/gm, pct = Math.min(100, Math.round(mSales/need*100));
+    html += '<div class="card" style="margin-bottom:12px;"><div class="breakeven" style="margin-top:0;"><span>To cover the fixed cost you need about</span><b>'+rupee(need)+'</b>'+
+            '<i>in sales this month at your '+Math.round(gm*100)+'% gross margin — '+rupee(mSales)+' sold so far ('+pct+'%)</i></div>'+
+            '<div class="stockbar" style="margin-top:8px;"><i style="width:'+pct+'%;background:'+(pct>=100?"#1F5C52":"#CE9A2E")+'"></i></div></div>';
+  }
+
+  // Last six months, to spot a bill creeping up.
+  html += '<div class="card"><h3>Last 6 months <span class="muted">· paid</span></h3><div class="rptablewrap"><table class="rptable"><thead><tr><th>Month</th><th>Overheads</th><th>Staff</th><th>Total</th></tr></thead><tbody>';
+  for(var i=5;i>=0;i--){
+    var mk = fmtDate(new Date(first.getFullYear(), first.getMonth()-i, 1)).slice(0,7);
+    var oh = actualInMonth(FIXED_CATS, mk), sf = actualInMonth(STAFF_CATS, mk);
+    html += '<tr><td>'+parseDate(mk+"-01").toLocaleDateString("en-IN",{month:"short",year:"2-digit"})+'</td><td>'+rupee(oh)+'</td><td>'+rupee(sf)+'</td><td><b>'+rupee(oh+sf)+'</b></td></tr>';
+  }
+  html += '</tbody></table></div></div>';
+
+  el.innerHTML = html;
+  function shift(n){ fcMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderFixedView(); updateRecordsTotal(); }
+  document.getElementById("fcPrev").addEventListener("click", function(){ shift(-1); });
+  document.getElementById("fcNext").addEventListener("click", function(){ shift(1); });
+  document.getElementById("fc_setup").addEventListener("click", openFixedCostForm);
+  Array.prototype.forEach.call(el.querySelectorAll("[data-fcpay]"), function(b){
+    b.addEventListener("click", function(){
+      var cat = b.getAttribute("data-fcpay");
+      openForm("expense", null, fmtDate(new Date()), { category:cat, amount:+b.getAttribute("data-amt"), description: cat+" - "+monthLabel(fcMonth) });
+    });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-fcstaff]"), function(b){
+    b.addEventListener("click", function(){
+      var st = staffById(b.getAttribute("data-fcstaff"));
+      if(!st) return;
+      var cb = staffCostBreakdown(st, fcMonth), done = staffPaidFor(st, fcMonth).byCat;
+      var pay = earnedSalary(st, fcMonth);
+      if(pay.a.marked===0){ pay = { earned: +st.salary||0, basis:"full month (attendance not marked)", a: pay.a }; }
+      // Only what is still unpaid for this month.
+      pay = { earned: Math.max(0, pay.earned - (done["Staff Salary"]||0)), basis: pay.basis, a: pay.a };
+      cb = { rent: Math.max(0, cb.rent-(done["Staff House Rent"]||0)), food: Math.max(0, cb.food-(done["Staff Food Allowance"]||0)),
+             travel: Math.max(0, cb.travel-(done["Staff Travel Allowance"]||0)) };
+      cb.cash = pay.earned + cb.rent + cb.food + cb.travel;
+      document.getElementById("sheetBg").classList.add("on");
+      openPaySheet(st, pay, fcMonth, cb, true);
+    });
+  });
+  if(recSub==="fixed") updateRecordsTotal();
+}
+
 function openFixedCostForm(){
   var planned = plannedFixed();
   var sheet = document.getElementById("sheet");
@@ -1759,6 +1938,10 @@ function openFixedCostForm(){
   FIXED_CATS.forEach(function(c){
     html += '<div class="field"><label>'+esc(c)+' (₹/month)</label><input type="number" inputmode="decimal" class="fcin" data-c="'+esc(c)+'" value="'+(planned[c]||"")+'"></div>';
   });
+  html += '<div class="field"><label>Add another monthly cost (e.g. Gas cylinder, Water, Security)</label><input type="text" id="fc_newname" placeholder="Name of the cost"></div>';
+  var extra = Array.isArray(settings.fixedExtra) ? settings.fixedExtra : [];
+  if(extra.length) html += '<div class="backupnote">To remove an added item, clear its amount and tick it: '+extra.map(function(n){
+    return '<label style="display:inline-flex;gap:4px;margin-right:10px;"><input type="checkbox" class="fcdel" data-c="'+esc(n)+'">'+esc(n)+'</label>'; }).join("")+'</div>';
   html += '<div class="backupnote">Staff cost is taken from each person’s salary and allowances in the Staff tab, so it is not typed here.</div>';
   html += '<div class="card" style="margin:10px 0;"><div class="psrow"><span>Staff, from the Staff tab</span><b>'+rupee(plannedStaffCost())+'</b></div></div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="fc_cancel">Cancel</button><button class="btn-save" id="fc_save">Save</button></div>';
@@ -1772,6 +1955,13 @@ function openFixedCostForm(){
       if(!isNaN(v) && v>0) fc[inp.getAttribute("data-c")] = v;
     });
     settings.fixedCosts = fc;
+    var extra = (Array.isArray(settings.fixedExtra) ? settings.fixedExtra : []).slice();
+    Array.prototype.forEach.call(sheet.querySelectorAll(".fcdel"), function(cb){
+      if(cb.checked){ var n = cb.getAttribute("data-c"); extra = extra.filter(function(x){ return x!==n; }); delete fc[n]; }
+    });
+    var nn = document.getElementById("fc_newname").value.trim();
+    if(nn && extra.indexOf(nn)<0 && BASE_EXP_CATS.indexOf(nn)<0) extra.push(nn);
+    settings.fixedExtra = extra;
     saveSettings(); closeForm(); renderAll();
   });
 }
@@ -2031,7 +2221,10 @@ function entryRow(item, type){
     var neg = item.invType==="Withdrawal";
     return '<div class="entry" data-type="investment" data-id="'+item.id+'"><div><div class="who">'+esc(item.partner)+' · '+esc(item.invType)+'</div><div class="meta">'+esc(item.purpose||"")+'</div></div><div class="amt '+(neg?"purch":"sale")+'">'+rupeeSigned(investAmt(item))+'</div></div>';
   } else {
-    return '<div class="entry" data-type="expense" data-id="'+item.id+'"><div><div class="who">'+esc(item.category)+'</div><div class="meta">'+esc(item.description||"")+' · '+item.mode+'</div></div><div class="amt purch">'+rupee(expAmt(item))+'</div></div>';
+    var pp = payerIsPersonal(item.paidBy);
+    return '<div class="entry" data-type="expense" data-id="'+item.id+'"><div><div class="who">'+esc(item.category)+'</div><div class="meta">'+esc(item.description||"")+' · '+esc(item.mode)+
+      (pp ? ' · paid by '+esc(payerPartner(item.paidBy))+' (own) '+(item.settled?'<span class="pill ok">settled</span>':'<span class="pill bad">owed</span>') : '')+
+      '</div></div><div class="amt purch">'+rupee(expAmt(item))+'</div></div>';
   }
 }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
@@ -2053,9 +2246,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Fixed cost per month", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -2066,6 +2259,7 @@ function updateRecordsTotal(){
   else if(recSub==="purchases"){ var t2=purchases.reduce(function(a,p){return a+purchTotal(p);},0); lbl.textContent = purchases.length+" entries · "+rupee(t2); }
   else if(recSub==="investments"){ var t3=investments.reduce(function(a,v){return a+investAmt(v);},0); lbl.textContent = investments.length+" entries · net "+rupeeSigned(t3); }
   else if(recSub==="expenses"){ var t4=expenses.reduce(function(a,x){return a+expAmt(x);},0); lbl.textContent = expenses.length+" entries · "+rupee(t4); }
+  else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
   else if(recSub==="cash"){ lbl.textContent = rupee(cashInHand())+" in hand · "+rupee(settings.bankBalance||0)+" bank"; }
   else if(recSub==="customers"){ var due=customers.reduce(function(a,c){return a+customerDue(c);},0);
     lbl.textContent = customers.length+" customer"+(customers.length!==1?"s":"")+(due>0?" · "+rupee(due)+" due":""); }
@@ -2097,13 +2291,19 @@ function billSettled(billId){ var b = getBill(billId); return b ? !!b.settled : 
 
 // Bills a partner paid for out of their own pocket that the cafe hasn't paid back yet.
 function pendingReimbursements(){
-  return billGroups().filter(function(g){
+  var fromBills = billGroups().filter(function(g){
     return payerIsPersonal(g.paidBy) && !billSettled(g.id);
   }).map(function(g){
     g.amount = g.lines.reduce(function(a,p){ return a+purchTotal(p); },0);
     g.partner = payerPartner(g.paidBy);
     return g;
   });
+  // Expenses (rent, bills, salaries...) a partner paid personally.
+  var fromExpenses = expenses.filter(function(x){ return payerIsPersonal(x.paidBy) && !x.settled; }).map(function(x){
+    return { id:"exp:"+x.id, date:x.date, vendor:(x.category||"Expense")+(x.description?" - "+x.description:""),
+             amount:expAmt(x), partner:payerPartner(x.paidBy), lines:[], isExpense:true };
+  });
+  return fromBills.concat(fromExpenses);
 }
 
 function owedSummary(){
@@ -2115,14 +2315,14 @@ function owedSummary(){
     return '<div class="psrow"><span>'+esc(k)+'</span><b class="owed">'+rupee(byP[k])+'</b></div>';
   }).join("");
   return '<div class="card owedcard" style="margin-bottom:14px;"><h3>Money owed to partners <span class="muted">· paid from own pocket</span></h3>'+rows+
-         '<button class="btn-additem" id="owed_view" style="margin-top:10px;">View & settle ('+pend.length+' bill'+(pend.length!==1?'s':'')+')</button></div>';
+         '<button class="btn-additem" id="owed_view" style="margin-top:10px;">View & settle ('+pend.length+' item'+(pend.length!==1?'s':'')+')</button></div>';
 }
 
 function openOwedSheet(){
   var pend = pendingReimbursements().sort(function(a,b){ return a.date.localeCompare(b.date); });
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">Money owed to partners</h2>';
-  html += '<div class="backupnote">These bills were paid by a partner from their own money, so the cafe still owes it back. Settle each one when you repay it, or count it as extra capital they put in.</div>';
+  html += '<div class="backupnote">These bills and expenses were paid by a partner from their own money, so the cafe still owes it back. Settle each one when you repay it, or count it as extra capital they put in.</div>';
   if(pend.length===0){ html += '<div class="empty">Nothing pending.</div>'; }
   else {
     html += pend.map(function(g){
@@ -2145,9 +2345,9 @@ function openSettleSheet(billId){
   if(!g) return;
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">Settle '+rupee(g.amount)+'</h2>';
-  html += '<div class="backupnote">'+esc(g.partner)+' paid this '+esc(g.vendor)+' bill on '+parseDate(g.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'. How do you want to settle it?</div>';
+  html += '<div class="backupnote">'+esc(g.partner)+' paid '+(g.isExpense?'':'this ')+esc(g.vendor)+(g.isExpense?'':' bill')+' on '+parseDate(g.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'. How do you want to settle it?</div>';
   html += '<div class="sheetbtns" style="margin-top:4px;"><button class="btn-save" id="st_cash" style="flex:1;">Cafe repaid them in cash</button></div>';
-  html += '<div class="backupnote" style="margin-top:6px;">Marks it cleared. The purchase is already counted as a cafe expense, so nothing else changes.</div>';
+  html += '<div class="backupnote" style="margin-top:6px;">Marks it cleared. It is already counted as a cafe cost, so nothing else changes.</div>';
   html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="st_inv" style="flex:1;">Count as their investment</button></div>';
   html += '<div class="backupnote" style="margin-top:6px;">Adds '+rupee(g.amount)+' to the capital of '+esc(g.partner)+' in the Investments tab, instead of repaying them.</div>';
   html += '<div class="sheetbtns" style="margin-top:16px;"><button class="btn-cancel" id="st_back" style="flex:1;">Back</button></div>';
@@ -2156,7 +2356,7 @@ function openSettleSheet(billId){
   document.getElementById("st_cash").addEventListener("click", function(){ markSettled(g.id); openOwedSheet(); });
   document.getElementById("st_inv").addEventListener("click", function(){
     investments.push({ id:uid(), date:g.date, partner:g.partner, invType:"Investment", purpose:"Working capital",
-                       amount:g.amount, mode:"Cash", notes:"Paid "+g.vendor+" bill from own pocket" });
+                       amount:g.amount, mode:"Cash", notes:"Paid "+g.vendor+" from own pocket" });
     saveInvest();
     markSettled(g.id);
     openOwedSheet();
@@ -2165,6 +2365,12 @@ function openSettleSheet(billId){
 }
 
 function markSettled(billId){
+  if(String(billId).indexOf("exp:")===0){
+    var x = expenses.find(function(e){ return "exp:"+e.id===billId; });
+    if(x){ x.settled = true; saveExpense(); }
+    renderAll();
+    return;
+  }
   var b = getBill(billId);
   if(b){ b.settled = true; }
   else { bills.push({ id:billId, image:null, settled:true }); }
@@ -2252,6 +2458,7 @@ function renderExpenseList(){
       '<div class="psrow"><span>Variable (everything else)</span><b>'+rupee(varAct)+'</b></div>'+
       '<div class="psrow"><span><b>Total paid</b></span><b>'+rupee(fixedAct+varAct)+'</b></div></div>';
   }
+  head = owedSummary().replace('id="owed_view"', 'id="owed_view_x"') + head;
   var sorted = expenses.slice().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
   if(sorted.length===0){ el.innerHTML = head + '<div class="empty">No expenses logged yet. Tap + to add one.</div>'; }
   else {
@@ -2263,6 +2470,8 @@ function renderExpenseList(){
     el.innerHTML = html;
     wireEntryClicks(el);
   }
+  var ov2 = el.querySelector("#owed_view_x");
+  if(ov2) ov2.addEventListener("click", openOwedSheet);
   if(recSub==="expenses") updateRecordsTotal();
 }
 
@@ -5876,7 +6085,7 @@ function cashMovement(dateStr){
                     .reduce(function(a,s){ return a+saleTotal(s); },0);
   var outPurch = purchases.filter(function(p){ return p.date===dateStr && paidFromTill(p); })
                     .reduce(function(a,p){ return a+purchTotal(p); },0);
-  var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash"; })
+  var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash" && !payerIsPersonal(x.paidBy); })
                     .reduce(function(a,x){ return a+expAmt(x); },0);
   return { inflow: inflow, outflow: outPurch + outExp, outPurch: outPurch, outExp: outExp };
 }
@@ -6445,15 +6654,92 @@ function openAssignSheet(shiftName){
 }
 
 // --- Attendance ---
+var attMode = "month", attMonth = fmtDate(new Date()).slice(0,7);
+var ATT_CYCLE = [null, "Present", "Half day", "Absent", "Leave"];
+var ATT_SHORT = { "Present":"P", "Half day":"½", "Absent":"A", "Leave":"L" };
+
+function attModeCtl(){
+  return '<div class="segctl" id="attModeCtl" style="margin-bottom:10px;">'+
+    '<button data-am="month" class="'+(attMode==="month"?"on":"")+'">Month calendar</button>'+
+    '<button data-am="day" class="'+(attMode==="day"?"on":"")+'">One day</button></div>';
+}
+function wireAttMode(el){
+  Array.prototype.forEach.call(el.querySelectorAll("#attModeCtl button"), function(b){
+    b.addEventListener("click", function(){ attMode = b.getAttribute("data-am"); renderAttendView(); });
+  });
+}
+
+// One stable id per person per day, so two phones marking the same day update
+// one record instead of creating two.
+function attId(date, staffId){ return "att_" + date + "_" + staffId; }
+function setAttendanceOn(date, staffId, status){
+  var existing = attendance.filter(function(a){ return a.date===date && a.staffId===staffId; });
+  attendance = attendance.filter(function(a){ return !(a.date===date && a.staffId===staffId); });
+  if(status){
+    var keep = existing[0];
+    attendance.push({ id: keep ? keep.id : attId(date, staffId), date:date, staffId:staffId, status:status });
+  }
+}
+
+function renderAttendMonth(el){
+  var y = +attMonth.slice(0,4), m = +attMonth.slice(5,7)-1;
+  var first = new Date(y, m, 1), days = new Date(y, m+1, 0).getDate();
+  var today = fmtDate(new Date());
+  var html = attModeCtl();
+  html += '<div class="calhead" style="margin-bottom:8px;"><button id="amPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
+          first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="amNext">›</button></div>';
+  html += '<div class="attlegend"><span><i class="ac-p"></i>Present</span><span><i class="ac-h"></i>Half day</span><span><i class="ac-a"></i>Absent</span><span><i class="ac-l"></i>Leave</span><span><i class="ac-r"></i>Rostered, not marked</span></div>';
+  html += '<div class="backupnote" style="margin:0 0 10px;">Tap a day to change it: Present → Half day → Absent → Leave → clear. Changes show on the other phone within seconds.</div>';
+  var people = activeStaff();
+  if(!people.length){ el.innerHTML = html + '<div class="empty">Add staff first.</div>'; wireAttMonth(el); return; }
+  people.forEach(function(st){
+    var a = monthAttendance(st.id, attMonth);
+    var pay = earnedSalary(st, attMonth);
+    html += '<div class="attmonth"><div class="attmhead"><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+'</span></div>';
+    html += '<div class="attmstats"><span class="ok">'+a.present+' present</span>'+(a.half?'<span>'+a.half+' half</span>':'')+
+            '<span class="bad">'+a.absent+' absent</span><span>'+a.leave+' leave</span><span>'+rupee(pay.earned)+' earned</span></div>';
+    html += '<div class="attcal">'+["S","M","T","W","T","F","S"].map(function(d){ return '<div class="acdow">'+d+'</div>'; }).join("");
+    for(var i=0;i<first.getDay();i++) html += '<div></div>';
+    for(var d=1; d<=days; d++){
+      var ds = fmtDate(new Date(y, m, d));
+      var rec = attendFor(ds, st.id);
+      var rostered = roster.some(function(r){ return r.date===ds && r.staffId===st.id; });
+      var cls = "ac" + (rec ? " ac-" + ATT_SHORT[rec.status].replace("½","h").toLowerCase() : (rostered ? " ac-r" : "")) +
+                (ds===today ? " ac-today" : "") + (ds>today ? " ac-future" : "");
+      html += '<button class="'+cls+'" data-ad="'+ds+'" data-as="'+st.id+'"><span>'+d+'</span>'+(rec?'<b>'+ATT_SHORT[rec.status]+'</b>':'')+'</button>';
+    }
+    html += '</div></div>';
+  });
+  el.innerHTML = html;
+  wireAttMonth(el);
+}
+function wireAttMonth(el){
+  wireAttMode(el);
+  function shift(n){ var p = attMonth.split("-"); attMonth = fmtDate(new Date(+p[0], +p[1]-1+n, 1)).slice(0,7); renderAttendView(); }
+  var pv = document.getElementById("amPrev"), nx = document.getElementById("amNext");
+  if(pv) pv.addEventListener("click", function(){ shift(-1); });
+  if(nx) nx.addEventListener("click", function(){ shift(1); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ad]"), function(b){
+    b.addEventListener("click", function(){
+      var ds = b.getAttribute("data-ad"), sid = b.getAttribute("data-as");
+      var cur = attendFor(ds, sid);
+      var next = ATT_CYCLE[(ATT_CYCLE.indexOf(cur ? cur.status : null) + 1) % ATT_CYCLE.length];
+      setAttendanceOn(ds, sid, next);
+      saveAttend(); renderStaffSection();
+    });
+  });
+}
+
 function renderAttendView(){
   var el = document.getElementById("attendView");
   if(!el) return;
-  var html = dateStepper("att");
+  if(attMode==="month"){ renderAttendMonth(el); return; }
+  var html = attModeCtl() + dateStepper("att");
   var todays = roster.filter(function(r){ return r.date===staffDate; });
   var ids = {};
   todays.forEach(function(r){ ids[r.staffId] = r.shift; });
   var people = activeStaff();
-  if(people.length===0){ el.innerHTML = html + '<div class="empty">Add staff first.</div>'; wireDateStepper("att"); return; }
+  if(people.length===0){ el.innerHTML = html + '<div class="empty">Add staff first.</div>'; wireDateStepper("att"); wireAttMode(el); return; }
 
   html += '<button class="btn-additem" id="att_allpresent" style="margin-bottom:12px;">Mark everyone rostered as present</button>';
   html += people.map(function(s){
@@ -6467,6 +6753,7 @@ function renderAttendView(){
   }).join("");
   el.innerHTML = html;
   wireDateStepper("att");
+  wireAttMode(el);
   document.getElementById("att_allpresent").addEventListener("click", function(){
     todays.forEach(function(r){ setAttendance(r.staffId, "Present", true); });
     saveAttend(); renderStaffSection();
@@ -6481,15 +6768,8 @@ function renderAttendView(){
 
 function setAttendance(staffId, status, skipToggle){
   var existing = attendFor(staffDate, staffId);
-  if(existing){
-    if(existing.status===status && !skipToggle){
-      attendance = attendance.filter(function(a){ return a!==existing; }); // tap again to clear
-      return;
-    }
-    existing.status = status;
-  } else {
-    attendance.push({ id:uid(), date:staffDate, staffId:staffId, status:status });
-  }
+  if(existing && existing.status===status && !skipToggle){ setAttendanceOn(staffDate, staffId, null); return; } // tap again to clear
+  setAttendanceOn(staffDate, staffId, status);
 }
 
 // --- Tasks ---
@@ -6709,7 +6989,7 @@ function openConductForm(staffId, type){
   });
 }
 
-function openPaySheet(s, pay, mKey, cb){
+function openPaySheet(s, pay, mKey, cb, fromFixed){
   var sheet = document.getElementById("sheet");
   var monthName = parseDate(mKey+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
   var html = '<h2 class="serif">Pay '+esc(s.name)+'</h2>';
@@ -6720,6 +7000,8 @@ function openPaySheet(s, pay, mKey, cb){
   html += '<div><label>Travel allowance (₹)</label><input type="number" inputmode="decimal" id="pay_travel" value="'+((cb&&cb.travel)||0)+'"></div></div>';
   html += '<div class="field two"><div><label>Mode</label><select id="pay_mode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option></select></div>';
   html += '<div><label>Date paid</label><input type="date" id="pay_date" value="'+fmtDate(new Date())+'"></div></div>';
+  html += '<div class="field"><label>Paid by</label><select id="pay_by">'+payerOptions().map(function(o){
+    return '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>'; }).join("")+'</select></div>';
   html += '<div class="card" style="margin-bottom:12px;"><div class="psrow"><span><b>Total being paid</b></span><b id="pay_total">'+rupee(((cb&&cb.cash)||pay.earned))+'</b></div></div>';
   html += '<div class="err" id="pay_err"></div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="pay_cancel">Back</button><button class="btn-save" id="pay_save">Record payment</button></div>';
@@ -6737,7 +7019,11 @@ function openPaySheet(s, pay, mKey, cb){
   });
   payTotal();
 
-  document.getElementById("pay_cancel").addEventListener("click", function(){ openStaffProfile(s.id); });
+  document.getElementById("pay_cancel").addEventListener("click", function(){ if(fromFixed) closeForm(); else openStaffProfile(s.id); });
+  document.getElementById("pay_by").addEventListener("change", function(){
+    var v = this.value, m = document.getElementById("pay_mode");
+    if(v==="Cafe cash") m.value = "Cash"; else if(v==="Cafe UPI/bank" && m.value==="Cash") m.value = "UPI";
+  });
   document.getElementById("pay_save").addEventListener("click", function(){
     var errEl = document.getElementById("pay_err");
     errEl.style.display = "none";
@@ -6747,11 +7033,12 @@ function openPaySheet(s, pay, mKey, cb){
     var travel = parseFloat(document.getElementById("pay_travel").value) || 0;
     if(amt<=0 && rent<=0 && food<=0 && travel<=0){ errEl.textContent = "Enter at least one amount."; errEl.style.display="block"; return; }
     var pdate = document.getElementById("pay_date").value || fmtDate(new Date());
-    var pmode = document.getElementById("pay_mode").value;
-    if(amt>0) expenses.push({ id:uid(), date:pdate, category:"Staff Salary", description:s.name+" - "+monthName+" salary", amount:amt, mode:pmode });
-    if(rent>0) expenses.push({ id:uid(), date:pdate, category:"Staff House Rent", description:s.name+" - "+monthName+" house rent", amount:rent, mode:pmode });
-    if(food>0) expenses.push({ id:uid(), date:pdate, category:"Staff Food Allowance", description:s.name+" - "+monthName+" food allowance", amount:food, mode:pmode });
-    if(travel>0) expenses.push({ id:uid(), date:pdate, category:"Staff Travel Allowance", description:s.name+" - "+monthName+" travel allowance", amount:travel, mode:pmode });
+    var pmode = document.getElementById("pay_mode").value, pby = document.getElementById("pay_by").value;
+    function add(cat, what, a){ expenses.push({ id:uid(), date:pdate, category:cat, description:s.name+" - "+monthName+" "+what, amount:a, mode:pmode, paidBy:pby, settled:false }); }
+    if(amt>0) add("Staff Salary", "salary", amt);
+    if(rent>0) add("Staff House Rent", "house rent", rent);
+    if(food>0) add("Staff Food Allowance", "food allowance", food);
+    if(travel>0) add("Staff Travel Allowance", "travel allowance", travel);
     saveExpense();
     closeForm();
     renderAll();
@@ -6762,7 +7049,7 @@ function openPaySheet(s, pay, mKey, cb){
 // ---------- FORM SHEET ----------
 var TYPE_LABEL = {sale:"sale", purchase:"purchase", investment:"partner investment", expense:"expense"};
 
-function openForm(type, item, defaultDate){
+function openForm(type, item, defaultDate, prefill){
   if(type==="purchase"){ return openBillForm(item ? (item.billId || item.id) : null, defaultDate); }
   var isEdit = !!item;
   var d = item ? item.date : (defaultDate||fmtDate(new Date()));
@@ -6785,10 +7072,18 @@ function openForm(type, item, defaultDate){
     html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Bank Transfer"].map(function(m){return '<option '+(item&&item.mode===m?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
     html += '<div class="field"><label>Notes</label><input type="text" id="f_notes" placeholder="Optional" value="'+esc(item?item.notes:"")+'"></div>';
   } else {
-    html += '<div class="field"><label>Category</label><select id="f_expcat">'+EXP_CATS.map(function(c){return '<option '+(item&&item.category===c?"selected":"")+'>'+c+'</option>';}).join("")+'</select></div>';
-    html += '<div class="field"><label>Description</label><input type="text" id="f_desc" placeholder="e.g. Ramesh - August salary" value="'+esc(item?item.description:"")+'"></div>';
-    html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:"")+'"></div>';
+    var pf = prefill || {};
+    var cats = EXP_CATS.slice();
+    if(item && item.category && cats.indexOf(item.category)<0) cats.splice(cats.length-1, 0, item.category);
+    var curCat = item ? item.category : (pf.category || "");
+    html += '<div class="field"><label>Category</label><select id="f_expcat">'+cats.map(function(c){return '<option value="'+esc(c)+'" '+(curCat===c?"selected":"")+'>'+esc(c)+'</option>';}).join("")+'</select></div>';
+    html += '<div class="field"><label>Description</label><input type="text" id="f_desc" placeholder="e.g. Rent - September 2026" value="'+esc(item?item.description:(pf.description||""))+'"></div>';
+    html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:(pf.amount||""))+'"></div>';
     html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Card","Bank Transfer"].map(function(m){return '<option '+(item&&item.mode===m?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
+    var curPaid = item ? (item.paidBy || (item.mode==="Cash" ? "Cafe cash" : "Cafe UPI/bank")) : "Cafe cash";
+    html += '<div class="field"><label>Paid by</label><select id="f_paidby">'+payerOptions().map(function(o){
+      return '<option value="'+esc(o.value)+'" '+(curPaid===o.value?"selected":"")+'>'+esc(o.label)+'</option>'; }).join("")+'</select></div>';
+    html += '<div class="backupnote" id="f_paidnote" style="margin-top:-4px;display:'+(payerIsPersonal(curPaid)?"block":"none")+';">Paid from a partner’s own pocket - the cafe owes this back. It shows under <b>Money owed to partners</b> until settled, and it does not come out of the cash counter.</div>';
   }
 
   html += '<div class="err" id="f_err"></div>';
@@ -6800,6 +7095,19 @@ function openForm(type, item, defaultDate){
 
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
+  var fpb = document.getElementById("f_paidby");
+  if(fpb){
+    var fm = document.getElementById("f_mode");
+    fpb.addEventListener("change", function(){
+      document.getElementById("f_paidnote").style.display = payerIsPersonal(fpb.value) ? "block" : "none";
+      if(fpb.value==="Cafe cash") fm.value = "Cash";
+      else if(fpb.value==="Cafe UPI/bank" && fm.value==="Cash") fm.value = "UPI";
+    });
+    fm.addEventListener("change", function(){
+      if(payerIsPersonal(fpb.value)) return;
+      fpb.value = fm.value==="Cash" ? "Cafe cash" : "Cafe UPI/bank";
+    });
+  }
 
   document.getElementById("f_cancel").addEventListener("click", closeForm);
   if(isEdit){
@@ -6856,7 +7164,9 @@ function submitForm(type, item){
     var amount4 = parseFloat(document.getElementById("f_amount").value);
     var mode4 = document.getElementById("f_mode").value;
     if(isNaN(amount4) || amount4<=0){ errEl.textContent = "Enter an amount greater than 0."; errEl.style.display="block"; return; }
-    var rec4 = {id: item?item.id:uid(), date:date, category:expcat, description:xdesc, amount:amount4, mode:mode4};
+    var paidBy4 = document.getElementById("f_paidby").value;
+    var rec4 = {id: item?item.id:uid(), date:date, category:expcat, description:xdesc, amount:amount4, mode:mode4, paidBy:paidBy4,
+                settled: (item && item.paidBy===paidBy4) ? !!item.settled : false};
     if(item){ var idx4 = expenses.findIndex(function(x){return x.id===item.id;}); expenses[idx4]=rec4; }
     else { expenses.push(rec4); }
     saveExpense();
