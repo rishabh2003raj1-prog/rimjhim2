@@ -76,4 +76,5 @@ Staff → **Salary** shows each person's salary for a month:
 - Each list (sales, purchases, …) is saved to the server a moment after every change. The top bar shows **Saved to cloud hh:mm**, **Saving…**, or **Offline — N changes will upload**.
 - If both phones change the same list at the same time, the changes are merged record by record. Additions, edits and deletions from both phones are all kept.
 - Changes from the other phone appear within a few seconds, or straight away when the app is reopened.
+- **↻ Refresh** in the top bar pulls the latest data from the server and recalculates every screen. Screens also recalculate after every saved change, when the Dashboard is opened, and when the date changes.
 - **Backup & restore → Download backup** still produces a full JSON backup for safekeeping.

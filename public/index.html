@@ -34,6 +34,9 @@
   .topbar .clock b{font-size:14px;color:var(--ink);display:block;font-weight:600;}
   .row2{display:flex;justify-content:space-between;align-items:center;margin-top:8px;}
   #saveStatus{font-size:10.5px;color:var(--teal-dk);}
+  .topbtns{display:flex;gap:10px;align-items:center;}
+  #refreshBtn{font-family:inherit;font-size:11.5px;font-weight:600;color:var(--teal-dk);background:var(--teal-bg);border:1px solid var(--line);border-radius:14px;padding:4px 10px;}
+  #refreshBtn:disabled{opacity:.6;}
   #saveStatus.warn{color:var(--brick);font-weight:600;}
   #backupBtn{background:none;border:none;color:var(--ink-soft);font-family:inherit;font-size:11px;font-weight:600;text-decoration:underline;padding:0;}
   .backupnote{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;}
@@ -358,7 +361,7 @@
     </div>
     <div class="row2">
       <span id="saveStatus">—</span>
-      <button id="backupBtn">Backup &amp; restore</button>
+      <span class="topbtns"><button id="refreshBtn" aria-label="Refresh data">↻ Refresh</button><button id="backupBtn">Backup &amp; restore</button></span>
     </div>
   </div>
 
@@ -797,6 +800,7 @@ function lsSet(key, val){
   }
   cloud.values[key] = val;
   cloud.dirty[key] = true;
+  markStale();
   cacheWrite(key);
   scheduleFlush(300);
   updateSaveIndicator();
@@ -996,6 +1000,46 @@ function applyRemote(items){
 function applyDeferred(){
   var d = cloud.deferred; cloud.deferred = {};
   if(Object.keys(d).length && applyRemote(d)) renderAll();
+}
+
+// Pull-to-refresh by hand: send anything waiting, fetch every list from the
+// server (not just recent changes), and redraw all screens.
+function refreshNow(){
+  var btn = document.getElementById("refreshBtn");
+  if(btn.disabled) return;
+  btn.disabled = true; btn.textContent = "↻ Refreshing…";
+  function finish(msg){
+    btn.disabled = false; btn.textContent = "↻ Refresh";
+    renderAll(); updateSaveIndicator();
+    if(msg) appAlert(msg);
+  }
+  if(pendingCount()) flushNow();
+  var waited = 0;
+  (function whenFlushed(){
+    if((cloud.flushing || pendingCount()) && waited < 8000 && cloud.state!=="offline"){ waited += 200; setTimeout(whenFlushed, 200); return; }
+    api("GET", "/api/data"+API_Q).then(function(r){
+      if(r.status===401){ btn.disabled = false; btn.textContent = "↻ Refresh"; showLogin(); return; }
+      if(!r.ok || !r.data) throw new Error("load");
+      cloud.state = "ok";
+      cloud.since = r.data.serverTime;
+      var items = r.data.items || {};
+      Object.keys(items).forEach(function(key){
+        if(SYNC_KEYS.indexOf(key)<0 || cloud.dirty[key]) return;
+        setKeyValue(key, items[key].value);
+        cloud.rev[key] = items[key].rev;
+        cloud.base[key] = JSON.stringify(items[key].value);
+        cacheWrite(key);
+      });
+      loadOutlets();
+      cloud.deferred = {};
+      finish(null);
+      var st = document.getElementById("saveStatus");
+      if(st && !pendingCount()){ st.textContent = "Refreshed " + new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}); st.className = ""; }
+    }).catch(function(){
+      cloud.state = "offline";
+      finish("Couldn't reach the server — showing the copy saved on this phone. Check the internet connection and try again.");
+    });
+  })();
 }
 
 function pollRemote(){
@@ -1454,9 +1498,27 @@ function renderClock(){
   var d = new Date();
   document.getElementById("clockTime").textContent = d.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
   document.getElementById("clockDate").textContent = d.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"});
+  if(lastRenderDay && fmtDate(d)!==lastRenderDay) renderAll();   // "today" moved on overnight
+}
+
+// Some screens redraw only themselves after a change (attendance, roster, tasks).
+// Anything saved marks every screen stale; if nothing redrew them all within a
+// moment, do it then - so the dashboard never shows old figures.
+var viewsStale = false, staleTimer = null, lastRenderDay = null;
+function markStale(){
+  viewsStale = true;
+  if(staleTimer) clearTimeout(staleTimer);
+  staleTimer = setTimeout(function(){
+    staleTimer = null;
+    if(!viewsStale) return;
+    if(document.getElementById("sheetBg").classList.contains("on")) { markStale(); return; } // wait until the form closes
+    renderAll();
+  }, 400);
 }
 
 function renderAll(){
+  viewsStale = false;
+  lastRenderDay = fmtDate(new Date());
   refreshCats();
   renderDashboard();
   renderCalendar();
@@ -8280,6 +8342,8 @@ function showAiBanner(counts, needsReview, usedOffline){
 function showView(name){
   Array.prototype.forEach.call(document.querySelectorAll(".view"), function(v){ v.classList.remove("active"); });
   document.getElementById("view-"+name).classList.add("active");
+  if(viewsStale) renderAll();
+  else if(name==="dashboard") renderDashboard();
   Array.prototype.forEach.call(document.querySelectorAll("nav.tabs button"), function(b){ b.classList.toggle("on", b.getAttribute("data-v")===name); });
 }
 
@@ -8352,6 +8416,7 @@ document.addEventListener("DOMContentLoaded", function(){
   });
 
   document.getElementById("backupBtn").addEventListener("click", openBackupSheet);
+  document.getElementById("refreshBtn").addEventListener("click", refreshNow);
   document.getElementById("outletName").addEventListener("click", openOutletSheet);
   document.getElementById("loginGo").addEventListener("click", submitLogin);
   document.getElementById("loginPin").addEventListener("keydown", function(e){ if(e.key==="Enter") submitLogin(); });
