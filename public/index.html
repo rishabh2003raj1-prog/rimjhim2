@@ -446,7 +446,7 @@
       </div>
 
       <div class="card">
-        <h3>Expenses breakdown <span class="muted">· paid in this range · % of sales</span></h3>
+        <h3>Expenses breakdown <span class="muted">· for this range · % of sales</span></h3>
         <div id="expBreak"></div>
       </div>
 
@@ -1242,7 +1242,7 @@ function monthTotalsFor(items){
   function val(k){ var it = items[k]; return (it && Array.isArray(it.value)) ? it.value : []; }
   var s = val(SALES_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+saleTotal(x); },0);
   var p = val(PURCH_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+purchTotal(x); },0);
-  var e = val(EXPENSE_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+expAmt(x); },0);
+  var e = val(EXPENSE_KEY).filter(function(x){ return expBookDate(x).slice(0,7)===mk; }).reduce(function(a,x){ return a+expAmt(x); },0);
   return { sales:s, costs:p+e, net:s-p-e };
 }
 
@@ -1614,7 +1614,7 @@ function renderDashboard(){
 
   function sumSales(set){ return sales.filter(function(x){return set[x.date];}).reduce(function(a,x){return a+saleTotal(x);},0); }
   function sumPurch(set){ return purchases.filter(function(x){return set[x.date];}).reduce(function(a,x){return a+purchTotal(x);},0); }
-  function sumExp(set){ return expenses.filter(function(x){return set[x.date];}).reduce(function(a,x){return a+expAmt(x);},0); }
+  function sumExp(set){ return expenses.filter(function(x){return set[expBookDate(x)];}).reduce(function(a,x){return a+expAmt(x);},0); }
 
   var totalSales = sumSales(dateSet), totalPurch = sumPurch(dateSet), totalExp = sumExp(dateSet);
   var net = totalSales - totalPurch - totalExp;
@@ -1654,7 +1654,7 @@ function renderDashboard(){
   dateList.forEach(function(d){ salesByDay[d]=0; outByDay[d]=0; });
   sales.forEach(function(x){ if(dateSet[x.date]) salesByDay[x.date]+=saleTotal(x); });
   purchases.forEach(function(x){ if(dateSet[x.date]) outByDay[x.date]+=purchTotal(x); });
-  expenses.forEach(function(x){ if(dateSet[x.date]) outByDay[x.date]+=expAmt(x); });
+  expenses.forEach(function(x){ var bd = expBookDate(x); if(dateSet[bd]) outByDay[bd]+=expAmt(x); });
   var labels = dateList.map(function(d){ var dt=parseDate(d); return dt.getDate()+"/"+(dt.getMonth()+1); });
   document.getElementById("trendRangeLbl").textContent = "· "+rangeLabel;
 
@@ -1766,7 +1766,7 @@ function renderDashboard(){
 
   // --- expenses breakdown ---
   var expTotals = {};
-  expenses.forEach(function(x){ if(dateSet[x.date]){ var c=x.category||"Other"; expTotals[c]=(expTotals[c]||0)+expAmt(x); } });
+  expenses.forEach(function(x){ if(dateSet[expBookDate(x)]){ var c=x.category||"Other"; expTotals[c]=(expTotals[c]||0)+expAmt(x); } });
   var eKeys = Object.keys(expTotals).sort(function(a,b){return expTotals[b]-expTotals[a];});
   var eb = document.getElementById("expBreak");
   eb.innerHTML = eKeys.length===0 ? '<div class="backupnote" style="margin:0;">No expenses in this range.</div>' :
@@ -1902,6 +1902,17 @@ function expenseMonth(x){
   var m = MONTH_RE.exec(x.description||"");
   if(m) return m[2] + "-" + String(MONTH_NAMES.indexOf(m[1])+1).padStart(2,"0");
   return monthKey(x.date||"");
+}
+// The date a bill or salary counts on in profit & loss: a payment made for another
+// month ("Ravi Kumar - salary August 2026" paid on 3 Sep) counts in the month it is
+// for, the same way the fixed cost card counts it. Cash and bank still use the
+// real payment date.
+function expBookDate(x){
+  var d = x.date || "";
+  if(!d || (FIXED_CATS.indexOf(x.category)<0 && STAFF_CATS.indexOf(x.category)<0)) return d;
+  var m = expenseMonth(x);
+  if(!m || m===d.slice(0,7)) return d;
+  return m < d.slice(0,7) ? m+"-"+String(daysInMonthOf(m)).padStart(2,"0") : m+"-01";
 }
 function monthLabel(mKey){ return MONTH_NAMES[+mKey.slice(5,7)-1] + " " + mKey.slice(0,4); }
 function actualInMonth(cats, mKey){
@@ -2385,7 +2396,7 @@ function renderInsights(totalSales, totalPurch, totalExp, salesByDay, dateList, 
 
   var staffCats = ["Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance"];
   var inRangeSet = {}; dateList.forEach(function(d){ inRangeSet[d] = true; });
-  var salaryTot = expenses.filter(function(x){ return staffCats.indexOf(x.category)>=0 && inRangeSet[x.date]; }).reduce(function(a,x){return a+expAmt(x);},0);
+  var salaryTot = expenses.filter(function(x){ return staffCats.indexOf(x.category)>=0 && inRangeSet[expBookDate(x)]; }).reduce(function(a,x){return a+expAmt(x);},0);
   if(totalSales>0 && salaryTot>0){
     var sPct = Math.round(salaryTot/totalSales*100);
     if(sPct>30) items.push("Staff cost is "+sPct+"% of sales in this range — on the high side; check shift coverage against how busy those hours really are.");
@@ -5726,7 +5737,7 @@ function buildReportPdf(rr, chosen, Ctor){
   var F = rr.from, T = rr.to;
   var S = sales.filter(function(x){ return inRange(x.date,F,T); });
   var P = purchases.filter(function(x){ return inRange(x.date,F,T); });
-  var E = expenses.filter(function(x){ return inRange(x.date,F,T); });
+  var E = expenses.filter(function(x){ return inRange(expBookDate(x),F,T); });
   var sTot = S.reduce(function(a,x){ return a+saleTotal(x); },0);
   var pTot = P.reduce(function(a,x){ return a+purchTotal(x); },0);
   var eTot = E.reduce(function(a,x){ return a+expAmt(x); },0);

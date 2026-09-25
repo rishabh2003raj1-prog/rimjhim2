@@ -65,6 +65,7 @@ Tap the outlet name at the top of the app to switch outlets, add a new one, or r
 Records → **Bills** shows one month's rent, electricity, other monthly costs and each person's salary: the amount for that month, every payment made for it (tap one to edit it, 📅 to see that day on the calendar), and what is still to pay.
 - **Edit amount** changes a bill for that month only (e.g. this month's electricity bill) or from that month onward (e.g. a new rent).
 - **Edit salary** changes a salary for that month only or from that month onward (a raise), plus the joining and leaving dates. Earlier months keep their old salary. A salary changed in the staff profile applies from the current month.
+- Rent, bills and salaries count in the month they are for, on every screen that shows profit (Dashboard, reports, outlet totals). August salary paid on 3 September counts as an August expense. Cash in the counter and bank still go by the day the money actually left.
 - The Calendar and the Bills tab always show the same month. Under the calendar is a summary of that month's bills; purple dots mark days a bill or salary was paid. The Dashboard's fixed cost card has a button to open that month's bills.
 
 ## Staff salary
