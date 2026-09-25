@@ -1704,14 +1704,48 @@ function renderDashboard(){
 }
 
 // Planned monthly overheads the owner sets, plus what staff contractually cost.
-function plannedFixed(){
-  var pf = (settings.fixedCosts && typeof settings.fixedCosts==="object") ? settings.fixedCosts : {};
+// Amounts can change over time (a ₹1 fit-out rent in July, full rent from August),
+// so each set of amounts applies from a month onward until the next change.
+function fixedCostPlans(){
+  var h = Array.isArray(settings.fixedCostHistory) ? settings.fixedCostHistory.slice() : [];
+  if(!h.length && settings.fixedCosts && typeof settings.fixedCosts==="object" && Object.keys(settings.fixedCosts).length){
+    // Amounts saved before month-by-month amounts existed: they apply from the
+    // café's first recorded day, never to months before it opened.
+    h = [{ from: earliestRecordDate().slice(0,7), costs: settings.fixedCosts, start: true }];
+  }
+  return h.sort(function(a,b){ return a.from.localeCompare(b.from); });
+}
+function fixedPlanFor(mKey){
+  var plan = null;
+  fixedCostPlans().forEach(function(p){ if(p.from <= mKey) plan = p; });
+  return plan;
+}
+function plannedFixed(mKey){
+  mKey = mKey || fmtDate(new Date()).slice(0,7);
+  var plan = fixedPlanFor(mKey), pf = plan ? plan.costs : {};
   var out = {};
   FIXED_CATS.forEach(function(c){ out[c] = +pf[c] || 0; });
   return out;
 }
-function plannedStaffCost(){
-  return activeStaff().reduce(function(a,st){ return a + (+st.salary||0) + allowanceTotal(st); }, 0);
+
+// Share of a month a staff member was employed: nothing before joining or after
+// leaving, and part of the month they joined or left in.
+function staffMonthShare(st, mKey){
+  var first = mKey + "-01", days = daysInMonthOf(mKey), last = mKey + "-" + String(days).padStart(2,"0");
+  var from = (st.joinDate && st.joinDate > first) ? st.joinDate : first;
+  var to = (st.status==="Left" && st.leftDate && st.leftDate < last) ? st.leftDate : last;
+  if(st.status==="Left" && !st.leftDate && mKey > fmtDate(new Date()).slice(0,7)) return { share:0, days:0 };
+  if(from > to) return { share:0, days:0 };
+  var n = datesBetween(from, to).length;
+  return { share: n/days, days: n, from: from, to: to };
+}
+function staffPlanFor(st, mKey){
+  var sh = staffMonthShare(st, mKey);
+  return Math.round(((+st.salary||0) + allowanceTotal(st)) * sh.share);
+}
+function plannedStaffCost(mKey){
+  mKey = mKey || fmtDate(new Date()).slice(0,7);
+  return staff.reduce(function(a,st){ return a + staffPlanFor(st, mKey); }, 0);
 }
 // Which month a payment is FOR. "Rent - September 2026" paid on 3 Oct belongs to
 // September; without a month in the description, the payment date decides.
@@ -1741,7 +1775,7 @@ function renderFixedCosts(dateList){
   var monthName = parseDate(mKey+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
   document.getElementById("fcMonthLbl").textContent = "· "+monthName;
 
-  var planned = plannedFixed();
+  var planned = plannedFixed(mKey);
   var rows = "", plannedTotal = 0, actualTotal = 0;
 
   FIXED_CATS.forEach(function(c){
@@ -1755,7 +1789,7 @@ function renderFixedCosts(dateList){
             (plan>0 ? ' <span style="font-size:10px;opacity:.65">of '+rupee(plan)+'</span>' : '')+'</b></div>';
   });
 
-  var staffPlan = plannedStaffCost();
+  var staffPlan = plannedStaffCost(mKey);
   var staffAct = actualInMonth(STAFF_CATS, mKey);
   var mealCost = staffMealCost(mKey, null);
   plannedTotal += staffPlan; actualTotal += staffAct;
@@ -1814,26 +1848,29 @@ function staffPaidFor(st, mKey){
   return { total: total, byCat: byCat };
 }
 function fixedMonthSummary(mKey){
-  var planned = plannedFixed(), rows = [], staffRows = [];
+  var planned = plannedFixed(mKey), rows = [], staffRows = [];
   FIXED_CATS.forEach(function(c){
     var plan = +planned[c] || 0, paid = actualInMonth([c], mKey);
     rows.push({ name:c, planned:plan, paid:paid, due:Math.max(0, plan-paid) });
   });
   var isCur = mKey===fmtDate(new Date()).slice(0,7);
   staff.filter(function(st){
-    if(st.status!=="Left") return true;
-    return staffPaidFor(st, mKey).total > 0;   // people who left still show for months they were paid
+    // Only months they actually worked in (or were paid for).
+    return staffMonthShare(st, mKey).days > 0 || staffPaidFor(st, mKey).total > 0;
   }).forEach(function(st){
-    var fixedPart = (+st.salary||0) + allowanceTotal(st);
+    var sh = staffMonthShare(st, mKey);
+    var fixedPart = staffPlanFor(st, mKey);
     var earned = earnedSalary(st, mKey);
     var a = earned.a;
     var past = mKey < fmtDate(new Date()).slice(0,7);
-    // The month's fixed cost is the full salary + allowances. Once a month is over
-    // and attendance was marked, what is owed is the salary actually earned.
-    var plan = (past && a.marked>0) ? earned.earned + allowanceTotal(st) : fixedPart;
+    // The month's fixed cost is salary + allowances for the days they were employed.
+    // Once a month is over and attendance was marked, it is the salary actually earned.
+    var allowPart = Math.round(allowanceTotal(st) * sh.share);
+    var plan = (past && a.marked>0) ? earned.earned + allowPart : fixedPart;
     var paid = staffPaidFor(st, mKey).total;
     staffRows.push({ st:st, planned:plan, full:fixedPart, paid:paid, due:Math.max(0, plan-paid), earnedSoFar: earned.earned + allowanceTotal(st),
-                     basis: a.marked>0 ? (a.present+" of "+daysInMonthOf(mKey)+" days present"+(isCur?" so far · earned "+rupee(earned.earned)+" + allowances":"")) : "attendance not marked" });
+                     basis: (sh.days < daysInMonthOf(mKey) && sh.days>0 ? "employed "+sh.days+" of "+daysInMonthOf(mKey)+" days ("+(sh.from>mKey+"-01"?"joined "+parseDate(sh.from).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"left "+parseDate(sh.to).toLocaleDateString("en-IN",{day:"numeric",month:"short"}))+") · " : "") +
+                            (a.marked>0 ? (a.present+" days present"+(isCur?" so far · earned "+rupee(earned.earned)+" + allowances":"")) : "attendance not marked") });
   });
   var planTot = rows.reduce(function(t,r){ return t+r.planned; },0) + staffRows.reduce(function(t,r){ return t+r.planned; },0);
   var paidTot = rows.reduce(function(t,r){ return t+r.paid; },0) + staffRows.reduce(function(t,r){ return t+r.paid; },0);
@@ -1865,10 +1902,12 @@ function renderFixedView(){
     html += '<div class="fcrow"><div class="fcname"><b>'+esc(r.name)+'</b><span>'+rupee(r.paid)+' paid of '+rupee(r.planned)+' '+st+'</span></div>'+
             (r.due>0 ? '<button class="btn-additem fcpay" data-fcpay="'+esc(r.name)+'" data-amt="'+Math.round(r.due)+'">Pay '+rupee(r.due)+'</button>' : '')+'</div>';
   });
-  html += '<button class="btn-additem" id="fc_setup" style="margin-top:10px;">Set monthly amounts / add an item</button></div>';
+  var pl = fixedPlanFor(fcMonth);
+  html += '<div class="backupnote" style="margin:8px 0 0;">'+(pl ? 'Amounts in use since '+parseDate(pl.from+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'.' : 'No amounts set for this month yet.')+'</div>';
+  html += '<button class="btn-additem" id="fc_setup" style="margin-top:10px;">Change amounts from this month / add an item</button></div>';
 
   html += '<div class="card" style="margin-bottom:12px;"><h3>Staff salary &amp; allowances</h3>';
-  if(!sm.staffRows.length) html += '<div class="backupnote" style="margin:0;">No staff added yet (Staff tab).</div>';
+  if(!sm.staffRows.length) html += '<div class="backupnote" style="margin:0;">'+(staff.length ? 'Nobody was employed this month (going by joining dates in the Staff tab).' : 'No staff added yet (Staff tab).')+'</div>';
   sm.staffRows.forEach(function(r){
     var st = r.planned===0 && r.paid===0 ? '<span class="pill">no salary set</span>' : r.due<=0 ? '<span class="pill ok">paid</span>' : r.paid>0 ? '<span class="pill bad">part paid</span>' : '<span class="pill bad">due</span>';
     html += '<div class="fcrow"><div class="fcname"><b>'+esc(r.st.name)+'</b>'+
@@ -1917,11 +1956,15 @@ function renderFixedView(){
       if(!st) return;
       var cb = staffCostBreakdown(st, fcMonth), done = staffPaidFor(st, fcMonth).byCat;
       var pay = earnedSalary(st, fcMonth);
-      if(pay.a.marked===0){ pay = { earned: +st.salary||0, basis:"full month (attendance not marked)", a: pay.a }; }
+      if(pay.a.marked===0){
+        var shr = staffMonthShare(st, fcMonth);
+        pay = { earned: Math.round((+st.salary||0) * shr.share), basis: (shr.days<daysInMonthOf(fcMonth) ? shr.days+" days employed" : "full month")+" (attendance not marked)", a: pay.a };
+      }
       // Only what is still unpaid for this month.
       pay = { earned: Math.max(0, pay.earned - (done["Staff Salary"]||0)), basis: pay.basis, a: pay.a };
-      cb = { rent: Math.max(0, cb.rent-(done["Staff House Rent"]||0)), food: Math.max(0, cb.food-(done["Staff Food Allowance"]||0)),
-             travel: Math.max(0, cb.travel-(done["Staff Travel Allowance"]||0)) };
+      var shA = staffMonthShare(st, fcMonth).share;
+      cb = { rent: Math.max(0, Math.round(cb.rent*shA)-(done["Staff House Rent"]||0)), food: Math.max(0, Math.round(cb.food*shA)-(done["Staff Food Allowance"]||0)),
+             travel: Math.max(0, Math.round(cb.travel*shA)-(done["Staff Travel Allowance"]||0)) };
       cb.cash = pay.earned + cb.rent + cb.food + cb.travel;
       document.getElementById("sheetBg").classList.add("on");
       openPaySheet(st, pay, fcMonth, cb, true);
@@ -1931,10 +1974,12 @@ function renderFixedView(){
 }
 
 function openFixedCostForm(){
-  var planned = plannedFixed();
+  var fromM = (typeof fcMonth==="string" && fcMonth) ? fcMonth : fmtDate(new Date()).slice(0,7);
+  var planned = plannedFixed(fromM);
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">Monthly fixed costs</h2>';
-  html += '<div class="backupnote">What these normally cost each month. The app compares them with what you actually paid, and works out how much you need to sell to cover them.</div>';
+  html += '<div class="backupnote">What these cost each month. New amounts apply from the month you pick until you change them again - earlier months keep their old amounts (for example ₹1 fit-out rent in July, full rent from August).</div>';
+  html += '<div class="field"><label>These amounts apply from</label><input type="month" id="fc_from" value="'+fromM+'"></div>';
   FIXED_CATS.forEach(function(c){
     html += '<div class="field"><label>'+esc(c)+' (₹/month)</label><input type="number" inputmode="decimal" class="fcin" data-c="'+esc(c)+'" value="'+(planned[c]||"")+'"></div>';
   });
@@ -1943,18 +1988,44 @@ function openFixedCostForm(){
   if(extra.length) html += '<div class="backupnote">To remove an added item, clear its amount and tick it: '+extra.map(function(n){
     return '<label style="display:inline-flex;gap:4px;margin-right:10px;"><input type="checkbox" class="fcdel" data-c="'+esc(n)+'">'+esc(n)+'</label>'; }).join("")+'</div>';
   html += '<div class="backupnote">Staff cost is taken from each person’s salary and allowances in the Staff tab, so it is not typed here.</div>';
-  html += '<div class="card" style="margin:10px 0;"><div class="psrow"><span>Staff, from the Staff tab</span><b>'+rupee(plannedStaffCost())+'</b></div></div>';
+  html += '<div class="card" style="margin:10px 0;"><div class="psrow"><span>Staff, from the Staff tab ('+esc(monthLabel(fromM))+')</span><b>'+rupee(plannedStaffCost(fromM))+'</b></div></div>';
+  var plans = fixedCostPlans();
+  if(plans.length){
+    html += '<div class="card" style="margin:10px 0;"><h3>Amount changes</h3>'+plans.map(function(p){
+      var sum = Object.keys(p.costs||{}).map(function(k){ return esc(k)+" "+rupee(p.costs[k]); }).join(", ") || "all zero";
+      return '<div class="psrow"><span>From '+esc(monthLabel(p.from))+'</span><b style="font-size:12px;font-weight:500;text-align:right;">'+sum+
+             ' <button class="ndel" data-fcrm="'+p.from+'" aria-label="Remove">×</button></b></div>';
+    }).join("")+'</div>';
+  }
   html += '<div class="sheetbtns"><button class="btn-cancel" id="fc_cancel">Cancel</button><button class="btn-save" id="fc_save">Save</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("fc_cancel").addEventListener("click", closeForm);
+  document.getElementById("fc_from").addEventListener("change", function(){
+    var v = this.value; if(!v) return;
+    var pl = plannedFixed(v);
+    Array.prototype.forEach.call(sheet.querySelectorAll(".fcin"), function(inp){ inp.value = pl[inp.getAttribute("data-c")] || ""; });
+  });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-fcrm]"), function(b){
+    b.addEventListener("click", function(){
+      var f = b.getAttribute("data-fcrm");
+      askConfirm("Remove the amounts that start "+monthLabel(f)+"? Those months will use the earlier amounts.", function(){
+        settings.fixedCostHistory = fixedCostPlans().filter(function(p){ return p.from!==f; });
+        saveSettings(); renderAll(); openFixedCostForm();
+      });
+    });
+  });
   document.getElementById("fc_save").addEventListener("click", function(){
     var fc = {};
     Array.prototype.forEach.call(sheet.querySelectorAll(".fcin"), function(inp){
       var v = parseFloat(inp.value);
       if(!isNaN(v) && v>0) fc[inp.getAttribute("data-c")] = v;
     });
-    settings.fixedCosts = fc;
+    var from = document.getElementById("fc_from").value || fromM;
+    var hist = fixedCostPlans().filter(function(p){ return p.from!==from; });
+    hist = hist.map(function(p){ return { from:p.from, costs:p.costs }; });
+    hist.push({ from: from, costs: fc });
+    settings.fixedCostHistory = hist.sort(function(a,b){ return a.from.localeCompare(b.from); });
     var extra = (Array.isArray(settings.fixedExtra) ? settings.fixedExtra : []).slice();
     Array.prototype.forEach.call(sheet.querySelectorAll(".fcdel"), function(cb){
       if(cb.checked){ var n = cb.getAttribute("data-c"); extra = extra.filter(function(x){ return x!==n; }); delete fc[n]; }
@@ -1962,6 +2033,8 @@ function openFixedCostForm(){
     var nn = document.getElementById("fc_newname").value.trim();
     if(nn && extra.indexOf(nn)<0 && BASE_EXP_CATS.indexOf(nn)<0) extra.push(nn);
     settings.fixedExtra = extra;
+    refreshCats();
+    settings.fixedCosts = plannedFixed(fmtDate(new Date()).slice(0,7)); // kept for older copies of the app
     saveSettings(); closeForm(); renderAll();
   });
 }
@@ -6863,6 +6936,8 @@ function openStaffForm(staffId){
   html += '<div class="backupnote" style="margin-top:-4px;">Cash allowances paid on top of salary. Meals cooked in the cafe are tracked separately under Staff meals, since those come out of your raw material.</div>';
   html += '<div class="field two"><div><label>Joined on</label><input type="date" id="s_join" value="'+(s&&s.joinDate?s.joinDate:fmtDate(new Date()))+'"></div>';
   html += '<div><label>Status</label><select id="s_status"><option '+(s&&s.status==="Active"?"selected":"")+'>Active</option><option '+(s&&s.status==="Left"?"selected":"")+'>Left</option></select></div></div>';
+  html += '<div class="field" id="s_leftwrap" style="display:'+(s&&s.status==="Left"?"block":"none")+';"><label>Left on</label><input type="date" id="s_left" value="'+(s&&s.leftDate?s.leftDate:fmtDate(new Date()))+'"></div>';
+  html += '<div class="backupnote" style="margin-top:-4px;">Salary is only counted from the joining date (and up to the leaving date) in the Fixed cost tab.</div>';
   html += '<div class="field"><label>UPI / bank (optional)</label><input type="text" id="s_upi" value="'+esc(s?s.upi:"")+'"></div>';
   html += '<div class="err" id="s_err"></div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="s_cancel">Cancel</button>';
@@ -6871,6 +6946,9 @@ function openStaffForm(staffId){
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("s_cancel").addEventListener("click", closeForm);
+  document.getElementById("s_status").addEventListener("change", function(){
+    document.getElementById("s_leftwrap").style.display = this.value==="Left" ? "block" : "none";
+  });
   if(s){
     document.getElementById("s_delete").addEventListener("click", function(){
       askConfirm("Remove "+s.name+"? Their attendance and task history will also be removed. To keep the history instead, set their status to 'Left'.", function(){
@@ -6899,6 +6977,7 @@ function openStaffForm(staffId){
                 phone:document.getElementById("s_phone").value.trim(),
                 joinDate:document.getElementById("s_join").value,
                 status:document.getElementById("s_status").value,
+                leftDate: document.getElementById("s_status").value==="Left" ? (document.getElementById("s_left").value || fmtDate(new Date())) : "",
                 upi:document.getElementById("s_upi").value.trim() };
     if(s){ staff[staff.findIndex(function(x){return x.id===s.id;})] = rec; }
     else { staff.push(rec); }
