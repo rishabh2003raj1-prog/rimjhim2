@@ -63,9 +63,11 @@ Tap the outlet name at the top of the app to switch outlets, add a new one, or r
 ## Staff salary
 
 Staff → **Salary** shows each person's salary for a month:
-- **What they're owed:** days employed, leave taken against the paid leave allowance (2 days a month by default), deductions for extra leave, and allowances.
+- **What they're owed:** salary on a 30-day basis (daily rate = monthly salary ÷ 30; a full month is always the full salary; a part month is days worked × daily rate), days employed, leave taken against the paid leave allowance (2 days for each full month worked, none in a joining or leaving month), deductions for extra leave, and allowances.
 - **Unused leave:** paid leave days not taken are owed as extra pay.
 - **Payments:** what's been paid and on which dates, compared with the due date (the 7th of the next month by default).
+
+**Salary advance** (in the staff profile or on the Salary card) records money given early against a month's salary, reducing that month's balance.
 
 **Final settlement** closes a month. If the person chooses not to take the extra pay for unused leave, it's recorded as goodwill, which you can give back later with **Give bonus**. **Salary slip** shows the month's slip, which you can download as a PDF or send on WhatsApp.
 

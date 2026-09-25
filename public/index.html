@@ -1760,9 +1760,22 @@ function staffMonthShare(st, mKey){
   var n = datesBetween(from, to).length;
   return { share: n/days, days: n, from: from, to: to };
 }
-function staffPlanFor(st, mKey){
+// Salaries are for a 30-day month: a day is salary ÷ 30 whatever the calendar
+// month's length. A full month employed earns the full salary; part of a month
+// earns the days worked × daily rate (never more than the monthly salary).
+function r2(n){ return Math.round((+n||0) * 100) / 100; }
+function payFactor(st, mKey){
   var sh = staffMonthShare(st, mKey);
-  return Math.round(((+st.salary||0) + allowanceTotal(st)) * sh.share);
+  if(sh.days >= daysInMonthOf(mKey)) return 1;
+  return Math.min(1, sh.days / 30);
+}
+function staffPlanFor(st, mKey){
+  return r2(((+st.salary||0) + allowanceTotal(st)) * payFactor(st, mKey));
+}
+function rupeeP(n){
+  n = r2(n);
+  var frac = Math.abs(n % 1) > 0.001;
+  return (n<0?"-":"") + "₹" + Math.abs(n).toLocaleString("en-IN", { minimumFractionDigits: frac?2:0, maximumFractionDigits: 2 });
 }
 function plannedStaffCost(mKey){
   mKey = mKey || fmtDate(new Date()).slice(0,7);
@@ -2123,7 +2136,8 @@ function renderInsights(totalSales, totalPurch, totalExp, salesByDay, dateList, 
   }
 
   var staffCats = ["Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance"];
-  var salaryTot = expenses.filter(function(x){ return staffCats.indexOf(x.category)>=0; }).reduce(function(a,x){return a+expAmt(x);},0);
+  var inRangeSet = {}; dateList.forEach(function(d){ inRangeSet[d] = true; });
+  var salaryTot = expenses.filter(function(x){ return staffCats.indexOf(x.category)>=0 && inRangeSet[x.date]; }).reduce(function(a,x){return a+expAmt(x);},0);
   if(totalSales>0 && salaryTot>0){
     var sPct = Math.round(salaryTot/totalSales*100);
     if(sPct>30) items.push("Staff cost is "+sPct+"% of sales in this range — on the high side; check shift coverage against how busy those hours really are.");
@@ -3263,8 +3277,19 @@ function latestRate(ingredient){
 }
 
 // Purchases are bought in kg/litre/packets but recipes use g/ml/pcs - bridge the two.
+// "ltr", "Liter", "gm", "kgs"... all mean the same few units.
+function normUnit(u){
+  u = String(u||"").toLowerCase().trim().replace(/\.$/,"");
+  if(/^(l|lt|ltr|ltrs|liter|liters|litre|litres)$/.test(u)) return "litre";
+  if(/^(ml|mls|millilitre|milliliter)$/.test(u)) return "ml";
+  if(/^(kg|kgs|kilo|kilos|kilogram|kilograms)$/.test(u)) return "kg";
+  if(/^(g|gm|gms|gram|grams|gr)$/.test(u)) return "g";
+  if(/^(pc|pcs|piece|pieces|nos|no)$/.test(u)) return "pcs";
+  if(/^(pkt|pkts|packet|packets|pack|packs)$/.test(u)) return "packet";
+  return u;
+}
 function unitFactor(purchaseUnit, recipeUnit){
-  var pu = (purchaseUnit||"").toLowerCase(), ru = (recipeUnit||"").toLowerCase();
+  var pu = normUnit(purchaseUnit), ru = normUnit(recipeUnit);
   if(pu===ru) return 1;
   if((pu==="kg" && ru==="g") || (pu==="litre" && ru==="ml") || (pu==="l" && ru==="ml")) return 0.001;
   if((pu==="g" && ru==="kg") || (pu==="ml" && ru==="litre")) return 1000;
@@ -6451,7 +6476,8 @@ function roundHalf(n){ return Math.round(n*2)/2; }
 function salaryFor(st, mKey){
   var days = daysInMonthOf(mKey), sh = staffMonthShare(st, mKey);
   var today = fmtDate(new Date()), cur = mKey === today.slice(0,7), future = mKey > today.slice(0,7);
-  var rate = (+st.salary||0) / days;
+  var rate = (+st.salary||0) / 30;
+  var fullMonth = sh.days >= days, factor = payFactor(st, mKey);
   var absent = 0, leave = 0, half = 0, present = 0, marked = 0;
   attendance.forEach(function(a){
     if(a.staffId!==st.id || monthKey(a.date)!==mKey) return;
@@ -6463,27 +6489,28 @@ function salaryFor(st, mKey){
     else if(a.status==="Leave") leave++;
   });
   var offDays = absent + leave + half*0.5;
-  var allowedLeave = roundHalf(paidLeavePerMonth() * sh.share);
+  // Paid leave comes with a full month's work; a part month (joining or leaving) has none.
+  var allowedLeave = fullMonth ? paidLeavePerMonth() : 0;
   var unpaidDays = Math.max(0, offDays - allowedLeave);
   var unusedLeave = Math.max(0, allowedLeave - offDays);
-  var base = Math.round((+st.salary||0) * sh.share);
-  var deduction = Math.round(unpaidDays * rate);
-  var extraLeave = Math.round(unusedLeave * rate);
+  var base = r2((+st.salary||0) * factor);
+  var deduction = r2(unpaidDays * rate);
+  var extraLeave = r2(unusedLeave * rate);
   var rec = payrollFor(st.id, mKey);
   var choice = rec && rec.extraLeave ? rec.extraLeave : "pay";       // "pay" | "waived"
   // While the month is still running, unused leave is not final - don't add it yet.
   var extraPaid = (choice==="pay" && !cur && !future) ? extraLeave : 0;
   var waived = (choice==="waived" && !cur && !future) ? extraLeave : 0;
-  var allowances = Math.round(allowanceTotal(st) * sh.share);
-  var salaryNet = base - deduction + extraPaid;
-  var net = salaryNet + allowances;
+  var allowances = r2(allowanceTotal(st) * factor);
+  var salaryNet = r2(base - deduction + extraPaid);
+  var net = r2(salaryNet + allowances);
   // For the month still running: what has been earned up to today (for advances).
   var accruedSalary = salaryNet, accruedAllow = allowances;
   if(cur && sh.days>0){
     var upto = today < sh.to ? today : sh.to;
     var soFar = upto >= sh.from ? datesBetween(sh.from, upto).length : 0;
-    accruedSalary = Math.max(0, Math.round(base * soFar / sh.days) - deduction);
-    accruedAllow = Math.round(allowances * soFar / sh.days);
+    accruedSalary = Math.max(0, r2(Math.min(base, rate * soFar) - deduction));
+    accruedAllow = r2(allowances * Math.min(1, soFar / Math.max(1, Math.min(30, sh.days))));
   }
   // Payments made for this month (a salary paid in October for September counts for September).
   var pays = expenses.filter(function(x){
@@ -6492,9 +6519,10 @@ function salaryFor(st, mKey){
   var paid = pays.reduce(function(t,x){ return t+expAmt(x); },0);
   var dueDate = fmtDate(new Date(+mKey.slice(0,4), +mKey.slice(5,7), Math.min(salaryDueDay(), 28)));
   var lastPay = pays.length ? pays[pays.length-1].date : null;
-  var balance = Math.round(net - paid);
+  var balance = r2(net - paid);
+  if(Math.abs(balance) < 0.5) balance = 0;   // paise left over from rounding a payment
   var status = sh.days===0 ? "none" : (rec && rec.settled) ? "settled" : balance<=0 && paid>0 ? "paid" : paid>0 ? "part" : "due";
-  return { st:st, month:mKey, days:days, share:sh, employedDays:sh.days, rate:rate,
+  return { st:st, month:mKey, days:days, share:sh, employedDays:sh.days, rate:r2(rate), factor:factor, fullMonth:fullMonth,
            present:present, half:half, absent:absent, leave:leave, marked:marked, unmarked: Math.max(0, sh.days - marked),
            offDays:offDays, allowedLeave:allowedLeave, unpaidDays:unpaidDays, unusedLeave:unusedLeave,
            base:base, deduction:deduction, extraLeave:extraLeave, extraPaid:extraPaid, waived:waived, choice:choice,
@@ -6584,10 +6612,10 @@ function staffMealCost(mKey, staffId){
 // allowances, and the raw material of the meals they ate.
 function staffCostBreakdown(st, mKey){
   var pay = earnedSalary(st, mKey);
-  var shr = staffMonthShare(st, mKey).share;
-  var rent = Math.round((+st.houseRent || 0) * shr);
-  var food = Math.round((+st.foodAllowance || 0) * shr);
-  var travel = Math.round((+st.travelAllowance || 0) * shr);
+  var shr = payFactor(st, mKey);
+  var rent = r2((+st.houseRent || 0) * shr);
+  var food = r2((+st.foodAllowance || 0) * shr);
+  var travel = r2((+st.travelAllowance || 0) * shr);
   var meals = staffMealCost(mKey, st.id);
   return { salary: pay.earned, rent: rent, food: food, travel: travel, meals: meals,
            cash: pay.earned + rent + food + travel,
@@ -6621,9 +6649,9 @@ function renderSalaryView(){
   var list = staff.map(function(st){ return salaryFor(st, salMonth); }).filter(function(s){ return s.employedDays>0 || s.paid>0; });
   var tot = list.reduce(function(t,s){ t.net += s.net; t.paid += s.paid; t.bal += Math.max(0, s.balance); return t; }, { net:0, paid:0, bal:0 });
   html += '<div class="kpis fckpis" style="margin-bottom:10px;">'+
-    '<div class="kpi"><div class="lbl">Salary due</div><div class="val">'+rupee(tot.net)+'</div></div>'+
-    '<div class="kpi"><div class="lbl">Paid</div><div class="val pos">'+rupee(tot.paid)+'</div></div>'+
-    '<div class="kpi"><div class="lbl">Balance</div><div class="val '+(tot.bal>0?"neg":"pos")+'">'+rupee(tot.bal)+'</div></div></div>';
+    '<div class="kpi"><div class="lbl">Salary due</div><div class="val">'+rupeeP(tot.net)+'</div></div>'+
+    '<div class="kpi"><div class="lbl">Paid</div><div class="val pos">'+rupeeP(tot.paid)+'</div></div>'+
+    '<div class="kpi"><div class="lbl">Balance</div><div class="val '+(tot.bal>0?"neg":"pos")+'">'+rupeeP(tot.bal)+'</div></div></div>';
   html += '<div class="backupnote" style="margin:0 0 10px;">'+paidLeavePerMonth()+' paid leave days a month · salary due by the '+salaryDueDay()+
           ordinal(salaryDueDay())+' of the next month · days not marked in attendance count as worked. <a href="#" id="sl_rules">Change</a></div>';
   if(!list.length) html += '<div class="empty">Nobody was employed this month.</div>';
@@ -6631,26 +6659,28 @@ function renderSalaryView(){
     var st = s.st, gw = goodwillFor(st);
     var pill = s.status==="settled" ? '<span class="pill ok">settled</span>' : s.status==="paid" ? '<span class="pill ok">paid</span>' :
                s.status==="part" ? '<span class="pill bad">part paid</span>' : s.net>0 ? '<span class="pill bad">due</span>' : '';
-    html += '<div class="salcard"><div class="salhead"><div><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+' · '+rupee(st.salary||0)+'/month</span></div>'+pill+'</div>';
+    html += '<div class="salcard"><div class="salhead"><div><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+' · '+rupeeP(st.salary||0)+'/month</span></div>'+pill+'</div>';
     html += '<div class="psrow"><span>Days employed</span><b>'+s.employedDays+' of '+s.days+'</b></div>';
+    html += '<div class="psrow"><span>Salary</span><b>'+(s.fullMonth ? rupeeP(s.base)+' <span class="muted">full month</span>' : s.employedDays+' days × '+rupeeP(s.rate)+' = '+rupeeP(s.base))+'</b></div>';
     html += '<div class="psrow"><span>Leave taken</span><b>'+fmtQty(s.offDays)+' of '+fmtQty(s.allowedLeave)+' paid'+(s.unpaidDays?' · <span class="bad">'+fmtQty(s.unpaidDays)+' unpaid</span>':'')+'</b></div>';
     if(s.unusedLeave>0){
-      html += '<div class="psrow"><span>Unused leave</span><b>'+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupee(s.extraLeave)+
+      html += '<div class="psrow"><span>Unused leave</span><b>'+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupeeP(s.extraLeave)+
               (s.current ? ' <span class="muted">(final at month end)</span>' : s.choice==="waived" ? ' <span class="pill">waived · goodwill</span>' : ' <span class="pill ok">paid extra</span>')+'</b></div>';
     }
-    html += '<div class="psrow"><span><b>Total due</b></span><b>'+rupee(s.net)+'</b></div>';
-    html += '<div class="psrow"><span>Paid</span><b class="ok">'+rupee(s.paid)+'</b></div>';
+    html += '<div class="psrow"><span><b>Total due</b></span><b>'+rupeeP(s.net)+'</b></div>';
+    html += '<div class="psrow"><span>Paid</span><b class="ok">'+rupeeP(s.paid)+'</b></div>';
     if(s.pays.length){
       html += '<div class="salpays">'+s.pays.map(function(x){
-        return '<span>'+fmtD(x.date)+' · '+rupee(x.amount)+' · '+esc(x.mode||"")+(payerIsPersonal(x.paidBy)?' ('+esc(payerPartner(x.paidBy))+')':'')+'</span>';
+        return '<span>'+fmtD(x.date)+' · '+rupeeP(x.amount)+' · '+esc(x.mode||"")+(payerIsPersonal(x.paidBy)?' ('+esc(payerPartner(x.paidBy))+')':'')+'</span>';
       }).join("")+'</div>';
     }
-    html += '<div class="psrow"><span>'+(s.balance<0?'Paid in advance':'Balance')+'</span><b class="'+(s.balance>0?"bad":"ok")+'">'+rupee(Math.abs(s.balance))+'</b></div>';
+    html += '<div class="psrow"><span>'+(s.balance<0?'Paid in advance':'Balance')+'</span><b class="'+(s.balance>0?"bad":"ok")+'">'+rupeeP(Math.abs(s.balance))+'</b></div>';
     var timing = payTiming(s);
     if(timing) html += '<div class="barsub" style="margin-top:4px;">'+esc(timing)+'</div>';
-    if(gw.balance>0) html += '<div class="barsub" style="margin-top:4px;">Goodwill waived so far: <b>'+rupee(gw.balance)+'</b> — can be given back as a bonus.</div>';
+    if(gw.balance>0) html += '<div class="barsub" style="margin-top:4px;">Goodwill waived so far: <b>'+rupeeP(gw.balance)+'</b> — can be given back as a bonus.</div>';
     html += '<div class="salbtns">'+
-      (s.balance>0 ? '<button class="sale" data-slpay="'+st.id+'">Pay '+rupee(s.balance)+'</button>' : '')+
+      (s.balance>0 ? '<button class="sale" data-slpay="'+st.id+'">Pay '+rupeeP(s.balance)+'</button>' : '')+
+      '<button data-sladv="'+st.id+'">Advance</button>'+
       (!s.current && !s.future ? '<button class="invest" data-slsettle="'+st.id+'">'+(s.status==="settled"?"Settlement":"Final settlement")+'</button>' : '')+
       '<button class="expense" data-slslip="'+st.id+'">Salary slip</button>'+
       (gw.balance>0 ? '<button class="purch" data-slbonus="'+st.id+'">Give bonus</button>' : '')+'</div>';
@@ -6666,6 +6696,7 @@ function renderSalaryView(){
   wire("data-slsettle", function(st){ openSettlement(st, salMonth); });
   wire("data-slslip", function(st){ openSalarySlip(st, salMonth); });
   wire("data-slbonus", openBonusForm);
+  wire("data-sladv", function(st){ openAdvanceForm(st, salMonth); });
   if(staffSub==="salary") updateStaffTotal();
 }
 function ordinal(n){ n = +n; var s = ["th","st","nd","rd"], v = n % 100; return s[(v-20)%10] || s[v] || s[0]; }
@@ -6693,13 +6724,13 @@ function openSalaryPay(st, mKey){
   var s = salaryFor(st, mKey);
   var done = {};
   s.pays.forEach(function(x){ done[x.category] = (done[x.category]||0) + expAmt(x); });
-  var shr = s.share.share;
+  var shr = s.factor;
   var accr = s.current && s.allowances ? s.accruedAllow / s.allowances : 1;
-  var cb = { rent: Math.max(0, Math.round((+st.houseRent||0)*shr*accr) - (done["Staff House Rent"]||0)),
-             food: Math.max(0, Math.round((+st.foodAllowance||0)*shr*accr) - (done["Staff Food Allowance"]||0)),
-             travel: Math.max(0, Math.round((+st.travelAllowance||0)*shr*accr) - (done["Staff Travel Allowance"]||0)) };
-  var pay = { earned: Math.max(0, s.accruedSalary - (done["Staff Salary"]||0)), basis: (s.current ? "earned up to today, " : "")+s.employedDays+" days employed"+(s.unpaidDays?", "+fmtQty(s.unpaidDays)+" unpaid leave":"")+(s.extraPaid?", +"+fmtQty(s.unusedLeave)+" unused leave":"") };
-  cb.cash = pay.earned + cb.rent + cb.food + cb.travel;
+  var cb = { rent: Math.max(0, r2((+st.houseRent||0)*shr*accr - (done["Staff House Rent"]||0))),
+             food: Math.max(0, r2((+st.foodAllowance||0)*shr*accr - (done["Staff Food Allowance"]||0))),
+             travel: Math.max(0, r2((+st.travelAllowance||0)*shr*accr - (done["Staff Travel Allowance"]||0))) };
+  var pay = { earned: Math.max(0, r2(s.accruedSalary - (done["Staff Salary"]||0))), basis: (s.current ? "earned up to today, " : "")+s.employedDays+" days employed"+(s.unpaidDays?", "+fmtQty(s.unpaidDays)+" unpaid leave":"")+(s.extraPaid?", +"+fmtQty(s.unusedLeave)+" unused leave":"") };
+  cb.cash = r2(pay.earned + cb.rent + cb.food + cb.travel);
   document.getElementById("sheetBg").classList.add("on");
   openPaySheet(st, pay, mKey, cb, true);
 }
@@ -6711,12 +6742,12 @@ function openSettlement(st, mKey){
   var html = '<h2 class="serif">Final settlement</h2>';
   html += '<div class="backupnote">'+esc(st.name)+' · '+esc(monthLabel(mKey))+'</div>';
   html += '<div class="card" style="margin-bottom:12px;">'+
-    '<div class="psrow"><span>Salary for '+s.employedDays+' days</span><b>'+rupee(s.base)+'</b></div>'+
-    (s.deduction ? '<div class="psrow"><span>− '+fmtQty(s.unpaidDays)+' unpaid leave day(s)</span><b class="bad">'+rupee(s.deduction)+'</b></div>' : '')+
-    (s.allowances ? '<div class="psrow"><span>+ Allowances</span><b>'+rupee(s.allowances)+'</b></div>' : '')+'</div>';
+    '<div class="psrow"><span>Salary for '+s.employedDays+' days</span><b>'+rupeeP(s.base)+'</b></div>'+
+    (s.deduction ? '<div class="psrow"><span>− '+fmtQty(s.unpaidDays)+' unpaid leave day(s)</span><b class="bad">'+rupeeP(s.deduction)+'</b></div>' : '')+
+    (s.allowances ? '<div class="psrow"><span>+ Allowances</span><b>'+rupeeP(s.allowances)+'</b></div>' : '')+'</div>';
   var choice = s.choice;
   if(s.unusedLeave>0){
-    html += '<div class="card" style="margin-bottom:12px;"><h3>Unused leave · '+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupee(s.extraLeave)+'</h3>'+
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Unused leave · '+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupeeP(s.extraLeave)+'</h3>'+
       '<div class="backupnote" style="margin:0 0 8px;">'+esc(st.name)+' worked on '+fmtQty(s.unusedLeave)+' of the paid leave days, so this extra is owed to them.</div>'+
       '<label class="setlopt"><input type="radio" name="st_ch" value="pay" '+(choice==="pay"?"checked":"")+'> <span><b>Pay it</b> with this month’s salary</span></label>'+
       '<label class="setlopt"><input type="radio" name="st_ch" value="waived" '+(choice==="waived"?"checked":"")+'> <span><b>They don’t want it</b> — record as goodwill for a future bonus</span></label></div>';
@@ -6735,12 +6766,12 @@ function openSettlement(st, mKey){
   function cur(){ var r = sheet.querySelector('input[name="st_ch"]:checked'); return r ? r.value : "pay"; }
   function net(){ return s.base - s.deduction + s.allowances + (cur()==="pay" ? s.extraLeave : 0); }
   function draw(){
-    var n = net(), bal = Math.round(n - s.paid);
+    var n = r2(net()), bal = r2(n - s.paid); if(Math.abs(bal) < 0.5) bal = 0;
     document.getElementById("st_sum").innerHTML =
-      '<div class="psrow"><span><b>Total due</b></span><b>'+rupee(n)+'</b></div>'+
-      '<div class="psrow"><span>Already paid</span><b class="ok">'+rupee(s.paid)+'</b></div>'+
-      '<div class="psrow"><span>'+(bal<0?'Paid in advance':'Balance to pay')+'</span><b class="'+(bal>0?"bad":"ok")+'">'+rupee(Math.abs(bal))+'</b></div>'+
-      (cur()==="waived" && s.extraLeave ? '<div class="barsub">'+rupee(s.extraLeave)+' goes to '+esc(st.name)+'’s goodwill balance.</div>' : '');
+      '<div class="psrow"><span><b>Total due</b></span><b>'+rupeeP(n)+'</b></div>'+
+      '<div class="psrow"><span>Already paid</span><b class="ok">'+rupeeP(s.paid)+'</b></div>'+
+      '<div class="psrow"><span>'+(bal<0?'Paid in advance':'Balance to pay')+'</span><b class="'+(bal>0?"bad":"ok")+'">'+rupeeP(Math.abs(bal))+'</b></div>'+
+      (cur()==="waived" && s.extraLeave ? '<div class="barsub">'+rupeeP(s.extraLeave)+' goes to '+esc(st.name)+'’s goodwill balance.</div>' : '');
     document.getElementById("st_amt").value = Math.max(0, bal) || "";
   }
   Array.prototype.forEach.call(sheet.querySelectorAll('input[name="st_ch"]'), function(r){ r.addEventListener("change", draw); });
@@ -6761,7 +6792,46 @@ function openSettlement(st, mKey){
                    settled:true, settledOn: fmtDate(new Date()), note: document.getElementById("st_note").value.trim() });
     savePayroll();
     closeForm(); renderAll();
-    appAlert(st.name+" · "+monthLabel(mKey)+" settled."+(ch==="waived" && s.extraLeave ? " "+rupee(s.extraLeave)+" recorded as goodwill." : ""));
+    appAlert(st.name+" · "+monthLabel(mKey)+" settled."+(ch==="waived" && s.extraLeave ? " "+rupeeP(s.extraLeave)+" recorded as goodwill." : ""));
+  });
+}
+
+// Money given before salary is due. It is recorded as salary for the chosen month,
+// so that month's balance goes down by the same amount.
+function openAdvanceForm(st, mKey, back){
+  mKey = mKey || fmtDate(new Date()).slice(0,7);
+  var s = salaryFor(st, mKey);
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Salary advance</h2>';
+  html += '<div class="backupnote">'+esc(st.name)+' · adjusted against the salary of the month you pick. Already earned this month so far: <b>'+rupeeP(s.accruedSalary + s.accruedAllow)+'</b>, already paid: <b>'+rupeeP(s.paid)+'</b>.</div>';
+  html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="ad_amt"></div>';
+  html += '<div><label>Against salary of</label><input type="month" id="ad_month" value="'+mKey+'"></div></div>';
+  html += '<div class="field two"><div><label>Date given</label><input type="date" id="ad_date" value="'+fmtDate(new Date())+'"></div>';
+  html += '<div><label>Mode</label><select id="ad_mode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option></select></div></div>';
+  html += '<div class="field"><label>Paid by</label><select id="ad_by">'+payerOptions().map(function(o){ return '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="field"><label>Reason (optional)</label><input type="text" id="ad_note" placeholder="e.g. family function"></div>';
+  html += '<div id="ad_warn"></div><div class="err" id="ad_err"></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="ad_cancel">Cancel</button><button class="btn-save" id="ad_go">Give advance</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  function check(){
+    var m = document.getElementById("ad_month").value || mKey, a = parseFloat(document.getElementById("ad_amt").value) || 0;
+    var x = salaryFor(st, m), left = r2(x.net - x.paid);
+    document.getElementById("ad_warn").innerHTML = a > left ? '<div class="backupnote warnline">This is more than the '+rupeeP(Math.max(0,left))+' left of '+esc(monthLabel(m))+'’s salary — the extra will show as paid in advance.</div>' : '';
+  }
+  document.getElementById("ad_amt").addEventListener("input", check);
+  document.getElementById("ad_month").addEventListener("change", check);
+  document.getElementById("ad_cancel").addEventListener("click", function(){ if(back) back(); else closeForm(); });
+  document.getElementById("ad_go").addEventListener("click", function(){
+    var amt = parseFloat(document.getElementById("ad_amt").value);
+    if(isNaN(amt) || amt<=0){ var e = document.getElementById("ad_err"); e.textContent = "Enter the advance amount."; e.style.display = "block"; return; }
+    var m = document.getElementById("ad_month").value || mKey, note = document.getElementById("ad_note").value.trim();
+    expenses.push({ id:uid(), date:document.getElementById("ad_date").value || fmtDate(new Date()), category:"Staff Salary",
+                    description: st.name+" - "+monthLabel(m)+" salary advance"+(note?" ("+note+")":""), amount:r2(amt),
+                    mode:document.getElementById("ad_mode").value, paidBy:document.getElementById("ad_by").value, settled:false, advance:true });
+    saveExpense(); closeForm(); renderAll();
+    var after = salaryFor(st, m);
+    appAlert("Advance of "+rupeeP(amt)+" recorded against "+monthLabel(m)+". Remaining for that month: "+rupeeP(Math.max(0, after.balance))+".");
   });
 }
 
@@ -6769,7 +6839,7 @@ function openBonusForm(st){
   var gw = goodwillFor(st);
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">Bonus for '+esc(st.name)+'</h2>';
-  html += '<div class="backupnote">'+esc(st.name)+' has given up '+rupee(gw.waived)+' of unused-leave pay so far'+(gw.bonus?' and received '+rupee(gw.bonus)+' in bonuses':'')+'. Goodwill balance: <b>'+rupee(gw.balance)+'</b>.</div>';
+  html += '<div class="backupnote">'+esc(st.name)+' has given up '+rupeeP(gw.waived)+' of unused-leave pay so far'+(gw.bonus?' and received '+rupeeP(gw.bonus)+' in bonuses':'')+'. Goodwill balance: <b>'+rupeeP(gw.balance)+'</b>.</div>';
   html += '<div class="field two"><div><label>Bonus (₹)</label><input type="number" inputmode="decimal" id="bn_amt" value="'+Math.round(gw.balance)+'"></div>';
   html += '<div><label>Date</label><input type="date" id="bn_date" value="'+fmtDate(new Date())+'"></div></div>';
   html += '<div class="field two"><div><label>Mode</label><select id="bn_mode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option></select></div>';
@@ -6794,23 +6864,24 @@ function openBonusForm(st){
 // ---- salary slip ----
 function slipLines(s){
   var st = s.st, L = [];
-  L.push(["Monthly salary", rupee(st.salary||0)]);
+  L.push(["Monthly salary", rupeeP(st.salary||0)]);
+  L.push(["Daily rate (salary ÷ 30)", rupeeP(s.rate)]);
   L.push(["Days in month", String(s.days)]);
   L.push(["Days employed", String(s.employedDays)+(s.share.from && s.share.from>s.month+"-01" ? " (joined "+fmtD(s.share.from)+")" : "")]);
   L.push(["Present", String(s.present)+(s.unmarked?" + "+s.unmarked+" not marked (counted as worked)":"")]);
   if(s.half) L.push(["Half days", String(s.half)]);
   L.push(["Absent / leave taken", fmtQty(s.offDays)]);
   L.push(["Paid leave allowed", fmtQty(s.allowedLeave)]);
-  L.push(["Salary for days employed", rupee(s.base)]);
-  if(s.deduction) L.push(["Less: "+fmtQty(s.unpaidDays)+" unpaid leave day(s)", "- "+rupee(s.deduction)]);
-  if(s.extraLeave && !s.current) L.push(["Unused leave: "+fmtQty(s.unusedLeave)+" day(s)", s.choice==="waived" ? rupee(s.extraLeave)+" waived (goodwill)" : "+ "+rupee(s.extraLeave)]);
-  var shr = s.share.share;
-  if(+st.houseRent) L.push(["House rent allowance", rupee(Math.round(st.houseRent*shr))]);
-  if(+st.foodAllowance) L.push(["Food allowance", rupee(Math.round(st.foodAllowance*shr))]);
-  if(+st.travelAllowance) L.push(["Travel allowance", rupee(Math.round(st.travelAllowance*shr))]);
-  L.push(["NET PAYABLE", rupee(s.net)]);
-  s.pays.forEach(function(x){ L.push(["Paid on "+fmtD(x.date)+" ("+(x.mode||"")+")", rupee(x.amount)]); });
-  L.push([s.balance<0 ? "Paid in advance" : "Balance due", rupee(Math.abs(s.balance))]);
+  L.push([s.fullMonth ? "Salary (full month)" : "Salary: "+s.employedDays+" days × "+rupeeP(s.rate), rupeeP(s.base)]);
+  if(s.deduction) L.push(["Less: "+fmtQty(s.unpaidDays)+" unpaid leave day(s)", "- "+rupeeP(s.deduction)]);
+  if(s.extraLeave && !s.current) L.push(["Unused leave: "+fmtQty(s.unusedLeave)+" day(s)", s.choice==="waived" ? rupeeP(s.extraLeave)+" waived (goodwill)" : "+ "+rupeeP(s.extraLeave)]);
+  var shr = s.factor;
+  if(+st.houseRent) L.push(["House rent allowance", rupeeP(r2(st.houseRent*shr))]);
+  if(+st.foodAllowance) L.push(["Food allowance", rupeeP(r2(st.foodAllowance*shr))]);
+  if(+st.travelAllowance) L.push(["Travel allowance", rupeeP(r2(st.travelAllowance*shr))]);
+  L.push(["NET PAYABLE", rupeeP(s.net)]);
+  s.pays.forEach(function(x){ L.push(["Paid on "+fmtD(x.date)+" ("+(x.mode||"")+")", rupeeP(x.amount)]); });
+  L.push([s.balance<0 ? "Paid in advance" : "Balance due", rupeeP(Math.abs(s.balance))]);
   return L;
 }
 
@@ -7124,10 +7195,11 @@ function renderAttendMonth(el){
   if(!people.length){ el.innerHTML = html + '<div class="empty">Add staff first.</div>'; wireAttMonth(el); return; }
   people.forEach(function(st){
     var a = monthAttendance(st.id, attMonth);
-    var pay = earnedSalary(st, attMonth);
+    var sfa = salaryFor(st, attMonth);
+    var pay = { earned: sfa.current ? sfa.accruedSalary : sfa.salaryNet };
     html += '<div class="attmonth"><div class="attmhead"><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+'</span></div>';
     html += '<div class="attmstats"><span class="ok">'+a.present+' present</span>'+(a.half?'<span>'+a.half+' half</span>':'')+
-            '<span class="bad">'+a.absent+' absent</span><span>'+a.leave+' leave</span><span>'+rupee(pay.earned)+' earned</span></div>';
+            '<span class="bad">'+a.absent+' absent</span><span>'+a.leave+' leave</span><span>'+rupeeP(pay.earned)+(sfa.current?' earned so far':' salary')+'</span></div>';
     html += '<div class="attcal">'+["S","M","T","W","T","F","S"].map(function(d){ return '<div class="acdow">'+d+'</div>'; }).join("");
     for(var i=0;i<first.getDay();i++) html += '<div></div>';
     for(var d=1; d<=days; d++){
@@ -7377,8 +7449,14 @@ function openStaffProfile(staffId){
   if(cb.meals>0) html += '<div class="psrow"><span>Meals eaten (raw material)</span><b>'+rupee(cb.meals)+'</b></div>';
   html += '<div class="psrow"><span><b>Total cost to cafe</b></span><b>'+rupee(cb.total)+'</b></div></div>';
 
-  html += '<div class="paybox"><div><span>Cash payable now</span><b>'+rupee(cb.cash)+'</b><i>'+pay.basis+(cb.rent+cb.food>0?" + allowances":"")+'</i></div>'+
-          '<button class="btn-save" id="p_pay">Pay</button></div>';
+  var sm = salaryFor(s, mKey);
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Salary · '+monthName+'</h3>'+
+    '<div class="psrow"><span>Due for the month</span><b>'+rupeeP(sm.net)+'</b></div>'+
+    '<div class="psrow"><span>Earned so far</span><b>'+rupeeP(sm.accruedSalary + sm.accruedAllow)+'</b></div>'+
+    '<div class="psrow"><span>Paid / advanced</span><b class="ok">'+rupeeP(sm.paid)+'</b></div>'+
+    (sm.pays.length ? '<div class="salpays">'+sm.pays.map(function(x){ return '<span>'+fmtD(x.date)+' · '+rupeeP(x.amount)+(x.advance||/advance/i.test(x.description||"")?' · advance':'')+'</span>'; }).join("")+'</div>' : '')+
+    '<div class="psrow"><span>Balance for the month</span><b class="'+(sm.balance>0?"bad":"ok")+'">'+rupeeP(Math.max(0, sm.balance))+'</b></div></div>';
+  html += '<div class="sheetbtns" style="margin-bottom:12px;"><button class="btn-cancel" id="p_adv" style="flex:1;">Salary advance</button><button class="btn-save" id="p_pay" style="flex:1;">Pay salary</button></div>';
 
   html += '<h3 style="margin:18px 0 8px;font-size:14px;">Conduct record</h3>';
   html += '<div class="sheetbtns" style="margin-bottom:10px;"><button class="btn-cancel" id="p_warn" style="flex:1;">Log warning</button><button class="btn-cancel" id="p_appr" style="flex:1;">Log appreciation</button></div>';
@@ -7399,7 +7477,8 @@ function openStaffProfile(staffId){
   document.getElementById("p_edit").addEventListener("click", function(){ openStaffForm(s.id); });
   document.getElementById("p_warn").addEventListener("click", function(){ openConductForm(s.id, "Warning"); });
   document.getElementById("p_appr").addEventListener("click", function(){ openConductForm(s.id, "Appreciation"); });
-  document.getElementById("p_pay").addEventListener("click", function(){ openPaySheet(s, pay, mKey, cb); });
+  document.getElementById("p_pay").addEventListener("click", function(){ openSalaryPay(s, mKey); });
+  document.getElementById("p_adv").addEventListener("click", function(){ openAdvanceForm(s, mKey, function(){ openStaffProfile(s.id); }); });
 }
 
 function openConductForm(staffId, type){
