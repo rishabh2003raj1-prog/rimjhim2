@@ -181,6 +181,20 @@
   .fckpis{grid-template-columns:repeat(3,1fr) !important;}
   .fckpis .kpi{padding:10px;} .fckpis .val{font-size:17px !important;}
   .fcpay{width:auto !important;padding:8px 10px !important;margin:0 !important;white-space:nowrap;}
+  .salcard{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;}
+  .salhead{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;}
+  .salhead b{display:block;font-size:15px;} .salhead span{font-size:12px;color:var(--ink-soft);}
+  .salpays{display:flex;flex-direction:column;gap:2px;margin:2px 0 4px;padding-left:8px;border-left:2px solid var(--line);}
+  .salpays span{font-size:11.5px;color:var(--ink-soft);}
+  .salbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;}
+  .salbtns button{flex:1 1 45%;padding:9px 6px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink);}
+  .salbtns .sale{background:var(--teal);border-color:var(--teal);color:#fff;}
+  .setlopt{display:flex;gap:8px;align-items:flex-start;padding:8px 0;font-size:13.5px;}
+  .slip{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;}
+  .sliphead{display:flex;justify-content:space-between;align-items:baseline;border-bottom:2px solid var(--ink);padding-bottom:6px;margin-bottom:8px;}
+  .sliphead b{font-family:'Fraunces',serif;font-size:17px;} .sliphead span{font-size:12px;color:var(--ink-soft);}
+  .slipwho{margin-bottom:6px;} .slipwho b{display:block;font-size:15px;} .slipwho span{font-size:12px;color:var(--ink-soft);}
+  .sliptot{border-top:1px solid var(--ink);font-weight:700;}
   .attlegend{display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11px;color:var(--ink-soft);margin:0 0 8px;}
   .attlegend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;border:1px solid var(--line);}
   .attmonth{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px;margin-bottom:12px;}
@@ -508,12 +522,14 @@
         <button data-s="roster">Roster</button>
         <button data-s="attendance">Attend.</button>
         <button data-s="tasks">Tasks</button>
+        <button data-s="salary">Salary</button>
         <button data-s="meals">Meals</button>
       </div>
       <div id="teamView" class="reclist"></div>
       <div id="rosterView" class="reclist" style="display:none;"></div>
       <div id="attendView" class="reclist" style="display:none;"></div>
       <div id="tasksView" class="reclist" style="display:none;"></div>
+      <div id="salaryView" class="reclist" style="display:none;"></div>
       <div id="mealsView" class="reclist" style="display:none;"></div>
     </div>
 
@@ -623,11 +639,12 @@ function appAlert(msg){
 
 function storeKey(k){ return OUTLET.id==="rimjhim" ? k : (OUTLET.id + "__" + k); }
 
-var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1";
+var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1";
 var sales = [], purchases = [], notes = [], investments = [], expenses = [], bills = [];
 var staff = [], roster = [], attendance = [], tasks = [], conduct = [], cashDays = [];
 var menuItems = [], ingredients = [], dishLog = [], vendors = [], assets = [], customers = [], creditPayments = [];
 var wastage = [], prepBatches = [], stockAudits = [];
+var payroll = []; // one record per person per month: settlement + unused-leave choice
 var retailItems = [], retailSales = [];
 var cafeUse = [];
 var stockSub = "all";
@@ -656,6 +673,7 @@ var INVEST_PURPOSES = ["Cafe purchase price","Renovation / interiors","Equipment
 var EXP_CATS = ["Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance","Rent","Electricity","Wifi / Internet","Mobile recharge","Maintenance","Other"];
 // Overheads that land every month whether or not a single cup is sold.
 var BASE_FIXED_CATS = ["Rent","Electricity","Wifi / Internet","Mobile recharge"];
+EXP_CATS.splice(EXP_CATS.length-1, 0, "Staff Bonus");
 var BASE_EXP_CATS = EXP_CATS.slice();
 var FIXED_CATS = BASE_FIXED_CATS.slice();
 // Extra monthly overheads the owner adds (gas cylinder, water, security...) behave
@@ -729,7 +747,7 @@ function seedData(){
 // entries without internet; changes upload as soon as the connection is back.
 var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
-  RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
+  PAYROLL_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
   VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo";
 
@@ -949,6 +967,7 @@ function setKeyValue(key, v){
     case STAFF_KEY: staff = arr; break;             case ROSTER_KEY: roster = arr; break;
     case ATTEND_KEY: attendance = arr; break;       case TASKS_KEY: tasks = arr; break;
     case CONDUCT_KEY: conduct = arr; break;
+    case PAYROLL_KEY: payroll = arr; break;
     case PARTNERS_KEY: if(Array.isArray(v) && v.length) PARTNERS = v; break;
     case SETTINGS_KEY: settings = (v && typeof v==="object") ? v : {}; break;
   }
@@ -1290,6 +1309,7 @@ function readLists(){
   attendance = Array.isArray(at) ? at : [];
   tasks = Array.isArray(tk) ? tk : [];
   conduct = Array.isArray(cd) ? cd : [];
+  var pr = lsGet(PAYROLL_KEY); payroll = Array.isArray(pr) ? pr : [];
   var cdays = lsGet(CASH_KEY), sett = lsGet(SETTINGS_KEY);
   cashDays = Array.isArray(cdays) ? cdays : [];
   settings = (sett && typeof sett==="object") ? sett : { openingCash:null, openingCashDate:null, bankBalance:null, bankDate:null };
@@ -1336,6 +1356,7 @@ function saveRoster(){ return lsSet(ROSTER_KEY, roster); }
 function saveAttend(){ return lsSet(ATTEND_KEY, attendance); }
 function saveTasks(){ return lsSet(TASKS_KEY, tasks); }
 function saveConduct(){ return lsSet(CONDUCT_KEY, conduct); }
+function savePayroll(){ return lsSet(PAYROLL_KEY, payroll); }
 function saveCashDays(){ return lsSet(CASH_KEY, cashDays); }
 function saveSettings(){ return lsSet(SETTINGS_KEY, settings); }
 function saveMenu(){ return lsSet(MENU_KEY, menuItems); }
@@ -1860,13 +1881,11 @@ function fixedMonthSummary(mKey){
   }).forEach(function(st){
     var sh = staffMonthShare(st, mKey);
     var fixedPart = staffPlanFor(st, mKey);
-    var earned = earnedSalary(st, mKey);
-    var a = earned.a;
-    var past = mKey < fmtDate(new Date()).slice(0,7);
-    // The month's fixed cost is salary + allowances for the days they were employed.
-    // Once a month is over and attendance was marked, it is the salary actually earned.
-    var allowPart = Math.round(allowanceTotal(st) * sh.share);
-    var plan = (past && a.marked>0) ? earned.earned + allowPart : fixedPart;
+    var sal = salaryFor(st, mKey);
+    var earned = { earned: sal.salaryNet }, a = monthAttendance(st.id, mKey);
+    // Salary + allowances for the days employed, less leave beyond the paid days,
+    // plus unused paid leave once the month is over (unless waived).
+    var plan = sal.net;
     var paid = staffPaidFor(st, mKey).total;
     staffRows.push({ st:st, planned:plan, full:fixedPart, paid:paid, due:Math.max(0, plan-paid), earnedSoFar: earned.earned + allowanceTotal(st),
                      basis: (sh.days < daysInMonthOf(mKey) && sh.days>0 ? "employed "+sh.days+" of "+daysInMonthOf(mKey)+" days ("+(sh.from>mKey+"-01"?"joined "+parseDate(sh.from).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"left "+parseDate(sh.to).toLocaleDateString("en-IN",{day:"numeric",month:"short"}))+") · " : "") +
@@ -1953,21 +1972,7 @@ function renderFixedView(){
   Array.prototype.forEach.call(el.querySelectorAll("[data-fcstaff]"), function(b){
     b.addEventListener("click", function(){
       var st = staffById(b.getAttribute("data-fcstaff"));
-      if(!st) return;
-      var cb = staffCostBreakdown(st, fcMonth), done = staffPaidFor(st, fcMonth).byCat;
-      var pay = earnedSalary(st, fcMonth);
-      if(pay.a.marked===0){
-        var shr = staffMonthShare(st, fcMonth);
-        pay = { earned: Math.round((+st.salary||0) * shr.share), basis: (shr.days<daysInMonthOf(fcMonth) ? shr.days+" days employed" : "full month")+" (attendance not marked)", a: pay.a };
-      }
-      // Only what is still unpaid for this month.
-      pay = { earned: Math.max(0, pay.earned - (done["Staff Salary"]||0)), basis: pay.basis, a: pay.a };
-      var shA = staffMonthShare(st, fcMonth).share;
-      cb = { rent: Math.max(0, Math.round(cb.rent*shA)-(done["Staff House Rent"]||0)), food: Math.max(0, Math.round(cb.food*shA)-(done["Staff Food Allowance"]||0)),
-             travel: Math.max(0, Math.round(cb.travel*shA)-(done["Staff Travel Allowance"]||0)) };
-      cb.cash = pay.earned + cb.rent + cb.food + cb.travel;
-      document.getElementById("sheetBg").classList.add("on");
-      openPaySheet(st, pay, fcMonth, cb, true);
+      if(st) openSalaryPay(st, fcMonth);
     });
   });
   if(recSub==="fixed") updateRecordsTotal();
@@ -2678,7 +2683,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll };
 }
 
 function exportBackup(){
@@ -2855,6 +2860,7 @@ function applyBackupData(data, errEl, partial){
     prepBatches = take("prepBatches", prepBatches); stockAudits = take("stockAudits", stockAudits);
     retailItems = take("retailItems", retailItems); retailSales = take("retailSales", retailSales);
     cafeUse = take("cafeUse", cafeUse); custPayments = take("custPayments", custPayments);
+    payroll = take("payroll", payroll);
     offers = take("offers", offers);
     if(Array.isArray(data.partners) && data.partners.length){
       PARTNERS = partial ? PARTNERS.concat(data.partners.filter(function(p){ return PARTNERS.indexOf(p)<0; })) : data.partners;
@@ -2872,7 +2878,7 @@ function saveEverything(){
   saveSales(); savePurch(); saveInvest(); saveExpense(); saveNotes(); savePartners(); saveBills();
   saveStaff(); saveRoster(); saveAttend(); saveTasks(); saveConduct(); saveCashDays(); saveSettings();
   saveMenu(); saveIngredients(); saveDishLog(); saveVendors(); saveAssets(); saveCustomers(); saveCreditPayments();
-  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers();
+  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); savePayroll();
 }
 
 function importBackup(file){
@@ -6431,12 +6437,88 @@ function monthAttendance(staffId, mKey){
   return { marked: rows.length, present: present, absent: absent, leave: leave, half: half };
 }
 
+// ---- Salary rules ----
+// Monthly salary covers the days a person is employed that month. Each month
+// includes a few paid leave days (2 by default). Leave beyond that is deducted
+// at the daily rate; paid leave that is NOT used is owed as extra pay - unless
+// the person waives it, in which case it is recorded as goodwill for a future
+// bonus. Days not marked in attendance count as worked.
+function paidLeavePerMonth(){ var v = settings && settings.paidLeaveDays; return (v===null || v===undefined || v==="") ? 2 : +v; }
+function salaryDueDay(){ var v = settings && settings.salaryDueDay; return v ? +v : 7; }
+function payrollFor(staffId, mKey){ return payroll.find(function(r){ return r.staffId===staffId && r.month===mKey; }) || null; }
+function roundHalf(n){ return Math.round(n*2)/2; }
+
+function salaryFor(st, mKey){
+  var days = daysInMonthOf(mKey), sh = staffMonthShare(st, mKey);
+  var today = fmtDate(new Date()), cur = mKey === today.slice(0,7), future = mKey > today.slice(0,7);
+  var rate = (+st.salary||0) / days;
+  var absent = 0, leave = 0, half = 0, present = 0, marked = 0;
+  attendance.forEach(function(a){
+    if(a.staffId!==st.id || monthKey(a.date)!==mKey) return;
+    if(sh.from && (a.date < sh.from || a.date > sh.to)) return;
+    marked++;
+    if(a.status==="Present") present++;
+    else if(a.status==="Half day") half++;
+    else if(a.status==="Absent") absent++;
+    else if(a.status==="Leave") leave++;
+  });
+  var offDays = absent + leave + half*0.5;
+  var allowedLeave = roundHalf(paidLeavePerMonth() * sh.share);
+  var unpaidDays = Math.max(0, offDays - allowedLeave);
+  var unusedLeave = Math.max(0, allowedLeave - offDays);
+  var base = Math.round((+st.salary||0) * sh.share);
+  var deduction = Math.round(unpaidDays * rate);
+  var extraLeave = Math.round(unusedLeave * rate);
+  var rec = payrollFor(st.id, mKey);
+  var choice = rec && rec.extraLeave ? rec.extraLeave : "pay";       // "pay" | "waived"
+  // While the month is still running, unused leave is not final - don't add it yet.
+  var extraPaid = (choice==="pay" && !cur && !future) ? extraLeave : 0;
+  var waived = (choice==="waived" && !cur && !future) ? extraLeave : 0;
+  var allowances = Math.round(allowanceTotal(st) * sh.share);
+  var salaryNet = base - deduction + extraPaid;
+  var net = salaryNet + allowances;
+  // For the month still running: what has been earned up to today (for advances).
+  var accruedSalary = salaryNet, accruedAllow = allowances;
+  if(cur && sh.days>0){
+    var upto = today < sh.to ? today : sh.to;
+    var soFar = upto >= sh.from ? datesBetween(sh.from, upto).length : 0;
+    accruedSalary = Math.max(0, Math.round(base * soFar / sh.days) - deduction);
+    accruedAllow = Math.round(allowances * soFar / sh.days);
+  }
+  // Payments made for this month (a salary paid in October for September counts for September).
+  var pays = expenses.filter(function(x){
+    return STAFF_CATS.indexOf(x.category)>=0 && (x.description||"").toLowerCase().indexOf(st.name.toLowerCase())===0 && expenseMonth(x)===mKey;
+  }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+  var paid = pays.reduce(function(t,x){ return t+expAmt(x); },0);
+  var dueDate = fmtDate(new Date(+mKey.slice(0,4), +mKey.slice(5,7), Math.min(salaryDueDay(), 28)));
+  var lastPay = pays.length ? pays[pays.length-1].date : null;
+  var balance = Math.round(net - paid);
+  var status = sh.days===0 ? "none" : (rec && rec.settled) ? "settled" : balance<=0 && paid>0 ? "paid" : paid>0 ? "part" : "due";
+  return { st:st, month:mKey, days:days, share:sh, employedDays:sh.days, rate:rate,
+           present:present, half:half, absent:absent, leave:leave, marked:marked, unmarked: Math.max(0, sh.days - marked),
+           offDays:offDays, allowedLeave:allowedLeave, unpaidDays:unpaidDays, unusedLeave:unusedLeave,
+           base:base, deduction:deduction, extraLeave:extraLeave, extraPaid:extraPaid, waived:waived, choice:choice,
+           allowances:allowances, salaryNet:salaryNet, net:net, accruedSalary:accruedSalary, accruedAllow:accruedAllow, pays:pays, paid:paid, balance:balance,
+           dueDate:dueDate, lastPay:lastPay, rec:rec, status:status, current:cur, future:future };
+}
+
+// Kept for older screens: the salary part of this month's pay.
 function earnedSalary(st, mKey){
+  var s = salaryFor(st, mKey);
   var a = monthAttendance(st.id, mKey);
-  var workingDays = a.marked - a.leave;
-  if(workingDays <= 0) return { earned: 0, basis: "no days marked yet", a: a };
-  var per = (st.salary||0) / daysInMonthOf(mKey);
-  return { earned: Math.round(per * a.present), basis: a.present + " day(s) present", a: a };
+  return { earned: s.salaryNet, basis: s.employedDays+" days employed"+(s.unpaidDays?", "+s.unpaidDays+" unpaid leave":""), a: a };
+}
+
+// Goodwill: unused leave pay the person chose not to take, less bonuses paid since.
+function goodwillFor(st){
+  var waived = 0;
+  payroll.forEach(function(r){
+    if(r.staffId!==st.id || r.extraLeave!=="waived") return;
+    waived += +r.waivedAmount || 0;
+  });
+  var bonus = expenses.filter(function(x){ return x.category==="Staff Bonus" && (x.description||"").toLowerCase().indexOf(st.name.toLowerCase())===0; })
+                      .reduce(function(t,x){ return t+expAmt(x); },0);
+  return { waived: waived, bonus: bonus, balance: Math.max(0, waived - bonus) };
 }
 function daysInMonthOf(mKey){
   var p = mKey.split("-");
@@ -6502,13 +6584,284 @@ function staffMealCost(mKey, staffId){
 // allowances, and the raw material of the meals they ate.
 function staffCostBreakdown(st, mKey){
   var pay = earnedSalary(st, mKey);
-  var rent = +st.houseRent || 0;
-  var food = +st.foodAllowance || 0;
-  var travel = +st.travelAllowance || 0;
+  var shr = staffMonthShare(st, mKey).share;
+  var rent = Math.round((+st.houseRent || 0) * shr);
+  var food = Math.round((+st.foodAllowance || 0) * shr);
+  var travel = Math.round((+st.travelAllowance || 0) * shr);
   var meals = staffMealCost(mKey, st.id);
   return { salary: pay.earned, rent: rent, food: food, travel: travel, meals: meals,
            cash: pay.earned + rent + food + travel,
            total: pay.earned + rent + food + travel + meals, basis: pay.basis };
+}
+
+// ---------- STAFF SALARY: month by month, settlement, slips ----------
+var salMonth = (function(){ var d = new Date(); return fmtDate(new Date(d.getFullYear(), d.getMonth()-1, 1)).slice(0,7); })(); // last month: the one usually being paid
+
+function fmtD(d){ return d ? parseDate(d).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : "—"; }
+function daysBetween(a, b){ return Math.round((parseDate(b) - parseDate(a)) / 86400000); }
+
+// How the payment timing compares with the due date.
+function payTiming(s){
+  var today = fmtDate(new Date());
+  if(s.net<=0) return "";
+  if(s.balance<=0 && s.lastPay){
+    var late = daysBetween(s.dueDate, s.lastPay);
+    return late>0 ? "paid "+fmtD(s.lastPay)+" · "+late+" day"+(late!==1?"s":"")+" late" : "paid on time ("+fmtD(s.lastPay)+")";
+  }
+  if(today > s.dueDate) return "overdue by "+daysBetween(s.dueDate, today)+" days (due "+fmtD(s.dueDate)+")";
+  return "due by "+fmtD(s.dueDate);
+}
+
+function renderSalaryView(){
+  var el = document.getElementById("salaryView");
+  if(!el) return;
+  var first = parseDate(salMonth+"-01");
+  var html = '<div class="calhead" style="margin-bottom:8px;"><button id="slPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
+             first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="slNext">›</button></div>';
+  var list = staff.map(function(st){ return salaryFor(st, salMonth); }).filter(function(s){ return s.employedDays>0 || s.paid>0; });
+  var tot = list.reduce(function(t,s){ t.net += s.net; t.paid += s.paid; t.bal += Math.max(0, s.balance); return t; }, { net:0, paid:0, bal:0 });
+  html += '<div class="kpis fckpis" style="margin-bottom:10px;">'+
+    '<div class="kpi"><div class="lbl">Salary due</div><div class="val">'+rupee(tot.net)+'</div></div>'+
+    '<div class="kpi"><div class="lbl">Paid</div><div class="val pos">'+rupee(tot.paid)+'</div></div>'+
+    '<div class="kpi"><div class="lbl">Balance</div><div class="val '+(tot.bal>0?"neg":"pos")+'">'+rupee(tot.bal)+'</div></div></div>';
+  html += '<div class="backupnote" style="margin:0 0 10px;">'+paidLeavePerMonth()+' paid leave days a month · salary due by the '+salaryDueDay()+
+          ordinal(salaryDueDay())+' of the next month · days not marked in attendance count as worked. <a href="#" id="sl_rules">Change</a></div>';
+  if(!list.length) html += '<div class="empty">Nobody was employed this month.</div>';
+  list.forEach(function(s){
+    var st = s.st, gw = goodwillFor(st);
+    var pill = s.status==="settled" ? '<span class="pill ok">settled</span>' : s.status==="paid" ? '<span class="pill ok">paid</span>' :
+               s.status==="part" ? '<span class="pill bad">part paid</span>' : s.net>0 ? '<span class="pill bad">due</span>' : '';
+    html += '<div class="salcard"><div class="salhead"><div><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+' · '+rupee(st.salary||0)+'/month</span></div>'+pill+'</div>';
+    html += '<div class="psrow"><span>Days employed</span><b>'+s.employedDays+' of '+s.days+'</b></div>';
+    html += '<div class="psrow"><span>Leave taken</span><b>'+fmtQty(s.offDays)+' of '+fmtQty(s.allowedLeave)+' paid'+(s.unpaidDays?' · <span class="bad">'+fmtQty(s.unpaidDays)+' unpaid</span>':'')+'</b></div>';
+    if(s.unusedLeave>0){
+      html += '<div class="psrow"><span>Unused leave</span><b>'+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupee(s.extraLeave)+
+              (s.current ? ' <span class="muted">(final at month end)</span>' : s.choice==="waived" ? ' <span class="pill">waived · goodwill</span>' : ' <span class="pill ok">paid extra</span>')+'</b></div>';
+    }
+    html += '<div class="psrow"><span><b>Total due</b></span><b>'+rupee(s.net)+'</b></div>';
+    html += '<div class="psrow"><span>Paid</span><b class="ok">'+rupee(s.paid)+'</b></div>';
+    if(s.pays.length){
+      html += '<div class="salpays">'+s.pays.map(function(x){
+        return '<span>'+fmtD(x.date)+' · '+rupee(x.amount)+' · '+esc(x.mode||"")+(payerIsPersonal(x.paidBy)?' ('+esc(payerPartner(x.paidBy))+')':'')+'</span>';
+      }).join("")+'</div>';
+    }
+    html += '<div class="psrow"><span>'+(s.balance<0?'Paid in advance':'Balance')+'</span><b class="'+(s.balance>0?"bad":"ok")+'">'+rupee(Math.abs(s.balance))+'</b></div>';
+    var timing = payTiming(s);
+    if(timing) html += '<div class="barsub" style="margin-top:4px;">'+esc(timing)+'</div>';
+    if(gw.balance>0) html += '<div class="barsub" style="margin-top:4px;">Goodwill waived so far: <b>'+rupee(gw.balance)+'</b> — can be given back as a bonus.</div>';
+    html += '<div class="salbtns">'+
+      (s.balance>0 ? '<button class="sale" data-slpay="'+st.id+'">Pay '+rupee(s.balance)+'</button>' : '')+
+      (!s.current && !s.future ? '<button class="invest" data-slsettle="'+st.id+'">'+(s.status==="settled"?"Settlement":"Final settlement")+'</button>' : '')+
+      '<button class="expense" data-slslip="'+st.id+'">Salary slip</button>'+
+      (gw.balance>0 ? '<button class="purch" data-slbonus="'+st.id+'">Give bonus</button>' : '')+'</div>';
+    html += '</div>';
+  });
+  el.innerHTML = html;
+  function shift(n){ salMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderSalaryView(); updateStaffTotal(); }
+  document.getElementById("slPrev").addEventListener("click", function(){ shift(-1); });
+  document.getElementById("slNext").addEventListener("click", function(){ shift(1); });
+  document.getElementById("sl_rules").addEventListener("click", function(e){ e.preventDefault(); openSalaryRules(); });
+  function wire(attr, fn){ Array.prototype.forEach.call(el.querySelectorAll("["+attr+"]"), function(b){ b.addEventListener("click", function(){ var st = staffById(b.getAttribute(attr)); if(st) fn(st); }); }); }
+  wire("data-slpay", function(st){ openSalaryPay(st, salMonth); });
+  wire("data-slsettle", function(st){ openSettlement(st, salMonth); });
+  wire("data-slslip", function(st){ openSalarySlip(st, salMonth); });
+  wire("data-slbonus", openBonusForm);
+  if(staffSub==="salary") updateStaffTotal();
+}
+function ordinal(n){ n = +n; var s = ["th","st","nd","rd"], v = n % 100; return s[(v-20)%10] || s[v] || s[0]; }
+
+function openSalaryRules(){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Salary rules</h2>';
+  html += '<div class="field two"><div><label>Paid leave days per month</label><input type="number" inputmode="decimal" id="sr_leave" value="'+paidLeavePerMonth()+'"></div>';
+  html += '<div><label>Salary due by (day of next month)</label><input type="number" inputmode="numeric" id="sr_due" value="'+salaryDueDay()+'"></div></div>';
+  html += '<div class="backupnote">Leave beyond the paid days is deducted at the daily rate (monthly salary ÷ days in the month). Paid leave not used is paid extra — or, if the person chooses, recorded as goodwill for a future bonus.</div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="sr_cancel">Cancel</button><button class="btn-save" id="sr_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("sr_cancel").addEventListener("click", closeForm);
+  document.getElementById("sr_save").addEventListener("click", function(){
+    var l = parseFloat(document.getElementById("sr_leave").value), d = parseInt(document.getElementById("sr_due").value, 10);
+    settings.paidLeaveDays = isNaN(l) || l<0 ? 2 : l;
+    settings.salaryDueDay = isNaN(d) || d<1 || d>28 ? 7 : d;
+    saveSettings(); closeForm(); renderAll();
+  });
+}
+
+// Pay what is still owed for the month, split into salary and allowances.
+function openSalaryPay(st, mKey){
+  var s = salaryFor(st, mKey);
+  var done = {};
+  s.pays.forEach(function(x){ done[x.category] = (done[x.category]||0) + expAmt(x); });
+  var shr = s.share.share;
+  var accr = s.current && s.allowances ? s.accruedAllow / s.allowances : 1;
+  var cb = { rent: Math.max(0, Math.round((+st.houseRent||0)*shr*accr) - (done["Staff House Rent"]||0)),
+             food: Math.max(0, Math.round((+st.foodAllowance||0)*shr*accr) - (done["Staff Food Allowance"]||0)),
+             travel: Math.max(0, Math.round((+st.travelAllowance||0)*shr*accr) - (done["Staff Travel Allowance"]||0)) };
+  var pay = { earned: Math.max(0, s.accruedSalary - (done["Staff Salary"]||0)), basis: (s.current ? "earned up to today, " : "")+s.employedDays+" days employed"+(s.unpaidDays?", "+fmtQty(s.unpaidDays)+" unpaid leave":"")+(s.extraPaid?", +"+fmtQty(s.unusedLeave)+" unused leave":"") };
+  cb.cash = pay.earned + cb.rent + cb.food + cb.travel;
+  document.getElementById("sheetBg").classList.add("on");
+  openPaySheet(st, pay, mKey, cb, true);
+}
+
+// Month-end: decide what happens to unused leave, pay any balance, close the month.
+function openSettlement(st, mKey){
+  var s = salaryFor(st, mKey);
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Final settlement</h2>';
+  html += '<div class="backupnote">'+esc(st.name)+' · '+esc(monthLabel(mKey))+'</div>';
+  html += '<div class="card" style="margin-bottom:12px;">'+
+    '<div class="psrow"><span>Salary for '+s.employedDays+' days</span><b>'+rupee(s.base)+'</b></div>'+
+    (s.deduction ? '<div class="psrow"><span>− '+fmtQty(s.unpaidDays)+' unpaid leave day(s)</span><b class="bad">'+rupee(s.deduction)+'</b></div>' : '')+
+    (s.allowances ? '<div class="psrow"><span>+ Allowances</span><b>'+rupee(s.allowances)+'</b></div>' : '')+'</div>';
+  var choice = s.choice;
+  if(s.unusedLeave>0){
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Unused leave · '+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupee(s.extraLeave)+'</h3>'+
+      '<div class="backupnote" style="margin:0 0 8px;">'+esc(st.name)+' worked on '+fmtQty(s.unusedLeave)+' of the paid leave days, so this extra is owed to them.</div>'+
+      '<label class="setlopt"><input type="radio" name="st_ch" value="pay" '+(choice==="pay"?"checked":"")+'> <span><b>Pay it</b> with this month’s salary</span></label>'+
+      '<label class="setlopt"><input type="radio" name="st_ch" value="waived" '+(choice==="waived"?"checked":"")+'> <span><b>They don’t want it</b> — record as goodwill for a future bonus</span></label></div>';
+  }
+  html += '<div class="card" style="margin-bottom:12px;" id="st_sum"></div>';
+  html += '<div class="field two"><div><label>Pay balance now (₹)</label><input type="number" inputmode="decimal" id="st_amt"></div>';
+  html += '<div><label>Date</label><input type="date" id="st_date" value="'+fmtDate(new Date())+'"></div></div>';
+  html += '<div class="field two"><div><label>Mode</label><select id="st_mode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option></select></div>';
+  html += '<div><label>Paid by</label><select id="st_by">'+payerOptions().map(function(o){ return '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>'; }).join("")+'</select></div></div>';
+  html += '<div class="field"><label>Note (optional)</label><input type="text" id="st_note" value="'+esc(s.rec&&s.rec.note||"")+'" placeholder="e.g. took 1 day less leave to help during Diwali rush"></div>';
+  html += '<div class="err" id="st_err"></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="st_cancel">Cancel</button><button class="btn-save" id="st_go">Settle month</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  sheet.scrollTop = 0;
+  function cur(){ var r = sheet.querySelector('input[name="st_ch"]:checked'); return r ? r.value : "pay"; }
+  function net(){ return s.base - s.deduction + s.allowances + (cur()==="pay" ? s.extraLeave : 0); }
+  function draw(){
+    var n = net(), bal = Math.round(n - s.paid);
+    document.getElementById("st_sum").innerHTML =
+      '<div class="psrow"><span><b>Total due</b></span><b>'+rupee(n)+'</b></div>'+
+      '<div class="psrow"><span>Already paid</span><b class="ok">'+rupee(s.paid)+'</b></div>'+
+      '<div class="psrow"><span>'+(bal<0?'Paid in advance':'Balance to pay')+'</span><b class="'+(bal>0?"bad":"ok")+'">'+rupee(Math.abs(bal))+'</b></div>'+
+      (cur()==="waived" && s.extraLeave ? '<div class="barsub">'+rupee(s.extraLeave)+' goes to '+esc(st.name)+'’s goodwill balance.</div>' : '');
+    document.getElementById("st_amt").value = Math.max(0, bal) || "";
+  }
+  Array.prototype.forEach.call(sheet.querySelectorAll('input[name="st_ch"]'), function(r){ r.addEventListener("change", draw); });
+  draw();
+  document.getElementById("st_cancel").addEventListener("click", closeForm);
+  document.getElementById("st_go").addEventListener("click", function(){
+    var amt = parseFloat(document.getElementById("st_amt").value) || 0;
+    var ch = cur();
+    if(amt>0){
+      var mode = document.getElementById("st_mode").value, by = document.getElementById("st_by").value;
+      expenses.push({ id:uid(), date:document.getElementById("st_date").value || fmtDate(new Date()), category:"Staff Salary",
+                      description: st.name+" - "+monthLabel(mKey)+" salary (final settlement)", amount:amt, mode:mode, paidBy:by, settled:false });
+      saveExpense();
+    }
+    payroll = payroll.filter(function(r){ return !(r.staffId===st.id && r.month===mKey); });
+    payroll.push({ id:"pr_"+st.id+"_"+mKey, staffId:st.id, month:mKey, extraLeave:ch,
+                   waivedAmount: ch==="waived" ? s.extraLeave : 0, unusedLeave: s.unusedLeave,
+                   settled:true, settledOn: fmtDate(new Date()), note: document.getElementById("st_note").value.trim() });
+    savePayroll();
+    closeForm(); renderAll();
+    appAlert(st.name+" · "+monthLabel(mKey)+" settled."+(ch==="waived" && s.extraLeave ? " "+rupee(s.extraLeave)+" recorded as goodwill." : ""));
+  });
+}
+
+function openBonusForm(st){
+  var gw = goodwillFor(st);
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Bonus for '+esc(st.name)+'</h2>';
+  html += '<div class="backupnote">'+esc(st.name)+' has given up '+rupee(gw.waived)+' of unused-leave pay so far'+(gw.bonus?' and received '+rupee(gw.bonus)+' in bonuses':'')+'. Goodwill balance: <b>'+rupee(gw.balance)+'</b>.</div>';
+  html += '<div class="field two"><div><label>Bonus (₹)</label><input type="number" inputmode="decimal" id="bn_amt" value="'+Math.round(gw.balance)+'"></div>';
+  html += '<div><label>Date</label><input type="date" id="bn_date" value="'+fmtDate(new Date())+'"></div></div>';
+  html += '<div class="field two"><div><label>Mode</label><select id="bn_mode"><option>Cash</option><option>UPI</option><option>Bank Transfer</option></select></div>';
+  html += '<div><label>Paid by</label><select id="bn_by">'+payerOptions().map(function(o){ return '<option value="'+esc(o.value)+'">'+esc(o.label)+'</option>'; }).join("")+'</select></div></div>';
+  html += '<div class="field"><label>Occasion</label><input type="text" id="bn_note" placeholder="e.g. Diwali bonus"></div>';
+  html += '<div class="err" id="bn_err"></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="bn_cancel">Cancel</button><button class="btn-save" id="bn_go">Record bonus</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("bn_cancel").addEventListener("click", closeForm);
+  document.getElementById("bn_go").addEventListener("click", function(){
+    var amt = parseFloat(document.getElementById("bn_amt").value);
+    if(isNaN(amt) || amt<=0){ var e = document.getElementById("bn_err"); e.textContent = "Enter the bonus amount."; e.style.display = "block"; return; }
+    var note = document.getElementById("bn_note").value.trim();
+    expenses.push({ id:uid(), date:document.getElementById("bn_date").value || fmtDate(new Date()), category:"Staff Bonus",
+                    description: st.name+" - bonus"+(note?" ("+note+")":""), amount:amt, mode:document.getElementById("bn_mode").value,
+                    paidBy:document.getElementById("bn_by").value, settled:false });
+    saveExpense(); closeForm(); renderAll();
+  });
+}
+
+// ---- salary slip ----
+function slipLines(s){
+  var st = s.st, L = [];
+  L.push(["Monthly salary", rupee(st.salary||0)]);
+  L.push(["Days in month", String(s.days)]);
+  L.push(["Days employed", String(s.employedDays)+(s.share.from && s.share.from>s.month+"-01" ? " (joined "+fmtD(s.share.from)+")" : "")]);
+  L.push(["Present", String(s.present)+(s.unmarked?" + "+s.unmarked+" not marked (counted as worked)":"")]);
+  if(s.half) L.push(["Half days", String(s.half)]);
+  L.push(["Absent / leave taken", fmtQty(s.offDays)]);
+  L.push(["Paid leave allowed", fmtQty(s.allowedLeave)]);
+  L.push(["Salary for days employed", rupee(s.base)]);
+  if(s.deduction) L.push(["Less: "+fmtQty(s.unpaidDays)+" unpaid leave day(s)", "- "+rupee(s.deduction)]);
+  if(s.extraLeave && !s.current) L.push(["Unused leave: "+fmtQty(s.unusedLeave)+" day(s)", s.choice==="waived" ? rupee(s.extraLeave)+" waived (goodwill)" : "+ "+rupee(s.extraLeave)]);
+  var shr = s.share.share;
+  if(+st.houseRent) L.push(["House rent allowance", rupee(Math.round(st.houseRent*shr))]);
+  if(+st.foodAllowance) L.push(["Food allowance", rupee(Math.round(st.foodAllowance*shr))]);
+  if(+st.travelAllowance) L.push(["Travel allowance", rupee(Math.round(st.travelAllowance*shr))]);
+  L.push(["NET PAYABLE", rupee(s.net)]);
+  s.pays.forEach(function(x){ L.push(["Paid on "+fmtD(x.date)+" ("+(x.mode||"")+")", rupee(x.amount)]); });
+  L.push([s.balance<0 ? "Paid in advance" : "Balance due", rupee(Math.abs(s.balance))]);
+  return L;
+}
+
+function openSalarySlip(st, mKey){
+  var s = salaryFor(st, mKey);
+  var L = slipLines(s);
+  var sheet = document.getElementById("sheet");
+  var html = '<div class="slip"><div class="sliphead"><b>'+esc(OUTLET.name)+'</b><span>Salary slip · '+esc(monthLabel(mKey))+'</span></div>'+
+    '<div class="slipwho"><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+(st.joinDate?' · joined '+fmtD(st.joinDate)+' '+st.joinDate.slice(0,4):'')+'</span></div>'+
+    L.map(function(r){ var strong = /^NET PAYABLE|^Balance due|^Paid in advance/.test(r[0]);
+      return '<div class="psrow'+(strong?' sliptot':'')+'"><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>'; }).join("")+
+    (s.rec && s.rec.settled ? '<div class="barsub" style="margin-top:8px;">Settled on '+fmtD(s.rec.settledOn)+(s.rec.note?' · '+esc(s.rec.note):'')+'</div>' : '')+
+    (s.current ? '<div class="barsub" style="margin-top:8px;">Month in progress — figures so far.</div>' : '')+'</div>';
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-save" id="sp_pdf" style="flex:1;">Download / share PDF</button></div>';
+  html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="sp_wa" style="flex:1;">Send on WhatsApp</button><button class="btn-cancel" id="sp_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  sheet.scrollTop = 0;
+  document.getElementById("sp_close").addEventListener("click", closeForm);
+  document.getElementById("sp_wa").addEventListener("click", function(){
+    var text = OUTLET.name+" - Salary slip "+monthLabel(mKey)+"\n"+st.name+"\n\n"+L.map(function(r){ return r[0]+": "+r[1]; }).join("\n");
+    if(!(st.phone||"").replace(/\D/g,"")){ try{ window.open("https://wa.me/?text="+encodeURIComponent(text), "_blank"); }catch(e){} return; }
+    openWhatsApp(st.phone, text);
+  });
+  document.getElementById("sp_pdf").addEventListener("click", function(){
+    var btn = this; btn.disabled = true; btn.textContent = "Creating…";
+    ensurePdfLib().then(function(){
+      var doc = new window.jspdf.jsPDF({ unit:"pt", format:"a5" });
+      var W = doc.internal.pageSize.getWidth(), y = 40;
+      doc.setFont("helvetica","bold"); doc.setFontSize(15); doc.text(OUTLET.name, 30, y); y += 18;
+      doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.text("Salary slip - "+monthLabel(mKey), 30, y); y += 22;
+      doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text(st.name, 30, y); y += 14;
+      doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.text((st.role||"")+(st.joinDate?"  |  joined "+st.joinDate:""), 30, y); y += 10;
+      doc.autoTable({ startY:y, margin:{left:30,right:30}, theme:"plain", styles:{ fontSize:9.5, cellPadding:4 },
+        body: L.map(function(r){ return [r[0], r[1].replace(/₹/g,"Rs. ")]; }),
+        columnStyles:{ 1:{ halign:"right" } },
+        didParseCell: function(d){ if(/^NET PAYABLE|^Balance due|^Paid in advance/.test(d.row.raw[0])) d.cell.styles.fontStyle = "bold"; } });
+      y = doc.lastAutoTable.finalY + 30;
+      doc.setFontSize(9); doc.text("Employee signature", 30, y); doc.text("For "+OUTLET.name, W-30, y, { align:"right" });
+      var fname = (st.name+"_Salary_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf";
+      var blob = doc.output("blob");
+      btn.disabled = false; btn.textContent = "Download / share PDF";
+      try{
+        var file = new File([blob], fname, { type:"application/pdf" });
+        if(navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){ navigator.share({ files:[file], title:fname }).catch(function(){}); return; }
+      }catch(e){}
+      var url = URL.createObjectURL(blob), a = document.createElement("a");
+      a.href = url; a.download = fname; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 8000);
+    }).catch(function(){ btn.disabled = false; btn.textContent = "Download / share PDF"; appAlert("Couldn't create the PDF. Check the internet connection."); });
+  });
 }
 
 function renderMealsView(){
@@ -6595,9 +6948,9 @@ function openStaffMealForm(dateStr){
 function switchStaffSub(name){
   staffSub = name;
   Array.prototype.forEach.call(document.querySelectorAll("#staffCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-s")===name); });
-  var ids = {team:"teamView", roster:"rosterView", attendance:"attendView", tasks:"tasksView", meals:"mealsView"};
+  var ids = {team:"teamView", roster:"rosterView", attendance:"attendView", tasks:"tasksView", salary:"salaryView", meals:"mealsView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {team:"Team", roster:"Shift roster", attendance:"Attendance", tasks:"Tasks", meals:"Staff meals"};
+  var titles = {team:"Team", roster:"Shift roster", attendance:"Attendance", tasks:"Tasks", salary:"Salary", meals:"Staff meals"};
   document.getElementById("staffTitle").textContent = titles[name];
   renderStaffSection();
 }
@@ -6608,6 +6961,7 @@ function renderStaffSection(){
   renderAttendView();
   renderTasksView();
   renderMealsView();
+  renderSalaryView();
   updateStaffTotal();
 }
 
@@ -6617,6 +6971,9 @@ function updateStaffTotal(){
   if(staffSub==="team"){
     var payroll = activeStaff().reduce(function(a,s){ return a+(s.salary||0); },0);
     lbl.textContent = activeStaff().length + " active · " + rupee(payroll) + "/mo";
+  } else if(staffSub==="salary"){
+    var ss = staff.map(function(st){ return salaryFor(st, salMonth); }).filter(function(x){ return x.employedDays>0; });
+    lbl.textContent = rupee(ss.reduce(function(t,x){ return t+Math.max(0,x.balance); },0))+" due · "+monthLabel(salMonth);
   } else if(staffSub==="tasks"){
     var open = tasks.filter(function(t){ return !t.done; }).length;
     lbl.textContent = open + " open task" + (open!==1?"s":"");

@@ -60,9 +60,18 @@ npm run dev     # http://localhost:8787
 
 Tap the outlet name at the top of the app to switch outlets, add a new one, or rename the current one. Each outlet keeps its own books: sales, purchases, expenses, stock, staff, cash and reports. The outlet list is shared, so both phones see the same outlets. The switcher also shows each outlet's figures for the current month, and a total across all outlets.
 
+## Staff salary
+
+Staff → **Salary** shows each person's salary for a month:
+- **What they're owed:** days employed, leave taken against the paid leave allowance (2 days a month by default), deductions for extra leave, and allowances.
+- **Unused leave:** paid leave days not taken are owed as extra pay.
+- **Payments:** what's been paid and on which dates, compared with the due date (the 7th of the next month by default).
+
+**Final settlement** closes a month. If the person chooses not to take the extra pay for unused leave, it's recorded as goodwill, which you can give back later with **Give bonus**. **Salary slip** shows the month's slip, which you can download as a PDF or send on WhatsApp.
+
 ## How saving works
 
 - Each list (sales, purchases, …) is saved to the server a moment after every change. The top bar shows **Saved to cloud hh:mm**, **Saving…**, or **Offline — N changes will upload**.
 - If both phones change the same list at the same time, the changes are merged record by record. Additions, edits and deletions from both phones are all kept.
-- Changes from the other phone appear within about 20 seconds, or straight away when the app is reopened.
+- Changes from the other phone appear within a few seconds, or straight away when the app is reopened.
 - **Backup & restore → Download backup** still produces a full JSON backup for safekeeping.
