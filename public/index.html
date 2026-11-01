@@ -2003,11 +2003,24 @@ function renderFixedCosts(dateList){
 var fcMonth = fmtDate(new Date()).slice(0,7);
 
 // Everything that is due every month, for one month: planned vs paid.
+// Is this expense a payment to this staff member? New payments carry staffId;
+// older ones are matched by the name at the start of the description, as a whole
+// name ("Ravi" must not pick up "Ravi Kumar - salary").
+function isStaffPay(x, st){
+  if(!st) return false;
+  if(x.staffId) return x.staffId===st.id;
+  var d = (x.description||"").toLowerCase().trim(), n = (st.name||"").toLowerCase().trim();
+  if(!n || d.indexOf(n)!==0) return false;
+  var c = d.charAt(n.length);
+  if(c && /[a-z0-9\u0900-\u097f]/.test(c)) return false;
+  // Someone else whose name starts with this one ("Ravi Kumar" vs "Ravi") owns it.
+  return !staff.some(function(o){ var on = (o.name||"").toLowerCase().trim(); return o.id!==st.id && on.length>n.length && d.indexOf(on)===0 && !/[a-z0-9\u0900-\u097f]/.test(d.charAt(on.length)||" "); });
+}
 function staffPaidFor(st, mKey){
   var byCat = {}, total = 0;
   expenses.forEach(function(x){
     if(STAFF_CATS.indexOf(x.category)<0) return;
-    if((x.description||"").toLowerCase().indexOf(st.name.toLowerCase())!==0) return;
+    if(!isStaffPay(x, st)) return;
     if(expenseMonth(x)!==mKey) return;
     byCat[x.category] = (byCat[x.category]||0) + expAmt(x); total += expAmt(x);
   });
@@ -6478,11 +6491,15 @@ function paidFromTill(p){
 function cashMovement(dateStr){
   var inflow = sales.filter(function(s){ return s.date===dateStr && s.mode==="Cash"; })
                     .reduce(function(a,s){ return a+saleTotal(s); },0);
+  // Udhaar paid back in cash goes into the counter too.
+  var inCredit = creditPayments.filter(function(p){ return p.date===dateStr && (p.mode||"Cash")==="Cash"; })
+                    .reduce(function(a,p){ return a+(+p.amount||0); },0);
+  inflow += inCredit;
   var outPurch = purchases.filter(function(p){ return p.date===dateStr && paidFromTill(p); })
                     .reduce(function(a,p){ return a+purchTotal(p); },0);
   var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash" && !payerIsPersonal(x.paidBy); })
                     .reduce(function(a,x){ return a+expAmt(x); },0);
-  return { inflow: inflow, outflow: outPurch + outExp, outPurch: outPurch, outExp: outExp };
+  return { inflow: inflow, inCredit: inCredit, outflow: outPurch + outExp, outPurch: outPurch, outExp: outExp };
 }
 
 function openingCashFor(dateStr){
@@ -6552,7 +6569,8 @@ function renderCashView(){
   html += '<div class="card" style="margin-bottom:14px;"><h3>Counter today <span class="muted">· '+parseDate(today).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</span></h3>';
   var m = cashMovement(today);
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(today))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit)+'</b></div>';
+  if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
   html += '<div class="psrow"><span><b>Should be in counter</b></span><b>'+rupee(exp)+'</b></div>';
   if(todayRec && todayRec.counted !== null && todayRec.counted !== undefined && todayRec.counted !== ""){
@@ -6652,7 +6670,8 @@ function openCashDayForm(dateStr){
 
   html += '<div class="card" style="margin-bottom:12px;">';
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(dateStr))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit)+'</b></div>';
+  if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
   html += '<div class="psrow"><span><b>Should be in counter</b></span><b>'+rupee(exp)+'</b></div></div>';
 
@@ -6811,7 +6830,7 @@ function salaryFor(st, mKey){
   }
   // Payments made for this month (a salary paid in October for September counts for September).
   var pays = expenses.filter(function(x){
-    return STAFF_CATS.indexOf(x.category)>=0 && (x.description||"").toLowerCase().indexOf(st.name.toLowerCase())===0 && expenseMonth(x)===mKey;
+    return STAFF_CATS.indexOf(x.category)>=0 && isStaffPay(x, st) && expenseMonth(x)===mKey;
   }).sort(function(a,b){ return a.date.localeCompare(b.date); });
   var paid = pays.reduce(function(t,x){ return t+expAmt(x); },0);
   var dueDate = fmtDate(new Date(+mKey.slice(0,4), +mKey.slice(5,7), Math.min(salaryDueDay(), 28)));
@@ -6841,7 +6860,7 @@ function goodwillFor(st){
     if(r.staffId!==st.id || r.extraLeave!=="waived") return;
     waived += +r.waivedAmount || 0;
   });
-  var bonus = expenses.filter(function(x){ return x.category==="Staff Bonus" && (x.description||"").toLowerCase().indexOf(st.name.toLowerCase())===0; })
+  var bonus = expenses.filter(function(x){ return x.category==="Staff Bonus" && isStaffPay(x, st); })
                       .reduce(function(t,x){ return t+expAmt(x); },0);
   return { waived: waived, bonus: bonus, balance: Math.max(0, waived - bonus) };
 }
@@ -7030,7 +7049,7 @@ function openSalaryPay(st, mKey){
   var cb = { rent: Math.max(0, r2((+st.houseRent||0)*shr*accr - (done["Staff House Rent"]||0))),
              food: Math.max(0, r2((+st.foodAllowance||0)*shr*accr - (done["Staff Food Allowance"]||0))),
              travel: Math.max(0, r2((+st.travelAllowance||0)*shr*accr - (done["Staff Travel Allowance"]||0))) };
-  var pay = { earned: Math.max(0, r2(s.accruedSalary - (done["Staff Salary"]||0))), basis: (s.current ? "earned up to today, " : "")+s.employedDays+" days employed"+(s.unpaidDays?", "+fmtQty(s.unpaidDays)+" unpaid leave":"")+(s.extraPaid?", +"+fmtQty(s.unusedLeave)+" unused leave":"") };
+  var pay = { earned: Math.max(0, r2(s.accruedSalary + (s.current ? 0 : s.roundOff) - (done["Staff Salary"]||0))), basis: (s.current ? "earned up to today, " : "")+s.employedDays+" days employed"+(s.unpaidDays?", "+fmtQty(s.unpaidDays)+" unpaid leave":"")+(s.extraPaid?", +"+fmtQty(s.unusedLeave)+" unused leave":"") };
   cb.cash = r2(pay.earned + cb.rent + cb.food + cb.travel);
   document.getElementById("sheetBg").classList.add("on");
   openPaySheet(st, pay, mKey, cb, true);
@@ -7109,7 +7128,7 @@ function openSettlement(st, mKey){
     }
     if(amt>0){
       var mode = document.getElementById("st_mode").value, by = document.getElementById("st_by").value;
-      expenses.push({ id:uid(), date:document.getElementById("st_date").value || fmtDate(new Date()), category:"Staff Salary",
+      expenses.push({ id:uid(), staffId:st.id, date:document.getElementById("st_date").value || fmtDate(new Date()), category:"Staff Salary",
                       description: st.name+" - "+monthLabel(mKey)+" salary (final settlement)", amount:amt, mode:mode, paidBy:by, settled:false });
       saveExpense();
     }
@@ -7154,7 +7173,7 @@ function openAdvanceForm(st, mKey, back){
     var amt = parseFloat(document.getElementById("ad_amt").value);
     if(isNaN(amt) || amt<=0){ var e = document.getElementById("ad_err"); e.textContent = "Enter the advance amount."; e.style.display = "block"; return; }
     var m = document.getElementById("ad_month").value || mKey, note = document.getElementById("ad_note").value.trim();
-    expenses.push({ id:uid(), date:document.getElementById("ad_date").value || fmtDate(new Date()), category:"Staff Salary",
+    expenses.push({ id:uid(), staffId:st.id, date:document.getElementById("ad_date").value || fmtDate(new Date()), category:"Staff Salary",
                     description: st.name+" - "+monthLabel(m)+" salary advance"+(note?" ("+note+")":""), amount:r2(amt),
                     mode:document.getElementById("ad_mode").value, paidBy:document.getElementById("ad_by").value, settled:false, advance:true });
     saveExpense(); closeForm(); renderAll();
@@ -7182,7 +7201,7 @@ function openBonusForm(st){
     var amt = parseFloat(document.getElementById("bn_amt").value);
     if(isNaN(amt) || amt<=0){ var e = document.getElementById("bn_err"); e.textContent = "Enter the bonus amount."; e.style.display = "block"; return; }
     var note = document.getElementById("bn_note").value.trim();
-    expenses.push({ id:uid(), date:document.getElementById("bn_date").value || fmtDate(new Date()), category:"Staff Bonus",
+    expenses.push({ id:uid(), staffId:st.id, date:document.getElementById("bn_date").value || fmtDate(new Date()), category:"Staff Bonus",
                     description: st.name+" - bonus"+(note?" ("+note+")":""), amount:amt, mode:document.getElementById("bn_mode").value,
                     paidBy:document.getElementById("bn_by").value, settled:false });
     saveExpense(); closeForm(); renderAll();
@@ -7802,6 +7821,14 @@ function openStaffForm(staffId){
                 leftDate: document.getElementById("s_status").value==="Left" ? (document.getElementById("s_left").value || fmtDate(new Date())) : "",
                 upi:document.getElementById("s_upi").value.trim() };
     if(s){
+      if(s.name !== name){
+        // Old payments were found by name; link them to this person before the name changes.
+        var tagged = 0;
+        expenses.forEach(function(x){
+          if(!x.staffId && (STAFF_CATS.indexOf(x.category)>=0 || x.category==="Staff Bonus") && isStaffPay(x, s)){ x.staffId = s.id; tagged++; }
+        });
+        if(tagged) saveExpense();
+      }
       var merged = Object.assign({}, s, rec);
       if(sal !== (+s.salary||0)){ merged.salary = s.salary; setSalaryFrom(merged, fmtDate(new Date()).slice(0,7), sal); }
       staff[staff.findIndex(function(x){return x.id===s.id;})] = merged;
@@ -7946,7 +7973,7 @@ function openPaySheet(s, pay, mKey, cb, fromFixed){
     if(amt<=0 && rent<=0 && food<=0 && travel<=0){ errEl.textContent = "Enter at least one amount."; errEl.style.display="block"; return; }
     var pdate = document.getElementById("pay_date").value || fmtDate(new Date());
     var pmode = document.getElementById("pay_mode").value, pby = document.getElementById("pay_by").value;
-    function add(cat, what, a){ expenses.push({ id:uid(), date:pdate, category:cat, description:s.name+" - "+monthName+" "+what, amount:a, mode:pmode, paidBy:pby, settled:false }); }
+    function add(cat, what, a){ expenses.push({ id:uid(), staffId:s.id, date:pdate, category:cat, description:s.name+" - "+monthName+" "+what, amount:a, mode:pmode, paidBy:pby, settled:false }); }
     if(amt>0) add("Staff Salary", "salary", amt);
     if(rent>0) add("Staff House Rent", "house rent", rent);
     if(food>0) add("Staff Food Allowance", "food allowance", food);
@@ -8055,7 +8082,7 @@ function submitForm(type, item){
     var mode = document.getElementById("f_mode").value;
     if(isNaN(amount) || amount<=0){ errEl.textContent = "Enter an amount greater than 0."; errEl.style.display="block"; return; }
     var rec = {id: item?item.id:uid(), date:date, customer:customer, desc:desc, amount:amount, gst:gst, mode:mode};
-    if(item){ var idx = sales.findIndex(function(x){return x.id===item.id;}); sales[idx]=rec; }
+    if(item){ var idx = sales.findIndex(function(x){return x.id===item.id;}); sales[idx]=Object.assign({}, item, rec); }
     else { sales.push(rec); }
     saveSales();
   } else if(type==="investment"){
@@ -8067,7 +8094,7 @@ function submitForm(type, item){
     var vnotes = document.getElementById("f_notes").value.trim();
     if(isNaN(amount3) || amount3<=0){ errEl.textContent = "Enter an amount greater than 0."; errEl.style.display="block"; return; }
     var rec3 = {id: item?item.id:uid(), date:date, partner:partner, invType:invType, purpose:purpose, amount:amount3, mode:mode3, notes:vnotes};
-    if(item){ var idx3 = investments.findIndex(function(x){return x.id===item.id;}); investments[idx3]=rec3; }
+    if(item){ var idx3 = investments.findIndex(function(x){return x.id===item.id;}); investments[idx3]=Object.assign({}, item, rec3); }
     else { investments.push(rec3); }
     saveInvest();
   } else {
@@ -8079,7 +8106,12 @@ function submitForm(type, item){
     var paidBy4 = document.getElementById("f_paidby").value;
     var rec4 = {id: item?item.id:uid(), date:date, category:expcat, description:xdesc, amount:amount4, mode:mode4, paidBy:paidBy4,
                 settled: (item && item.paidBy===paidBy4) ? !!item.settled : false};
-    if(item){ var idx4 = expenses.findIndex(function(x){return x.id===item.id;}); expenses[idx4]=rec4; }
+    if(item){
+      var keep = Object.assign({}, item, rec4);
+      // A different category or a new name in the description means it is no longer that person's payment.
+      if(keep.staffId && (STAFF_CATS.indexOf(expcat)<0 && expcat!=="Staff Bonus")) delete keep.staffId;
+      var idx4 = expenses.findIndex(function(x){return x.id===item.id;}); expenses[idx4]=keep;
+    }
     else { expenses.push(rec4); }
     saveExpense();
   }
