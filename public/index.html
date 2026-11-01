@@ -236,6 +236,13 @@
   .ac-r,.attlegend .ac-r{border:1.5px dashed var(--teal);}
   .ac-today{outline:2px solid var(--ink);outline-offset:-1px;}
   .ac-future{opacity:.45;}
+  .ac-out{background:repeating-linear-gradient(135deg,#EEE9DA 0 4px,#F7F4EA 4px 8px);color:#A79F8E;border-style:dashed;}
+  .ac-out.ac-p,.ac-out.ac-a,.ac-out.ac-l,.ac-out.ac-h{opacity:.55;}
+  .ac-unm{border:1.5px dashed #CE9A2E;}
+  .attmcalc{font-size:12px;color:var(--ink-soft);line-height:1.5;margin:-2px 0 8px;}
+  .attmcalc b{color:var(--ink);}
+  .attmwarn{font-size:12px;background:#FBF1DC;border:1px solid #E8D3A6;border-radius:9px;padding:7px 9px;margin:0 0 8px;color:#6B4E12;line-height:1.45;}
+  .attmwarn button{font:inherit;font-weight:600;font-size:12px;margin-top:5px;padding:5px 9px;border-radius:8px;border:1px solid #CE9A2E;background:#fff;color:var(--ink);}
   .attbtn.on.leave{background:var(--ink-soft);color:#fff;border-color:var(--ink-soft);}
   .taskcard{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;}
   .taskcard.done{opacity:.55;}
@@ -6735,7 +6742,11 @@ function attendFor(dateStr, staffId){
 
 // Attendance-weighted month summary: a half day counts as 0.5.
 function monthAttendance(staffId, mKey){
-  var rows = attendance.filter(function(a){ return a.staffId===staffId && monthKey(a.date)===mKey; });
+  var st = staffById(staffId), sh = st ? staffMonthShare(st, mKey) : null;
+  var rows = attendance.filter(function(a){
+    if(a.staffId!==staffId || monthKey(a.date)!==mKey) return false;
+    return !sh || !sh.from || (a.date >= sh.from && a.date <= sh.to);   // only days they were employed
+  });
   var present = 0, absent = 0, leave = 0, half = 0;
   rows.forEach(function(a){
     if(a.status==="Present") present++;
@@ -7478,24 +7489,67 @@ function renderAttendMonth(el){
           first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="amNext">›</button></div>';
   html += '<div class="attlegend"><span><i class="ac-p"></i>Present</span><span><i class="ac-h"></i>Half day</span><span><i class="ac-a"></i>Absent</span><span><i class="ac-l"></i>Leave</span><span><i class="ac-r"></i>Rostered, not marked</span></div>';
   html += '<div class="backupnote" style="margin:0 0 10px;">Tap a day to change it: Present → Half day → Absent → Leave → clear. Changes show on the other phone within seconds.</div>';
-  var people = activeStaff();
+  var people = staff.filter(function(st){ return st.status!=="Left" || staffMonthShare(st, attMonth).days > 0; });
   if(!people.length){ el.innerHTML = html + '<div class="empty">Add staff first.</div>'; wireAttMonth(el); return; }
   people.forEach(function(st){
-    var a = monthAttendance(st.id, attMonth);
-    var sfa = salaryFor(st, attMonth);
-    var pay = { earned: sfa.current ? sfa.accruedSalary : sfa.salaryNet };
+    // Counts and pay both come from salaryFor, so they always agree: only days
+    // between joining and leaving count.
+    var sfa = salaryFor(st, attMonth), sh = sfa.share;
+    var shortD = function(d){ return parseDate(d).toLocaleDateString("en-IN",{day:"numeric",month:"short"}); };
     html += '<div class="attmonth"><div class="attmhead"><b>'+esc(st.name)+'</b><span>'+esc(st.role||"")+'</span></div>';
-    html += '<div class="attmstats"><span class="ok">'+a.present+' present</span>'+(a.half?'<span>'+a.half+' half</span>':'')+
-            '<span class="bad">'+a.absent+' absent</span><span>'+a.leave+' leave</span><span>'+rupeeP(pay.earned)+(sfa.current?' earned so far':' salary')+'</span></div>';
+    if(!sfa.employedDays){
+      html += '<div class="attmcalc">Not employed in '+esc(monthLabel(attMonth))+
+              (st.joinDate && st.joinDate > attMonth+"-31" ? ' · joined '+esc(fmtD(st.joinDate))+(st.joinDate.slice(0,4)!==attMonth.slice(0,4)?' '+st.joinDate.slice(0,4):'') : '')+
+              (st.status==="Left" && st.leftDate ? ' · left '+esc(fmtD(st.leftDate)) : '')+
+              ((+sfa.monthly||0) ? '' : ' · no salary set')+'.</div></div>';
+      return;
+    }
+    var upto = sfa.current ? (today < sh.to ? today : sh.to) : sh.to;
+    var notMarked = 0, outMarks = [];
+    for(var d0=1; d0<=days; d0++){
+      var ds0 = fmtDate(new Date(y, m, d0)), r0 = attendFor(ds0, st.id);
+      var inside = ds0 >= sh.from && ds0 <= sh.to;
+      if(inside && !r0 && ds0 <= upto) notMarked++;
+      if(!inside && r0 && r0.status!=="Absent") outMarks.push(ds0);
+    }
+    var pres = sfa.present + sfa.half*0.5;
+    html += '<div class="attmstats"><span class="ok">'+fmtQty(pres)+' present</span>'+(sfa.half?'<span>'+sfa.half+' half</span>':'')+
+            '<span class="bad">'+sfa.absent+' absent</span><span>'+sfa.leave+' leave</span>'+
+            (notMarked ? '<span style="color:#9A6B12;font-weight:600;">'+notMarked+' not marked</span>' : '')+
+            '<span>'+rupeeP(sfa.current ? sfa.accruedSalary : sfa.salaryNet)+(sfa.current?' earned so far':' salary')+'</span></div>';
+    // How the salary is worked out.
+    var calc = rupeeP(sfa.monthly)+'/month ÷ 30 = '+rupeeP(sfa.rate)+'/day · ';
+    calc += sfa.fullMonth ? 'full month <b>'+rupeeP(sfa.base)+'</b>'
+          : (sh.from > attMonth+"-01" ? 'joined '+esc(shortD(sh.from))+' · ' : '')+(sh.to < attMonth+"-"+String(days).padStart(2,"0") ? 'left '+esc(shortD(sh.to))+' · ' : '')+
+            sfa.employedDays+' days × '+rupeeP(sfa.rate)+' = <b>'+rupeeP(sfa.base)+'</b>';
+    if(sfa.deduction) calc += ' − '+fmtQty(sfa.unpaidDays)+' unpaid day'+(sfa.unpaidDays!==1?'s':'')+' <b>'+rupeeP(sfa.deduction)+'</b>';
+    if(sfa.extraPaid) calc += ' + '+fmtQty(sfa.unusedLeave)+' unused leave <b>'+rupeeP(sfa.extraPaid)+'</b>';
+    if(sfa.waived) calc += ' · unused leave '+rupeeP(sfa.waived)+' waived';
+    if(sfa.fullMonth) calc += ' · '+fmtQty(sfa.allowedLeave)+' paid leave days';
+    else calc += ' · no paid leave in a part month';
+    if(!sfa.current) calc += ' = <b>'+rupeeP(sfa.salaryNet)+'</b>';
+    html += '<div class="attmcalc">'+calc+'</div>';
+    if(notMarked && !sfa.current){
+      html += '<div class="attmwarn">'+notMarked+' day'+(notMarked!==1?'s':'')+' not marked (dashed) '+(notMarked!==1?'are':'is')+' paid as worked days. Mark them if the person was absent or on leave.'+
+              '<br><button data-amfill="'+st.id+'" data-amst="Present">Mark them Present</button> <button data-amfill="'+st.id+'" data-amst="Absent">Mark them Absent</button></div>';
+    }
+    if(outMarks.length){
+      var early = outMarks.filter(function(d){ return d < sh.from; });
+      html += '<div class="attmwarn">'+outMarks.length+' day'+(outMarks.length!==1?'s are':' is')+' marked outside the employment dates (striped) and not paid'+
+              (early.length ? ': joining date is '+esc(shortD(sh.from))+' but '+esc(shortD(early[0]))+' is marked.'+
+                '<br><button data-amjoin="'+st.id+'" data-amdate="'+early[0]+'">Set joining date to '+esc(shortD(early[0]))+'</button>' : '.')+'</div>';
+    }
     html += '<div class="attcal">'+["S","M","T","W","T","F","S"].map(function(d){ return '<div class="acdow">'+d+'</div>'; }).join("");
     for(var i=0;i<first.getDay();i++) html += '<div></div>';
     for(var d=1; d<=days; d++){
       var ds = fmtDate(new Date(y, m, d));
       var rec = attendFor(ds, st.id);
+      var out = ds < sh.from || ds > sh.to;
       var rostered = roster.some(function(r){ return r.date===ds && r.staffId===st.id; });
       var cls = "ac" + (rec ? " ac-" + ATT_SHORT[rec.status].replace("½","h").toLowerCase() : (rostered ? " ac-r" : "")) +
+                (out ? " ac-out" : (!rec && ds <= upto ? " ac-unm" : "")) +
                 (ds===today ? " ac-today" : "") + (ds>today ? " ac-future" : "");
-      html += '<button class="'+cls+'" data-ad="'+ds+'" data-as="'+st.id+'"><span>'+d+'</span>'+(rec?'<b>'+ATT_SHORT[rec.status]+'</b>':'')+'</button>';
+      html += '<button class="'+cls+'" data-ad="'+ds+'" data-as="'+st.id+'"'+(out?' title="Not employed on this day"':'')+'><span>'+d+'</span>'+(rec?'<b>'+ATT_SHORT[rec.status]+'</b>':(out?'<b>–</b>':''))+'</button>';
     }
     html += '</div></div>';
   });
@@ -7508,6 +7562,27 @@ function wireAttMonth(el){
   var pv = document.getElementById("amPrev"), nx = document.getElementById("amNext");
   if(pv) pv.addEventListener("click", function(){ shift(-1); });
   if(nx) nx.addEventListener("click", function(){ shift(1); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-amfill]"), function(b){
+    b.addEventListener("click", function(){
+      var st = staffById(b.getAttribute("data-amfill")), status = b.getAttribute("data-amst");
+      if(!st) return;
+      var sh = staffMonthShare(st, attMonth), today = fmtDate(new Date());
+      var upto = sh.to < today ? sh.to : today, n = 0;
+      if(sh.days) datesBetween(sh.from, upto).forEach(function(ds){ if(!attendFor(ds, st.id)){ setAttendanceOn(ds, st.id, status); n++; } });
+      saveAttend(); renderStaffSection();
+    });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-amjoin]"), function(b){
+    b.addEventListener("click", function(){
+      var idx = staff.findIndex(function(x){ return x.id===b.getAttribute("data-amjoin"); });
+      if(idx<0) return;
+      var d = b.getAttribute("data-amdate");
+      askConfirm("Change "+staff[idx].name+"'s joining date to "+fmtD(d)+"? Salary will be counted from that day.", function(){
+        staff[idx] = Object.assign({}, staff[idx], { joinDate: d });
+        saveStaff(); renderAll();
+      });
+    });
+  });
   Array.prototype.forEach.call(el.querySelectorAll("[data-ad]"), function(b){
     b.addEventListener("click", function(){
       var ds = b.getAttribute("data-ad"), sid = b.getAttribute("data-as");
