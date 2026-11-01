@@ -77,7 +77,7 @@ Staff → **Salary** shows each person's salary for a month:
 
 **Salary advance** (in the staff profile or on the Salary card) records money given early against a month's salary, reducing that month's balance.
 
-**Final settlement** closes a month. If the person chooses not to take the extra pay for unused leave, it's recorded as goodwill, which you can give back later with **Give bonus**. **Salary slip** shows the month's slip, which you can download as a PDF or send on WhatsApp.
+**Final settlement** closes a month. You can round off the total: to the nearest ₹1, down to the rupee, to the nearest ₹10, down to ₹10, or an amount you type (within ₹100), e.g. ₹13,332.40 settled as ₹13,330. The round off shows on the Salary card and the salary slip, and Bills and the Dashboard use the rounded amount. If the person chooses not to take the extra pay for unused leave, it's recorded as goodwill, which you can give back later with **Give bonus**. **Salary slip** shows the month's slip, which you can download as a PDF or send on WhatsApp.
 
 ## How saving works
 

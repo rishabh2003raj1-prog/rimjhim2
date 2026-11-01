@@ -6798,7 +6798,9 @@ function salaryFor(st, mKey){
   var waived = (choice==="waived" && !cur && !future) ? extraLeave : 0;
   var allowances = r2(allowanceTotal(st) * factor);
   var salaryNet = r2(base - deduction + extraPaid);
-  var net = r2(salaryNet + allowances);
+  // Round-off agreed at final settlement (e.g. ₹13,332.40 settled as ₹13,330).
+  var roundOff = (rec && rec.settled && +rec.roundOff) ? r2(+rec.roundOff) : 0;
+  var net = r2(salaryNet + allowances + roundOff);
   // For the month still running: what has been earned up to today (for advances).
   var accruedSalary = salaryNet, accruedAllow = allowances;
   if(cur && sh.days>0){
@@ -6821,7 +6823,7 @@ function salaryFor(st, mKey){
            present:present, half:half, absent:absent, leave:leave, marked:marked, unmarked: Math.max(0, sh.days - marked),
            offDays:offDays, allowedLeave:allowedLeave, unpaidDays:unpaidDays, unusedLeave:unusedLeave,
            base:base, deduction:deduction, extraLeave:extraLeave, extraPaid:extraPaid, waived:waived, choice:choice,
-           allowances:allowances, salaryNet:salaryNet, net:net, accruedSalary:accruedSalary, accruedAllow:accruedAllow, pays:pays, paid:paid, balance:balance,
+           allowances:allowances, salaryNet:salaryNet, roundOff:roundOff, net:net, accruedSalary:accruedSalary, accruedAllow:accruedAllow, pays:pays, paid:paid, balance:balance,
            dueDate:dueDate, lastPay:lastPay, rec:rec, status:status, current:cur, future:future };
 }
 
@@ -6965,6 +6967,7 @@ function renderSalaryView(){
       html += '<div class="psrow"><span>Unused leave</span><b>'+fmtQty(s.unusedLeave)+' day'+(s.unusedLeave!==1?'s':'')+' = '+rupeeP(s.extraLeave)+
               (s.current ? ' <span class="muted">(final at month end)</span>' : s.choice==="waived" ? ' <span class="pill">waived · goodwill</span>' : ' <span class="pill ok">paid extra</span>')+'</b></div>';
     }
+    if(s.roundOff) html += '<div class="psrow"><span>Round off (settlement)</span><b>'+(s.roundOff>0?'+':'−')+rupeeP(Math.abs(s.roundOff))+'</b></div>';
     html += '<div class="psrow"><span><b>Total due</b></span><b>'+rupeeP(s.net)+'</b></div>';
     html += '<div class="psrow"><span>Paid</span><b class="ok">'+rupeeP(s.paid)+'</b></div>';
     if(s.pays.length){
@@ -7050,6 +7053,11 @@ function openSettlement(st, mKey){
       '<label class="setlopt"><input type="radio" name="st_ch" value="pay" '+(choice==="pay"?"checked":"")+'> <span><b>Pay it</b> with this month’s salary</span></label>'+
       '<label class="setlopt"><input type="radio" name="st_ch" value="waived" '+(choice==="waived"?"checked":"")+'> <span><b>They don’t want it</b> — record as goodwill for a future bonus</span></label></div>';
   }
+  var prevMode = (s.rec && s.rec.roundMode) || "r1";
+  html += '<div class="field"><label>Round off the total</label><select id="st_round">'+
+          [["exact","No round off"],["r1","To the nearest ₹1"],["d1","Down to the rupee"],["r10","To the nearest ₹10"],["d10","Down to ₹10"],["custom","Settle for an amount I type"]].map(function(o){
+            return '<option value="'+o[0]+'"'+(o[0]===prevMode?' selected':'')+'>'+o[1]+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="field" id="st_customwrap" style="display:none;"><label>Settle total at (₹, within ₹100 of the exact amount)</label><input type="number" inputmode="decimal" id="st_custom" value="'+(prevMode==="custom" && s.rec ? r2(s.net) : "")+'"></div>';
   html += '<div class="card" style="margin-bottom:12px;" id="st_sum"></div>';
   html += '<div class="field two"><div><label>Pay balance now (₹)</label><input type="number" inputmode="decimal" id="st_amt"></div>';
   html += '<div><label>Date</label><input type="date" id="st_date" value="'+fmtDate(new Date())+'"></div></div>';
@@ -7062,10 +7070,23 @@ function openSettlement(st, mKey){
   document.getElementById("sheetBg").classList.add("on");
   sheet.scrollTop = 0;
   function cur(){ var r = sheet.querySelector('input[name="st_ch"]:checked'); return r ? r.value : "pay"; }
-  function net(){ return s.base - s.deduction + s.allowances + (cur()==="pay" ? s.extraLeave : 0); }
+  function exact(){ return r2(s.base - s.deduction + s.allowances + (cur()==="pay" ? s.extraLeave : 0)); }
+  function rounded(){
+    var e = exact(), m = document.getElementById("st_round").value;
+    if(m==="r1") return Math.round(e);
+    if(m==="d1") return Math.floor(e + 0.001);
+    if(m==="r10") return Math.round(e/10)*10;
+    if(m==="d10") return Math.floor((e + 0.001)/10)*10;
+    if(m==="custom"){ var c = parseFloat(document.getElementById("st_custom").value); return isNaN(c) ? e : r2(c); }
+    return e;
+  }
+  function net(){ return rounded(); }
   function draw(){
-    var n = r2(net()), bal = r2(n - s.paid); if(Math.abs(bal) < 0.5) bal = 0;
+    document.getElementById("st_customwrap").style.display = document.getElementById("st_round").value==="custom" ? "block" : "none";
+    var e = exact(), n = r2(net()), ro = r2(n - e), bal = r2(n - s.paid); if(Math.abs(bal) < 0.5) bal = 0;
     document.getElementById("st_sum").innerHTML =
+      (ro ? '<div class="psrow"><span>Exact amount</span><b>'+rupeeP(e)+'</b></div>'+
+            '<div class="psrow"><span>Round off</span><b>'+(ro>0?'+':'−')+rupeeP(Math.abs(ro))+'</b></div>' : '')+
       '<div class="psrow"><span><b>Total due</b></span><b>'+rupeeP(n)+'</b></div>'+
       '<div class="psrow"><span>Already paid</span><b class="ok">'+rupeeP(s.paid)+'</b></div>'+
       '<div class="psrow"><span>'+(bal<0?'Paid in advance':'Balance to pay')+'</span><b class="'+(bal>0?"bad":"ok")+'">'+rupeeP(Math.abs(bal))+'</b></div>'+
@@ -7073,11 +7094,19 @@ function openSettlement(st, mKey){
     document.getElementById("st_amt").value = Math.max(0, bal) || "";
   }
   Array.prototype.forEach.call(sheet.querySelectorAll('input[name="st_ch"]'), function(r){ r.addEventListener("change", draw); });
+  document.getElementById("st_round").addEventListener("change", draw);
+  document.getElementById("st_custom").addEventListener("input", draw);
   draw();
   document.getElementById("st_cancel").addEventListener("click", closeForm);
   document.getElementById("st_go").addEventListener("click", function(){
     var amt = parseFloat(document.getElementById("st_amt").value) || 0;
-    var ch = cur();
+    var ch = cur(), rMode = document.getElementById("st_round").value, settledAt = r2(net()), rOff = r2(settledAt - exact());
+    if(rMode==="custom" && isNaN(parseFloat(document.getElementById("st_custom").value))){
+      var er = document.getElementById("st_err"); er.textContent = "Type the amount to settle at."; er.style.display = "block"; return;
+    }
+    if(Math.abs(rOff) > 100){   // a round off is small change, not a pay cut
+      var er2 = document.getElementById("st_err"); er2.textContent = "That is "+rupeeP(Math.abs(rOff))+" away from the exact amount - too big for a round off. Use a deduction, advance or bonus instead."; er2.style.display = "block"; return;
+    }
     if(amt>0){
       var mode = document.getElementById("st_mode").value, by = document.getElementById("st_by").value;
       expenses.push({ id:uid(), date:document.getElementById("st_date").value || fmtDate(new Date()), category:"Staff Salary",
@@ -7087,10 +7116,11 @@ function openSettlement(st, mKey){
     payroll = payroll.filter(function(r){ return !(r.staffId===st.id && r.month===mKey); });
     payroll.push({ id:"pr_"+st.id+"_"+mKey, staffId:st.id, month:mKey, extraLeave:ch,
                    waivedAmount: ch==="waived" ? s.extraLeave : 0, unusedLeave: s.unusedLeave,
+                   roundOff: rOff, roundMode: rMode,
                    settled:true, settledOn: fmtDate(new Date()), note: document.getElementById("st_note").value.trim() });
     savePayroll();
     closeForm(); renderAll();
-    appAlert(st.name+" · "+monthLabel(mKey)+" settled."+(ch==="waived" && s.extraLeave ? " "+rupeeP(s.extraLeave)+" recorded as goodwill." : ""));
+    appAlert(st.name+" · "+monthLabel(mKey)+" settled at "+rupeeP(settledAt)+"."+(rOff ? " Round off "+(rOff>0?"+":"−")+rupeeP(Math.abs(rOff))+"." : "")+(ch==="waived" && s.extraLeave ? " "+rupeeP(s.extraLeave)+" recorded as goodwill." : ""));
   });
 }
 
@@ -7177,6 +7207,7 @@ function slipLines(s){
   if(+st.houseRent) L.push(["House rent allowance", rupeeP(r2(st.houseRent*shr))]);
   if(+st.foodAllowance) L.push(["Food allowance", rupeeP(r2(st.foodAllowance*shr))]);
   if(+st.travelAllowance) L.push(["Travel allowance", rupeeP(r2(st.travelAllowance*shr))]);
+  if(s.roundOff) L.push(["Round off", (s.roundOff>0?"+ ":"- ")+rupeeP(Math.abs(s.roundOff))]);
   L.push(["NET PAYABLE", rupeeP(s.net)]);
   s.pays.forEach(function(x){ L.push(["Paid on "+fmtD(x.date)+" ("+(x.mode||"")+")", rupeeP(x.amount)]); });
   L.push([s.balance<0 ? "Paid in advance" : "Balance due", rupeeP(Math.abs(s.balance))]);
