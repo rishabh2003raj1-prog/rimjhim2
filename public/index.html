@@ -2626,7 +2626,7 @@ function entryRow(item, type){
   } else {
     var pp = payerIsPersonal(item.paidBy);
     return '<div class="entry" data-type="expense" data-id="'+item.id+'"><div><div class="who">'+esc(item.category)+'</div><div class="meta">'+esc(item.description||"")+' · '+esc(item.mode)+
-      (pp ? ' · paid by '+esc(payerPartner(item.paidBy))+' (own) '+(item.settled?'<span class="pill ok">settled</span>':'<span class="pill bad">owed</span>') : '')+
+      (pp ? ' · paid by '+esc(payerPartner(item.paidBy))+' (own) '+(item.settled?'<span class="pill ok">'+({bank:"repaid by UPI/bank",cash:"repaid in cash",held:"repaid from handover cash",invest:"counted as investment"}[item.settleMode]||"settled")+'</span>':'<span class="pill bad">owed</span>') : '')+
       (payerHeldBy(item.paidBy) ? ' · from '+esc(payerHeldBy(item.paidBy))+'\u2019s handover cash' : '')+
       '</div></div><div class="amt purch">'+rupee(expAmt(item))+'</div></div>';
   }
@@ -2730,6 +2730,13 @@ function openOwedSheet(){
   html += '<div class="backupnote">These bills and expenses were paid by a partner from their own money, so the cafe still owes it back. Settle each one when you repay it, or count it as extra capital they put in.</div>';
   if(pend.length===0){ html += '<div class="empty">Nothing pending.</div>'; }
   else {
+    var byP = {};
+    pend.forEach(function(g){ (byP[g.partner] = byP[g.partner] || []).push(g); });
+    Object.keys(byP).forEach(function(pn){
+      if(byP[pn].length < 2) return;
+      var tot = byP[pn].reduce(function(a,g){ return a+g.amount; },0);
+      html += '<button class="btn-additem" style="margin:0 0 8px;" data-settleall="'+esc(pn)+'">Repay all of '+esc(pn)+'\u2019s '+byP[pn].length+' items · '+rupee(tot)+'</button>';
+    });
     html += pend.map(function(g){
       return '<div class="entry"><div><div class="who">'+esc(g.partner)+' · '+rupee(g.amount)+'</div>'+
              '<div class="meta">'+esc(g.vendor)+' · '+parseDate(g.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</div></div>'+
@@ -2743,44 +2750,94 @@ function openOwedSheet(){
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-settle]"), function(b){
     b.addEventListener("click", function(){ openSettleSheet(b.getAttribute("data-settle")); });
   });
-}
-
-function openSettleSheet(billId){
-  var g = pendingReimbursements().find(function(x){ return x.id===billId; });
-  if(!g) return;
-  var sheet = document.getElementById("sheet");
-  var html = '<h2 class="serif">Settle '+rupee(g.amount)+'</h2>';
-  html += '<div class="backupnote">'+esc(g.partner)+' paid '+(g.isExpense?'':'this ')+esc(g.vendor)+(g.isExpense?'':' bill')+' on '+parseDate(g.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'. How do you want to settle it?</div>';
-  html += '<div class="sheetbtns" style="margin-top:4px;"><button class="btn-save" id="st_cash" style="flex:1;">Cafe repaid them in cash</button></div>';
-  html += '<div class="backupnote" style="margin-top:6px;">Marks it cleared. It is already counted as a cafe cost, so nothing else changes.</div>';
-  html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="st_inv" style="flex:1;">Count as their investment</button></div>';
-  html += '<div class="backupnote" style="margin-top:6px;">Adds '+rupee(g.amount)+' to the capital of '+esc(g.partner)+' in the Investments tab, instead of repaying them.</div>';
-  html += '<div class="sheetbtns" style="margin-top:16px;"><button class="btn-cancel" id="st_back" style="flex:1;">Back</button></div>';
-  sheet.innerHTML = html;
-  document.getElementById("st_back").addEventListener("click", openOwedSheet);
-  document.getElementById("st_cash").addEventListener("click", function(){ markSettled(g.id); openOwedSheet(); });
-  document.getElementById("st_inv").addEventListener("click", function(){
-    investments.push({ id:uid(), date:g.date, partner:g.partner, invType:"Investment", purpose:"Working capital",
-                       amount:g.amount, mode:"Cash", notes:"Paid "+g.vendor+" from own pocket" });
-    saveInvest();
-    markSettled(g.id);
-    openOwedSheet();
-    renderAll();
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-settleall]"), function(b){
+    b.addEventListener("click", function(){
+      var pn = b.getAttribute("data-settleall");
+      openSettleSheet(pend.filter(function(g){ return g.partner===pn; }).map(function(g){ return g.id; }));
+    });
   });
 }
 
-function markSettled(billId){
+// Repay one or more owed items. How the cafe repaid decides where the money
+// comes from: the counter (cash), the bank (UPI / transfer), or cash a partner is
+// holding from a handover. "Count as investment" adds it to their capital instead.
+function openSettleSheet(ids){
+  if(!Array.isArray(ids)) ids = [ids];
+  var pend = pendingReimbursements();
+  var items = ids.map(function(id){ return pend.find(function(x){ return x.id===id; }); }).filter(Boolean);
+  if(!items.length) return;
+  var partner = items[0].partner, total = r2(items.reduce(function(a,g){ return a+g.amount; },0));
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Repay '+esc(partner)+' '+rupee(total)+'</h2>';
+  html += '<div class="backupnote">'+(items.length===1
+    ? esc(partner)+' paid '+esc(items[0].vendor)+' on '+fmtD(items[0].date)+' from their own money.'
+    : items.length+' items '+esc(partner)+' paid from their own money.')+'</div>';
+  var holders = cashHolders().filter(function(h){ return h!==partner; });
+  html += '<div class="field"><label>How did the cafe repay?</label><select id="rp_mode">'+
+          '<option value="bank">UPI / bank transfer from the cafe account</option>'+
+          '<option value="cash">Cash from the counter</option>'+
+          holders.map(function(h){ return '<option value="held:'+esc(h)+'">Cash '+esc(h)+' holds from handovers</option>'; }).join("")+
+          '<option value="invest">Not repaid - count it as their investment</option></select></div>';
+  html += '<div class="field"><label>Date repaid</label><input type="date" id="rp_date" value="'+fmtDate(new Date())+'"></div>';
+  html += '<div class="backupnote" id="rp_hint"></div>';
+  html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="st_back">Back</button><button class="btn-save" id="rp_go">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  function hint(){
+    var v = document.getElementById("rp_mode").value;
+    document.getElementById("rp_hint").textContent =
+      v==="bank" ? "Comes off the cafe bank balance on that date." :
+      v==="cash" ? "Comes out of the counter: that day's expected counter cash goes down by "+rupee(total)+"." :
+      v==="invest" ? "Adds "+rupee(total)+" to "+partner+"'s capital in Investments instead of repaying it." :
+      "Comes out of the handover cash "+v.slice(5)+" is holding (Handover tab).";
+  }
+  document.getElementById("rp_mode").addEventListener("change", hint); hint();
+  document.getElementById("st_back").addEventListener("click", openOwedSheet);
+  document.getElementById("rp_go").addEventListener("click", function(){
+    var v = document.getElementById("rp_mode").value, d = document.getElementById("rp_date").value || fmtDate(new Date());
+    items.forEach(function(g){
+      if(v==="invest"){
+        investments.push({ id:uid(), date:g.date, partner:g.partner, invType:"Investment", purpose:"Working capital",
+                           amount:g.amount, mode:"Cash", notes:"Paid "+g.vendor+" from own pocket" });
+        markSettled(g.id, { mode:"invest", date:d }, true);
+      } else {
+        markSettled(g.id, { mode: v.indexOf("held:")===0 ? "held" : v, from: v.indexOf("held:")===0 ? v.slice(5) : "", date:d }, true);
+      }
+    });
+    if(v==="invest") saveInvest();
+    saveExpense(); saveBills();
+    renderAll(); openOwedSheet();
+  });
+}
+
+// Repayments the cafe made to partners, with how and when they were paid.
+function partnerRepayments(){
+  var out = [];
+  expenses.forEach(function(x){
+    if(payerIsPersonal(x.paidBy) && x.settled && x.settleMode)
+      out.push({ date:x.settledOn||x.date, amount:expAmt(x), mode:x.settleMode, from:x.settleFrom||"", partner:payerPartner(x.paidBy), what:(x.category||"Expense") });
+  });
+  billGroups().forEach(function(g){
+    if(!payerIsPersonal(g.paidBy)) return;
+    var b = getBill(g.id);
+    if(b && b.settled && b.settleMode)
+      out.push({ date:b.settledOn||g.date, amount:r2(g.lines.reduce(function(a,p){ return a+purchTotal(p); },0)), mode:b.settleMode, from:b.settleFrom||"", partner:payerPartner(g.paidBy), what:"Purchase"+(g.vendor?" · "+g.vendor:"") });
+  });
+  return out;
+}
+
+function markSettled(billId, how, quiet){
+  var extra = how ? { settleMode: how.mode, settledOn: how.date, settleFrom: how.from || "" } : {};
   if(String(billId).indexOf("exp:")===0){
     var x = expenses.find(function(e){ return "exp:"+e.id===billId; });
-    if(x){ x.settled = true; saveExpense(); }
-    renderAll();
+    if(x){ x.settled = true; Object.assign(x, extra); if(!quiet) saveExpense(); }
+    if(!quiet) renderAll();
     return;
   }
   var b = getBill(billId);
-  if(b){ b.settled = true; }
-  else { bills.push({ id:billId, image:null, settled:true }); }
-  saveBills();
-  renderAll();
+  if(b){ b.settled = true; Object.assign(b, extra); }
+  else { bills.push(Object.assign({ id:billId, image:null, settled:true }, extra)); }
+  if(!quiet){ saveBills(); renderAll(); }
 }
 
 // Spend grouped by who did the buying - makes an odd pattern easy to spot.
@@ -6499,7 +6556,8 @@ function bankMovements(){
   var from = settings.bankDate || "", today = fmtDate(new Date());
   function inRange(d){ return d && (!from || d >= from) && d <= today; }
   function cafePaid(x){ return !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); }
-  var m = { sales:0, udhaar:0, invest:0, deposits:0, bills:0, purchases:0, withdraw:0 };
+  var m = { sales:0, udhaar:0, invest:0, deposits:0, bills:0, purchases:0, withdraw:0, repaid:0 };
+  partnerRepayments().forEach(function(r){ if(r.mode==="bank" && inRange(r.date)) m.repaid += r.amount; });
   sales.forEach(function(x){ if(inRange(x.date) && (x.mode==="UPI" || x.mode==="Card")) m.sales += saleTotal(x); });
   creditPayments.forEach(function(x){ if(inRange(x.date) && x.mode && x.mode!=="Cash") m.udhaar += (+x.amount||0); });
   investments.forEach(function(v){
@@ -6512,7 +6570,7 @@ function bankMovements(){
   purchases.forEach(function(x){ if(inRange(x.date) && cafePaid(x) && x.mode!=="Credit" && !paidFromTill(x)) m.purchases += purchTotal(x); });
   Object.keys(m).forEach(function(k){ m[k] = r2(m[k]); });
   m.in = r2(m.sales + m.udhaar + m.invest + m.deposits);
-  m.out = r2(m.bills + m.purchases + m.withdraw);
+  m.out = r2(m.bills + m.purchases + m.withdraw + m.repaid);
   return m;
 }
 function bankDepositsSince(){ return bankMovements().deposits; }
@@ -6539,6 +6597,9 @@ function handoverRows(holder){
     }
     if(m.type==="pass" && m.to===holder) rows.push({ date:m.date, kind:"passin", amt:a, text:"Received from "+m.holder+(m.note?" · "+m.note:""), ref:m.id });
   });
+  partnerRepayments().forEach(function(r){
+    if(r.mode==="held" && r.from===holder) rows.push({ date:r.date, kind:"repay", amt:-r.amount, text:"Repaid "+r.partner+" · "+r.what, ref:"" });
+  });
   var pv = holder+" (cafe cash held)";
   expenses.forEach(function(x){ if(x.paidBy===pv) rows.push({ date:x.date, kind:"expense", amt:-expAmt(x), text:(x.category||"Expense")+(x.description?" · "+x.description:""), ref:x.id }); });
   var seen = {};
@@ -6552,7 +6613,7 @@ function handoverRows(holder){
 }
 function handoverLedger(mKey){
   return cashHolders().map(function(h){
-    var rows = handoverRows(h), r = { holder:h, opening:0, fromCounter:0, fromOthers:0, taken:0, expenses:0, purchases:0, bank:0, counter:0, pass:0, withdraw:0, rows:[] };
+    var rows = handoverRows(h), r = { holder:h, opening:0, fromCounter:0, fromOthers:0, taken:0, expenses:0, purchases:0, bank:0, counter:0, pass:0, withdraw:0, repay:0, rows:[] };
     rows.forEach(function(x){
       var m = x.date.slice(0,7);
       if(m < mKey){ r.opening += x.amt; return; }
@@ -6567,7 +6628,7 @@ function handoverLedger(mKey){
     });
     r.opening = r2(r.opening);
     r.received = r2(r.fromCounter + r.fromOthers + r.taken);
-    r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw);
+    r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw + r.repay);
     r.closing = r2(r.opening + r.received - r.used);
     return r;
   }).filter(function(r){ return r.opening || r.received || r.used || PARTNERS.indexOf(r.holder)>=0; });
@@ -6594,7 +6655,7 @@ function renderHandoverView(){
       '<div class="psrow"><span>With them at the start of the month</span><b>'+rupeeP(r.opening)+'</b></div>'+
       line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Received from others", r.fromOthers)+
       line("− Spent on expenses", r.expenses)+line("− Spent on purchases", r.purchases)+line("− Deposited in bank", r.bank)+
-      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+
+      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+
       '<div class="psrow"><span><b>Still with '+esc(r.holder)+'</b></span><b class="'+(r.closing<0?"bad":r.closing>0?"warnamt":"ok")+'">'+rupeeP(r.closing)+'</b></div>';
     if(r.closing < -0.5) html += '<div class="attmwarn" style="margin-top:8px;">More was spent than was handed over. Either a handover is missing, or '+esc(r.holder)+' added their own money (then change those entries to “own money” so the cafe owes it back).</div>';
     if(r.rows.length){
@@ -6621,6 +6682,7 @@ function renderHandoverView(){
       if(k==="handover"){ openCashDayForm(ref); return; }
       if(k==="expense"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
       if(k==="purchase"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
+      if(k==="repay"){ appAlert("This is a partner repayment. To change it, find the bill or expense it repaid (Expenses or Purchases tab)."); return; }
       var m = cashMoves.find(function(e){ return e.id===ref; }); if(m) openCashMoveForm(m);
     });
   });
@@ -6716,7 +6778,8 @@ function cashMovement(dateStr){
   var backIn = cashMoves.filter(function(m){ return m.date===dateStr && m.type==="counter"; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
   var takenOut = cashMoves.filter(function(m){ return m.date===dateStr && m.type==="taken"; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
   inflow += backIn;
-  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, outflow: outPurch + outExp + takenOut, outPurch: outPurch, outExp: outExp };
+  var repaid = partnerRepayments().filter(function(r){ return r.mode==="cash" && r.date===dateStr; }).reduce(function(a,r){ return a+r.amount; },0);
+  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, repaid: repaid, outflow: outPurch + outExp + takenOut + repaid, outPurch: outPurch, outExp: outExp };
 }
 
 function openingCashFor(dateStr){
@@ -6784,7 +6847,7 @@ function renderCashView(){
     html += '<div class="backupnote" style="margin:8px 0 4px;">Since '+(settings.bankDate ? fmtD(settings.bankDate) : 'then')+':</div>'+
       bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner investments (not cash)", bm.invest, "+")+
       bl("Handover cash deposited", bm.deposits, "+")+bl("Bills paid by UPI / bank", bm.bills, "−")+bl("Purchases paid by UPI / bank", bm.purchases, "−")+
-      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+
+      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+
       '<div class="psrow"><span><b>Cafe bank account now</b></span><b class="'+(bankBalanceNow()<0?"bad":"")+'">'+rupee(bankBalanceNow())+'</b></div>'+
       '<div class="backupnote" style="margin:6px 0 0;">Check this against your bank app now and then. If it differs (bank charges, interest, a missed entry), update the balance above and the count starts again from that date.</div>';
   }
@@ -6800,6 +6863,7 @@ function renderCashView(){
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   if(m.backIn) html += '<div class="psrow"><span>+ Handover cash put back</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
+  if(m.repaid) html += '<div class="psrow"><span>− Partner repaid in cash</span><b>'+rupee(m.repaid)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
   html += '<div class="psrow"><span><b>Should be in counter</b></span><b>'+rupee(exp)+'</b></div>';
   if(todayRec && todayRec.counted !== null && todayRec.counted !== undefined && todayRec.counted !== ""){
@@ -6906,6 +6970,7 @@ function openCashDayForm(dateStr){
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   if(m.backIn) html += '<div class="psrow"><span>+ Handover cash put back</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
+  if(m.repaid) html += '<div class="psrow"><span>− Partner repaid in cash</span><b>'+rupee(m.repaid)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
   html += '<div class="psrow"><span><b>Should be in counter</b></span><b>'+rupee(exp)+'</b></div></div>';
 

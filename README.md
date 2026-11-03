@@ -72,7 +72,9 @@ Records → **Bills** shows one month's rent, electricity, other monthly costs a
 
 The bank balance in the Cash tab and on the Dashboard is the balance last noted in Cash → Opening balances, plus everything since that date:
 - **In:** UPI and card sales, udhaar paid back by UPI/card/bank, partner investments not made in cash, handover cash deposited.
-- **Out:** bills and purchases the cafe paid by UPI, card or bank (not udhaar purchases, a partner's own money, or handover cash), and partner withdrawals not taken in cash.
+- **Out:** bills and purchases the cafe paid by UPI, card or bank (not udhaar purchases, a partner's own money, or handover cash), partner withdrawals not taken in cash, and partners repaid by UPI/bank.
+
+When the cafe repays a partner (Expenses → Money owed to partners → Settle, or "Repay all"), pick how: UPI/bank (comes off the bank balance), cash from the counter (comes off that day's counter cash), cash another partner holds from handovers (comes off their Handover balance), or count it as their investment.
 
 Compare it with the bank app now and then; if it differs (charges, interest, a missed entry), note the real balance and the count starts again from that date.
 
