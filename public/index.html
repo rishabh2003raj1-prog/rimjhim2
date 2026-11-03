@@ -2809,7 +2809,7 @@ function openSettleSheet(ids){
     items.forEach(function(g){
       if(v==="invest"){
         investments.push({ id:uid(), date:g.date, partner:g.partner, invType:"Investment", purpose:"Working capital",
-                           amount:g.amount, mode:"Cash", notes:"Paid "+g.vendor+" from own pocket" });
+                           amount:g.amount, mode:"Cash", viaBill:true, notes:"Paid "+g.vendor+" from own pocket" });
         markSettled(g.id, { mode:"invest", date:d }, true);
       } else {
         markSettled(g.id, { mode: v.indexOf("held:")===0 ? "held" : v, from: v.indexOf("held:")===0 ? v.slice(5) : "", date:d }, true);
@@ -6656,6 +6656,11 @@ function handoverRows(holder){
     }
     if(m.type==="pass" && m.to===holder) rows.push({ date:m.date, kind:"passin", amt:a, text:"Received from "+m.holder+(m.note?" · "+m.note:""), ref:m.id });
   });
+  investments.forEach(function(v){
+    if(!v.date || invCashTarget(v)!==holder) return;
+    if(v.invType==="Withdrawal") rows.push({ date:v.date, kind:"withdraw", amt:-(+v.amount||0), text:"Partner withdrawal · "+v.partner, ref:"inv:"+v.id });
+    else rows.push({ date:v.date, kind:"investin", amt:+v.amount||0, text:"Partner investment in cash · "+v.partner, ref:"inv:"+v.id });
+  });
   partnerRepayments().forEach(function(r){
     if(r.mode==="held" && r.from===holder) rows.push({ date:r.date, kind:"repay", amt:-r.amount, text:"Repaid "+r.partner+" · "+r.what, ref:"" });
   });
@@ -6682,13 +6687,14 @@ function handoverLedger(mKey){
       else if(x.kind==="passin") r.fromOthers += x.amt;
       else if(x.kind==="taken") r.taken += x.amt;
       else if(x.kind==="frombank") r.fromBank = (r.fromBank||0) + x.amt;
+      else if(x.kind==="investin") r.investIn = (r.investIn||0) + x.amt;
       else if(x.kind==="expense") r.expenses -= x.amt;
       else if(x.kind==="purchase") r.purchases -= x.amt;
       else r[x.kind] = (r[x.kind]||0) - x.amt;
     });
     r.opening = r2(r.opening);
-    r.fromBank = r2(r.fromBank||0);
-    r.received = r2(r.fromCounter + r.fromOthers + r.taken + r.fromBank);
+    r.fromBank = r2(r.fromBank||0); r.investIn = r2(r.investIn||0);
+    r.received = r2(r.fromCounter + r.fromOthers + r.taken + r.fromBank + r.investIn);
     r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw + r.repay);
     r.closing = r2(r.opening + r.received - r.used);
     return r;
@@ -6714,7 +6720,7 @@ function renderHandoverView(){
     var line = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+lbl+'</span><b>'+(sign||"")+rupeeP(v)+'</b></div>' : ''; };
     html += '<div class="card" style="margin-bottom:12px;"><h3>'+esc(r.holder)+'</h3>'+
       '<div class="psrow"><span>With them at the start of the month</span><b>'+rupeeP(r.opening)+'</b></div>'+
-      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Received from others", r.fromOthers)+
+      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Partner investment in cash", r.investIn)+line("+ Received from others", r.fromOthers)+
       line("− Spent on expenses", r.expenses)+line("− Spent on purchases", r.purchases)+line("− Deposited in bank", r.bank)+
       line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+
       '<div class="psrow"><span><b>Still with '+esc(r.holder)+'</b></span><b class="'+(r.closing<0?"bad":r.closing>0?"warnamt":"ok")+'">'+rupeeP(r.closing)+'</b></div>';
@@ -6750,6 +6756,7 @@ function renderHandoverView(){
       if(k==="handover"){ openCashDayForm(ref); return; }
       if(k==="expense"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
       if(k==="purchase"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
+      if(ref && ref.indexOf("inv:")===0){ var iv = investments.find(function(e){ return e.id===ref.slice(4); }); if(iv) openForm("investment", iv, iv.date); return; }
       var mm = cashMoves.find(function(e){ return e.id===ref; });
       if(mm && mm.type==="atmheld"){ openBankAdjForm(mm); return; }
       if(k==="repay"){ appAlert("This is a partner repayment. To change it, find the bill or expense it repaid (Expenses or Purchases tab)."); return; }
@@ -6910,8 +6917,8 @@ function cashReview(mKey){
   var flows = 0, handed = 0;
   datesBetween(first, upto).forEach(function(d){
     var m = cashMovement(d);
-    var cashSales = r2(m.inflow - m.inCredit - m.backIn);
-    add("cashSales", cashSales); add("udhaar", m.inCredit);
+    var cashSales = r2(m.inflow - m.inCredit - m.backIn - m.invIn);
+    add("cashSales", cashSales); add("udhaar", m.inCredit); add("invest", m.invIn); add("withdraw", -m.invOut);
     add("purchases", -m.outPurch); add("expenses", -m.outExp); add("repaid", -m.repaid);
     flows += m.inflow - m.outflow;
     var rec = cashDayFor(d);
@@ -6930,7 +6937,7 @@ function cashReview(mKey){
   handoverLedger(mKey).forEach(function(r){
     if(!r.opening && !r.received && !r.used && !r.closing) return;
     R.places.push({ name:"With "+r.holder, start:r.opening, end:r.closing, holder:r.holder });
-    add("expenses", -r.expenses); add("purchases", -r.purchases); add("withdraw", -r.withdraw); add("repaid", -r.repay);
+    add("expenses", -r.expenses); add("purchases", -r.purchases); add("withdraw", -r.withdraw); add("repaid", -r.repay); add("invest", r.investIn);
     if(r.bank) tr("Handover cash deposited in bank", r.bank);
     if(r.counter) tr("Handover cash put back in the counter", r.counter);
     if(r.pass) tr("Cash passed between people", r.pass);
@@ -7091,7 +7098,7 @@ function exportHandoverStatement(mKey, holder, btn){
       if(y > 700){ doc.addPage(); y = 46; }
       doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(36,26,18); doc.text(pdfClean(r.holder), M, y); y += 8;
       var sum = [["With them at the start ("+pdfDate(mKey+"-01")+")", pdfMoneyP(r.opening)]];
-      [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Received from others", r.fromOthers],
+      [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Partner investment in cash", r.investIn], ["+ Received from others", r.fromOthers],
        ["- Spent on expenses", r.expenses], ["- Spent on purchases", r.purchases], ["- Deposited in bank", r.bank], ["- Put back in the counter", r.counter],
        ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
       sum.push(["Still with "+pdfClean(r.holder)+" ("+pdfDate(last)+")", pdfMoneyP(r.closing)]);
@@ -7336,6 +7343,13 @@ function paidFromTill(p){
   return m==="Cash";
 }
 
+// Cash a partner put in or took out: "" = the counter, a name = cash that person
+// holds (Handover tab), null = no cash moved (not cash, or a bill they paid that was
+// counted as their investment).
+function invCashTarget(v){
+  if((v.mode||"Cash")!=="Cash" || v.viaBill || / from own pocket$/.test(v.notes||"")) return null;
+  return v.cashTo || "";
+}
 function cashMovement(dateStr){
   var inflow = sales.filter(function(s){ return s.date===dateStr && s.mode==="Cash"; })
                     .reduce(function(a,s){ return a+saleTotal(s); },0);
@@ -7352,7 +7366,13 @@ function cashMovement(dateStr){
   var takenOut = cashMoves.filter(function(m){ return m.date===dateStr && m.type==="taken"; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
   inflow += backIn;
   var repaid = partnerRepayments().filter(function(r){ return r.mode==="cash" && r.date===dateStr; }).reduce(function(a,r){ return a+r.amount; },0);
-  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, repaid: repaid, outflow: outPurch + outExp + takenOut + repaid, outPurch: outPurch, outExp: outExp };
+  var invIn = 0, invOut = 0;
+  investments.forEach(function(v){
+    if(v.date!==dateStr || invCashTarget(v)!=="") return;
+    if(v.invType==="Withdrawal") invOut += (+v.amount||0); else invIn += (+v.amount||0);
+  });
+  inflow += invIn;
+  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, outflow: outPurch + outExp + takenOut + repaid + invOut, outPurch: outPurch, outExp: outExp };
 }
 
 function openingCashFor(dateStr){
@@ -7445,7 +7465,9 @@ function renderCashView(){
   html += '<div class="card" style="margin-bottom:14px;"><h3>Counter today <span class="muted">· '+parseDate(today).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</span></h3>';
   var m = cashMovement(today);
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(today))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn)+'</b></div>';
+  if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
+  if(m.invOut) html += '<div class="psrow"><span>− Partner withdrawal in cash</span><b>'+rupee(m.invOut)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   if(m.backIn) html += '<div class="psrow"><span>+ Cash put back / withdrawn from bank</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
@@ -7565,7 +7587,9 @@ function openCashDayForm(dateStr){
 
   html += '<div class="card" style="margin-bottom:12px;">';
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(dateStr))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn)+'</b></div>';
+  if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
+  if(m.invOut) html += '<div class="psrow"><span>− Partner withdrawal in cash</span><b>'+rupee(m.invOut)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   if(m.backIn) html += '<div class="psrow"><span>+ Cash put back / withdrawn from bank</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
@@ -8907,6 +8931,10 @@ function openForm(type, item, defaultDate, prefill){
     html += '<div class="field"><label>Purpose</label><select id="f_purpose">'+INVEST_PURPOSES.map(function(p){return '<option '+(item&&item.purpose===p?"selected":"")+'>'+p+'</option>';}).join("")+'</select></div>';
     html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:"")+'"></div>';
     html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Bank Transfer"].map(function(m){return '<option '+(item&&item.mode===m?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
+    var viaBill = item && (item.viaBill || / from own pocket$/.test(item.notes||""));
+    html += '<div class="field" id="f_cashtowrap" style="display:'+((!item || item.mode==="Cash") && !viaBill ? "block" : "none")+';"><label id="f_cashtolbl">Cash went</label><select id="f_cashto">'+
+            '<option value="">Into / out of the counter</option>'+cashHolders().map(function(h){ return '<option value="'+esc(h)+'"'+(item&&item.cashTo===h?" selected":"")+'>Held by '+esc(h)+' (handover cash)</option>'; }).join("")+'</select></div>';
+    if(viaBill) html += '<div class="backupnote" style="margin-top:-4px;">This was a bill the partner paid, counted as their investment - no cash moved, so it doesn\u2019t change the counter.</div>';
     html += '<div class="field"><label>Notes</label><input type="text" id="f_notes" placeholder="Optional" value="'+esc(item?item.notes:"")+'"></div>';
   } else {
     var pf = prefill || {};
@@ -8946,6 +8974,13 @@ function openForm(type, item, defaultDate, prefill){
     });
   }
 
+  var fct = document.getElementById("f_cashtowrap");
+  if(fct && type==="investment" && !(item && (item.viaBill || / from own pocket$/.test(item.notes||"")))){
+    var fmi = document.getElementById("f_mode"), fit = document.getElementById("f_invtype");
+    var syncCashTo = function(){ fct.style.display = fmi.value==="Cash" ? "block" : "none";
+      document.getElementById("f_cashtolbl").textContent = fit.value==="Withdrawal" ? "Cash taken from" : "Cash went to"; };
+    fmi.addEventListener("change", syncCashTo); fit.addEventListener("change", syncCashTo); syncCashTo();
+  }
   document.getElementById("f_cancel").addEventListener("click", closeForm);
   if(isEdit){
     document.getElementById("f_delete").addEventListener("click", function(){
@@ -8991,7 +9026,8 @@ function submitForm(type, item){
     var mode3 = document.getElementById("f_mode").value;
     var vnotes = document.getElementById("f_notes").value.trim();
     if(isNaN(amount3) || amount3<=0){ errEl.textContent = "Enter an amount greater than 0."; errEl.style.display="block"; return; }
-    var rec3 = {id: item?item.id:uid(), date:date, partner:partner, invType:invType, purpose:purpose, amount:amount3, mode:mode3, notes:vnotes};
+    var rec3 = {id: item?item.id:uid(), date:date, partner:partner, invType:invType, purpose:purpose, amount:amount3, mode:mode3, notes:vnotes,
+                cashTo: mode3==="Cash" ? (document.getElementById("f_cashto").value || "") : ""};
     if(item){ var idx3 = investments.findIndex(function(x){return x.id===item.id;}); investments[idx3]=Object.assign({}, item, rec3); }
     else { investments.push(rec3); }
     saveInvest();

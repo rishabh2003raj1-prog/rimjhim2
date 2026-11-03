@@ -90,6 +90,10 @@ Records → **Bank** reviews the cafe bank / UPI account month by month, like th
 - **Mark month as reviewed** once it matches the statement.
 - **Download statement PDF**: an A4 statement for the month with the summary, every entry with money in / out and running balance, and spending by category. On a phone it opens the share sheet (WhatsApp, Drive, email).
 
+## Partner investments in cash
+
+A partner investment or withdrawal made in **Cash** moves cash: by default into (or out of) the counter, changing that day's expected counter cash, or choose **Held by** a person to put it in (or take it from) their handover cash. UPI / bank investments go to the bank balance. A bill a partner paid that was settled as "count it as their investment" moves no cash.
+
 ## Monthly cash review
 
 Records → **Cash review** (also from the Cash tab) shows all the cafe's money for a month:
