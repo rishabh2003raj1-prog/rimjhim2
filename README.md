@@ -68,6 +68,15 @@ Records → **Bills** shows one month's rent, electricity, other monthly costs a
 - Rent, bills and salaries count in the month they are for, on every screen that shows profit (Dashboard, reports, outlet totals). August salary paid on 3 September counts as an August expense. Cash in the counter and bank still go by the day the money actually left.
 - The Calendar and the Bills tab always show the same month. Under the calendar is a summary of that month's bills; purple dots mark days a bill or salary was paid. The Dashboard's fixed cost card has a button to open that month's bills.
 
+## Cash handover
+
+Records → **Handover** follows the counter cash handed to each partner (or staff member) at the daily count, month by month:
+- **Received:** handovers from the counter, cash taken from the counter, cash received from another person.
+- **Where it went:** bills and purchases paid from it (choose "*name* - from cafe cash they hold" as **Paid by**), deposits in the cafe bank, cash put back in the counter, cash given to someone else, and cash kept as a partner withdrawal (also shown on the Partners tab).
+- **Still with them:** carried forward to the next month. A warning appears if more was used than was handed over.
+
+Cash put back in, or taken out of, the counter changes that day's expected counter cash. Tap any line to edit it.
+
 ## Staff salary
 
 Staff → **Salary** shows each person's salary for a month:

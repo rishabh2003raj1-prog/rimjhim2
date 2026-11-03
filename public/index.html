@@ -506,6 +506,7 @@
         <button data-r="menu">Menu</button>
         <button data-r="stock">Stock</button>
         <button data-r="cash">Cash</button>
+        <button data-r="handover">Handover</button>
         <button data-r="partners">Partners</button>
       </div>
       <div id="salesList" class="reclist"></div>
@@ -520,6 +521,7 @@
       <div id="stockView" class="reclist" style="display:none;"></div>
       <div id="cashView" class="reclist" style="display:none;"></div>
       <div id="partnersView" class="reclist" style="display:none;"></div>
+      <div id="handoverView" class="reclist" style="display:none;"></div>
     </div>
 
     <div class="view" id="view-notes">
@@ -670,12 +672,13 @@ function appAlert(msg){
 
 function storeKey(k){ return OUTLET.id==="rimjhim" ? k : (OUTLET.id + "__" + k); }
 
-var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1";
+var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1";
 var sales = [], purchases = [], notes = [], investments = [], expenses = [], bills = [];
 var staff = [], roster = [], attendance = [], tasks = [], conduct = [], cashDays = [];
 var menuItems = [], ingredients = [], dishLog = [], vendors = [], assets = [], customers = [], creditPayments = [];
 var wastage = [], prepBatches = [], stockAudits = [];
 var payroll = []; // one record per person per month: settlement + unused-leave choice
+var cashMoves = []; // what was done with handed-over cash: banked, put back, passed on, withdrawn, taken
 var retailItems = [], retailSales = [];
 var cafeUse = [];
 var stockSub = "all";
@@ -778,7 +781,7 @@ function seedData(){
 // entries without internet; changes upload as soon as the connection is back.
 var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
-  PAYROLL_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
+  PAYROLL_KEY, CASHMOVE_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
   VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo";
 
@@ -1000,6 +1003,7 @@ function setKeyValue(key, v){
     case ATTEND_KEY: attendance = arr; break;       case TASKS_KEY: tasks = arr; break;
     case CONDUCT_KEY: conduct = arr; break;
     case PAYROLL_KEY: payroll = arr; break;
+    case CASHMOVE_KEY: cashMoves = arr; break;
     case PARTNERS_KEY: if(Array.isArray(v) && v.length) PARTNERS = v; break;
     case SETTINGS_KEY: settings = (v && typeof v==="object") ? v : {}; break;
   }
@@ -1382,6 +1386,7 @@ function readLists(){
   tasks = Array.isArray(tk) ? tk : [];
   conduct = Array.isArray(cd) ? cd : [];
   var pr = lsGet(PAYROLL_KEY); payroll = Array.isArray(pr) ? pr : [];
+  var cmv = lsGet(CASHMOVE_KEY); cashMoves = Array.isArray(cmv) ? cmv : [];
   var cdays = lsGet(CASH_KEY), sett = lsGet(SETTINGS_KEY);
   cashDays = Array.isArray(cdays) ? cdays : [];
   settings = (sett && typeof sett==="object") ? sett : { openingCash:null, openingCashDate:null, bankBalance:null, bankDate:null };
@@ -1429,6 +1434,7 @@ function saveAttend(){ return lsSet(ATTEND_KEY, attendance); }
 function saveTasks(){ return lsSet(TASKS_KEY, tasks); }
 function saveConduct(){ return lsSet(CONDUCT_KEY, conduct); }
 function savePayroll(){ return lsSet(PAYROLL_KEY, payroll); }
+function saveCashMoves(){ return lsSet(CASHMOVE_KEY, cashMoves); }
 function saveCashDays(){ return lsSet(CASH_KEY, cashDays); }
 function saveSettings(){ return lsSet(SETTINGS_KEY, settings); }
 function saveMenu(){ return lsSet(MENU_KEY, menuItems); }
@@ -1562,6 +1568,7 @@ function renderAll(){
   renderMenuView();
   renderStockView();
   renderCashView();
+  renderHandoverView();
   renderPartnersView();
   renderStaffSection();
   renderNotes();
@@ -2620,6 +2627,7 @@ function entryRow(item, type){
     var pp = payerIsPersonal(item.paidBy);
     return '<div class="entry" data-type="expense" data-id="'+item.id+'"><div><div class="who">'+esc(item.category)+'</div><div class="meta">'+esc(item.description||"")+' · '+esc(item.mode)+
       (pp ? ' · paid by '+esc(payerPartner(item.paidBy))+' (own) '+(item.settled?'<span class="pill ok">settled</span>':'<span class="pill bad">owed</span>') : '')+
+      (payerHeldBy(item.paidBy) ? ' · from '+esc(payerHeldBy(item.paidBy))+'\u2019s handover cash' : '')+
       '</div></div><div class="amt purch">'+rupee(expAmt(item))+'</div></div>';
   }
 }
@@ -2642,9 +2650,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -2656,6 +2664,7 @@ function updateRecordsTotal(){
   else if(recSub==="investments"){ var t3=investments.reduce(function(a,v){return a+investAmt(v);},0); lbl.textContent = investments.length+" entries · net "+rupeeSigned(t3); }
   else if(recSub==="expenses"){ var t4=expenses.reduce(function(a,x){return a+expAmt(x);},0); lbl.textContent = expenses.length+" entries · "+rupee(t4); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
+  else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
   else if(recSub==="cash"){ lbl.textContent = rupee(cashInHand())+" in hand · "+rupee(settings.bankBalance||0)+" bank"; }
   else if(recSub==="customers"){ var due=customers.reduce(function(a,c){return a+customerDue(c);},0);
     lbl.textContent = customers.length+" customer"+(customers.length!==1?"s":"")+(due>0?" · "+rupee(due)+" due":""); }
@@ -2881,7 +2890,8 @@ function renderPartnersView(){
     html += PARTNERS.map(function(name){
       var inv = investments.filter(function(v){return v.partner===name;});
       var invested = inv.reduce(function(a,v){return a + (v.invType==="Investment"?v.amount:0);},0);
-      var withdrawn = inv.reduce(function(a,v){return a + (v.invType==="Withdrawal"?v.amount:0);},0);
+      var withdrawn = inv.reduce(function(a,v){return a + (v.invType==="Withdrawal"?v.amount:0);},0) +
+                      cashMoves.filter(function(m){ return m.type==="withdraw" && m.holder===name; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
       var net = invested - withdrawn;
       return '<div class="entry partnercard" data-partner="'+esc(name)+'">'+
         '<div><div class="who">'+esc(name)+'</div><div class="meta">Invested '+rupee(invested)+(withdrawn>0?" · Withdrawn "+rupee(withdrawn):"")+'</div></div>'+
@@ -3001,7 +3011,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves };
 }
 
 function exportBackup(){
@@ -3179,6 +3189,7 @@ function applyBackupData(data, errEl, partial){
     retailItems = take("retailItems", retailItems); retailSales = take("retailSales", retailSales);
     cafeUse = take("cafeUse", cafeUse); custPayments = take("custPayments", custPayments);
     payroll = take("payroll", payroll);
+    cashMoves = take("cashMoves", cashMoves);
     offers = take("offers", offers);
     if(Array.isArray(data.partners) && data.partners.length){
       PARTNERS = partial ? PARTNERS.concat(data.partners.filter(function(p){ return PARTNERS.indexOf(p)<0; })) : data.partners;
@@ -3196,7 +3207,7 @@ function saveEverything(){
   saveSales(); savePurch(); saveInvest(); saveExpense(); saveNotes(); savePartners(); saveBills();
   saveStaff(); saveRoster(); saveAttend(); saveTasks(); saveConduct(); saveCashDays(); saveSettings();
   saveMenu(); saveIngredients(); saveDishLog(); saveVendors(); saveAssets(); saveCustomers(); saveCreditPayments();
-  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); savePayroll();
+  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); savePayroll(); saveCashMoves();
 }
 
 function importBackup(file){
@@ -3226,7 +3237,13 @@ function payerOptions(){
   var out = [{value:"Cafe cash", label:"Cafe cash (till)", personal:false},
              {value:"Cafe UPI/bank", label:"Cafe UPI / bank account", personal:false}];
   PARTNERS.forEach(function(p){ out.push({value:p+" (personal)", label:p+" - own money", personal:true, partner:p}); });
+  // Counter cash someone collected at a handover and is still holding.
+  cashHolders().forEach(function(h){ out.push({value:h+" (cafe cash held)", label:h+" - from cafe cash they hold", personal:false, held:true, holder:h}); });
   return out;
+}
+function payerHeldBy(v){
+  var m = /^(.*) \(cafe cash held\)$/.exec(v||"");
+  return m ? m[1] : null;
 }
 function payerIsPersonal(v){
   var o = payerOptions().find(function(x){ return x.value===v; });
@@ -6459,6 +6476,173 @@ function openDishLogForm(dateStr){
   });
 }
 
+// ---------- CASH HANDOVER ----------
+// Counter cash handed to a partner (or staff) at the daily count stays "with" that
+// person until it is spent on a cafe bill, deposited in the bank, put back in the
+// counter, given to someone else, or kept as their withdrawal.
+var hoMonth = fmtDate(new Date()).slice(0,7);
+var MOVE_TYPES = [
+  { v:"bank",     label:"Deposited in cafe bank",      out:true },
+  { v:"counter",  label:"Put back in the counter",     out:true },
+  { v:"pass",     label:"Given to another person",     out:true },
+  { v:"withdraw", label:"Kept as partner withdrawal",  out:true },
+  { v:"taken",    label:"Took cash from the counter",  out:false }
+];
+function moveLabel(t){ var m = MOVE_TYPES.find(function(x){ return x.v===t; }); return m ? m.label : t; }
+function cashHolders(){
+  var names = PARTNERS.slice();
+  (cashDays||[]).forEach(function(c){ if(c.receivedBy && handoverAmount(c)>0 && names.indexOf(c.receivedBy)<0) names.push(c.receivedBy); });
+  (cashMoves||[]).forEach(function(m){ [m.holder, m.to].forEach(function(n){ if(n && names.indexOf(n)<0) names.push(n); }); });
+  return names;
+}
+// Every movement of a person's handover cash, as +in / -out rows.
+function handoverRows(holder){
+  var rows = [];
+  cashDays.forEach(function(c){
+    var a = handoverAmount(c);
+    if(a>0 && c.receivedBy===holder) rows.push({ date:c.date, kind:"handover", amt:a, text:"From the counter"+(c.incharge?" (incharge "+c.incharge+")":""), ref:c.date });
+  });
+  cashMoves.forEach(function(m){
+    var a = +m.amount||0;
+    if(m.holder===holder){
+      if(m.type==="taken") rows.push({ date:m.date, kind:"taken", amt:a, text:moveLabel(m.type)+(m.note?" · "+m.note:""), ref:m.id });
+      else rows.push({ date:m.date, kind:m.type, amt:-a, text:moveLabel(m.type)+(m.type==="pass"&&m.to?" → "+m.to:"")+(m.note?" · "+m.note:""), ref:m.id });
+    }
+    if(m.type==="pass" && m.to===holder) rows.push({ date:m.date, kind:"passin", amt:a, text:"Received from "+m.holder+(m.note?" · "+m.note:""), ref:m.id });
+  });
+  var pv = holder+" (cafe cash held)";
+  expenses.forEach(function(x){ if(x.paidBy===pv) rows.push({ date:x.date, kind:"expense", amt:-expAmt(x), text:(x.category||"Expense")+(x.description?" · "+x.description:""), ref:x.id }); });
+  var seen = {};
+  purchases.forEach(function(p){
+    if(p.paidBy!==pv) return;
+    var bid = p.billId||p.id;
+    if(!seen[bid]){ seen[bid] = { date:p.date, kind:"purchase", amt:0, text:"Purchase"+(p.vendor?" · "+p.vendor:""), ref:p.id }; rows.push(seen[bid]); }
+    seen[bid].amt -= purchTotal(p);
+  });
+  return rows.sort(function(a,b){ return a.date.localeCompare(b.date); });
+}
+function handoverLedger(mKey){
+  return cashHolders().map(function(h){
+    var rows = handoverRows(h), r = { holder:h, opening:0, fromCounter:0, fromOthers:0, taken:0, expenses:0, purchases:0, bank:0, counter:0, pass:0, withdraw:0, rows:[] };
+    rows.forEach(function(x){
+      var m = x.date.slice(0,7);
+      if(m < mKey){ r.opening += x.amt; return; }
+      if(m > mKey) return;
+      r.rows.push(x);
+      if(x.kind==="handover") r.fromCounter += x.amt;
+      else if(x.kind==="passin") r.fromOthers += x.amt;
+      else if(x.kind==="taken") r.taken += x.amt;
+      else if(x.kind==="expense") r.expenses -= x.amt;
+      else if(x.kind==="purchase") r.purchases -= x.amt;
+      else r[x.kind] = (r[x.kind]||0) - x.amt;
+    });
+    r.opening = r2(r.opening);
+    r.received = r2(r.fromCounter + r.fromOthers + r.taken);
+    r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw);
+    r.closing = r2(r.opening + r.received - r.used);
+    return r;
+  }).filter(function(r){ return r.opening || r.received || r.used || PARTNERS.indexOf(r.holder)>=0; });
+}
+
+function renderHandoverView(){
+  var el = document.getElementById("handoverView");
+  if(!el) return;
+  var first = parseDate(hoMonth+"-01");
+  var led = handoverLedger(hoMonth);
+  var tot = { rec:0, bank:0, spent:0, left:0 };
+  led.forEach(function(r){ tot.rec += r.fromCounter + r.taken; tot.bank += r.bank; tot.spent += r.expenses + r.purchases; tot.left += r.closing; });
+  var html = '<div class="calhead" style="margin-bottom:10px;"><button id="hoPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
+             first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="hoNext">›</button></div>';
+  html += '<div class="kpis fckpis" style="margin-bottom:12px;">'+
+    '<div class="kpi"><div class="lbl">Handed over</div><div class="val">'+rupee(tot.rec)+'</div><div class="sub2">from the counter</div></div>'+
+    '<div class="kpi"><div class="lbl">Banked</div><div class="val pos">'+rupee(tot.bank)+'</div><div class="sub2">'+rupee(tot.spent)+' spent</div></div>'+
+    '<div class="kpi"><div class="lbl">Still with people</div><div class="val '+(tot.left>0?"neg":"pos")+'">'+rupee(tot.left)+'</div><div class="sub2">end of month</div></div></div>';
+  html += '<div class="backupnote" style="margin:0 0 10px;">Handovers come from the daily counter count (Cash tab). When someone pays a bill with that cash, choose “<i>name</i> - from cafe cash they hold” as <b>Paid by</b>, so it shows here.</div>';
+  if(!led.length) html += '<div class="empty">No handovers yet.</div>';
+  led.forEach(function(r){
+    var line = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+lbl+'</span><b>'+(sign||"")+rupeeP(v)+'</b></div>' : ''; };
+    html += '<div class="card" style="margin-bottom:12px;"><h3>'+esc(r.holder)+'</h3>'+
+      '<div class="psrow"><span>With them at the start of the month</span><b>'+rupeeP(r.opening)+'</b></div>'+
+      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Received from others", r.fromOthers)+
+      line("− Spent on expenses", r.expenses)+line("− Spent on purchases", r.purchases)+line("− Deposited in bank", r.bank)+
+      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+
+      '<div class="psrow"><span><b>Still with '+esc(r.holder)+'</b></span><b class="'+(r.closing<0?"bad":r.closing>0?"warnamt":"ok")+'">'+rupeeP(r.closing)+'</b></div>';
+    if(r.closing < -0.5) html += '<div class="attmwarn" style="margin-top:8px;">More was spent than was handed over. Either a handover is missing, or '+esc(r.holder)+' added their own money (then change those entries to “own money” so the cafe owes it back).</div>';
+    if(r.rows.length){
+      html += '<div class="billpays" style="margin-top:10px;">'+r.rows.map(function(x){
+        return '<button class="bpedit" style="margin:4px 0;width:100%;" data-hok="'+x.kind+'" data-horef="'+esc(x.ref)+'"><b class="'+(x.amt<0?"bad":"ok")+'">'+(x.amt<0?"−":"+")+rupeeP(Math.abs(x.amt))+'</b> · '+fmtD(x.date)+' · '+esc(x.text)+'<span class="bphint">Edit</span></button>';
+      }).join("")+'</div>';
+    }
+    html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" data-hobank="'+esc(r.holder)+'">Deposit in bank</button>'+
+            '<button class="btn-additem" data-homove="'+esc(r.holder)+'">Other use / return</button></div>'+
+            '<button class="btn-additem" data-hoexp="'+esc(r.holder)+'" style="margin-top:8px;">+ Expense paid from this cash</button></div>';
+  });
+  el.innerHTML = html;
+  function shift(n){ hoMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderHandoverView(); updateRecordsTotal(); }
+  document.getElementById("hoPrev").addEventListener("click", function(){ shift(-1); });
+  document.getElementById("hoNext").addEventListener("click", function(){ shift(1); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-hobank]"), function(b){ b.addEventListener("click", function(){ openCashMoveForm(null, b.getAttribute("data-hobank"), "bank"); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-homove]"), function(b){ b.addEventListener("click", function(){ openCashMoveForm(null, b.getAttribute("data-homove"), "counter"); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-hoexp]"), function(b){
+    b.addEventListener("click", function(){ openForm("expense", null, billDefaultDate(hoMonth), { paidBy: b.getAttribute("data-hoexp")+" (cafe cash held)", mode:"Cash" }); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-hok]"), function(b){
+    b.addEventListener("click", function(){
+      var k = b.getAttribute("data-hok"), ref = b.getAttribute("data-horef");
+      if(k==="handover"){ openCashDayForm(ref); return; }
+      if(k==="expense"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
+      if(k==="purchase"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
+      var m = cashMoves.find(function(e){ return e.id===ref; }); if(m) openCashMoveForm(m);
+    });
+  });
+  if(recSub==="handover") updateRecordsTotal();
+}
+
+function openCashMoveForm(rec, holder, type){
+  holder = rec ? rec.holder : holder; type = rec ? rec.type : (type || "bank");
+  var people = cashHolders();
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+(rec?"Edit handover cash entry":"Handover cash")+'</h2>';
+  html += '<div class="field"><label>Whose cash</label><select id="cm_holder">'+people.map(function(n){ return '<option'+(n===holder?" selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="field"><label>What happened</label><select id="cm_type">'+MOVE_TYPES.map(function(t){ return '<option value="'+t.v+'"'+(t.v===type?" selected":"")+'>'+t.label+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="field" id="cm_towrap"><label>Given to</label><select id="cm_to">'+people.map(function(n){ return '<option'+(rec&&rec.to===n?" selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="cm_amt" value="'+(rec?rec.amount:"")+'"></div>'+
+          '<div><label>Date</label><input type="date" id="cm_date" value="'+(rec?rec.date:billDefaultDate(hoMonth))+'"></div></div>';
+  html += '<div class="field"><label>Note (optional)</label><input type="text" id="cm_note" value="'+esc(rec&&rec.note||"")+'" placeholder="e.g. SBI deposit slip no., reason"></div>';
+  html += '<div class="backupnote" id="cm_hint"></div>';
+  html += '<div class="err" id="cm_err"></div><div class="sheetbtns"><button class="btn-cancel" id="cm_cancel">Cancel</button>'+(rec?'<button class="btn-del" id="cm_del">Delete</button>':'')+'<button class="btn-save" id="cm_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  function hint(){
+    var t = document.getElementById("cm_type").value, h = document.getElementById("cm_holder").value;
+    document.getElementById("cm_towrap").style.display = t==="pass" ? "block" : "none";
+    var cur = handoverLedger(hoMonth).find(function(r){ return r.holder===h; });
+    var txt = { bank:"Cash taken to the cafe bank account.", counter:"Cash returned to the till. The counter's expected cash goes up by this amount on that day.",
+                pass:"Cash handed from one person to another.", withdraw:"The partner keeps this as their withdrawal / profit share. It shows as withdrawn on the Partners tab.",
+                taken:"Cash taken out of the counter without a closing count. The counter's expected cash goes down by this amount on that day." }[t];
+    document.getElementById("cm_hint").innerHTML = txt + (cur ? ' Currently with '+esc(h)+': <b>'+rupeeP(cur.closing)+'</b>.' : '');
+  }
+  document.getElementById("cm_type").addEventListener("change", hint);
+  document.getElementById("cm_holder").addEventListener("change", hint);
+  hint();
+  document.getElementById("cm_cancel").addEventListener("click", closeForm);
+  if(rec) document.getElementById("cm_del").addEventListener("click", function(){
+    askConfirm("Delete this entry?", function(){ cashMoves = cashMoves.filter(function(m){ return m.id!==rec.id; }); saveCashMoves(); closeForm(); renderAll(); });
+  });
+  document.getElementById("cm_save").addEventListener("click", function(){
+    var err = document.getElementById("cm_err");
+    var amt = parseFloat(document.getElementById("cm_amt").value), t = document.getElementById("cm_type").value;
+    var h = document.getElementById("cm_holder").value, to = document.getElementById("cm_to").value;
+    if(isNaN(amt) || amt<=0){ err.textContent = "Enter an amount greater than 0."; err.style.display = "block"; return; }
+    if(t==="pass" && to===h){ err.textContent = "Pick a different person to give it to."; err.style.display = "block"; return; }
+    var r = { id: rec ? rec.id : uid(), date: document.getElementById("cm_date").value || fmtDate(new Date()), holder:h, type:t, amount:amt,
+              note: document.getElementById("cm_note").value.trim() };
+    if(t==="pass") r.to = to;
+    if(rec){ cashMoves[cashMoves.findIndex(function(m){ return m.id===rec.id; })] = r; } else cashMoves.push(r);
+    saveCashMoves(); closeForm(); renderAll();
+  });
+}
+
 // ---------- CASH & COUNTER ----------
 function cashDayFor(dateStr){ return cashDays.find(function(c){ return c.date===dateStr; }) || null; }
 
@@ -6497,9 +6681,13 @@ function cashMovement(dateStr){
   inflow += inCredit;
   var outPurch = purchases.filter(function(p){ return p.date===dateStr && paidFromTill(p); })
                     .reduce(function(a,p){ return a+purchTotal(p); },0);
-  var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash" && !payerIsPersonal(x.paidBy); })
+  var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash" && !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); })
                     .reduce(function(a,x){ return a+expAmt(x); },0);
-  return { inflow: inflow, inCredit: inCredit, outflow: outPurch + outExp, outPurch: outPurch, outExp: outExp };
+  // Handed-over cash put back in the counter, or cash taken out without a count.
+  var backIn = cashMoves.filter(function(m){ return m.date===dateStr && m.type==="counter"; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
+  var takenOut = cashMoves.filter(function(m){ return m.date===dateStr && m.type==="taken"; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
+  inflow += backIn;
+  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, outflow: outPurch + outExp + takenOut, outPurch: outPurch, outExp: outExp };
 }
 
 function openingCashFor(dateStr){
@@ -6569,8 +6757,10 @@ function renderCashView(){
   html += '<div class="card" style="margin-bottom:14px;"><h3>Counter today <span class="muted">· '+parseDate(today).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</span></h3>';
   var m = cashMovement(today);
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(today))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
+  if(m.backIn) html += '<div class="psrow"><span>+ Handover cash put back</span><b>'+rupee(m.backIn)+'</b></div>';
+  if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
   html += '<div class="psrow"><span><b>Should be in counter</b></span><b>'+rupee(exp)+'</b></div>';
   if(todayRec && todayRec.counted !== null && todayRec.counted !== undefined && todayRec.counted !== ""){
@@ -6596,7 +6786,8 @@ function renderCashView(){
   if(hKeys.length){
     html += '<div class="card" style="margin-bottom:14px;"><h3>Cash handed over <span class="muted">· this month</span></h3>'+
       hKeys.map(function(k){ return '<div class="psrow"><span>'+esc(k)+'</span><b>'+rupee(handTot[k])+'</b></div>'; }).join("")+
-      '<div class="backupnote" style="margin-top:8px;">This is counter cash collected by each person. Once it is banked or spent, record it so your bank figure stays right.</div></div>';
+      '<div class="backupnote" style="margin-top:8px;">Counter cash collected by each person. Record where it went (bank, expenses, back to the counter) in the Handover tab.</div>'+
+      '<button class="btn-additem" id="cash_ho" style="margin-top:8px;">See where the handover cash went</button></div>';
   }
 
   var recent = cashDays.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 20);
@@ -6620,6 +6811,8 @@ function renderCashView(){
   el.innerHTML = html;
   document.getElementById("cash_setup").addEventListener("click", openOpeningBalanceForm);
   document.getElementById("cash_close").addEventListener("click", function(){ openCashDayForm(today); });
+  var cho = document.getElementById("cash_ho");
+  if(cho) cho.addEventListener("click", function(){ hoMonth = today.slice(0,7); switchRecordsSub("handover"); renderHandoverView(); window.scrollTo(0,0); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-cash]"), function(b){
     b.addEventListener("click", function(){
       var dstr = b.getAttribute("data-cash");
@@ -6670,8 +6863,10 @@ function openCashDayForm(dateStr){
 
   html += '<div class="card" style="margin-bottom:12px;">';
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(dateStr))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
+  if(m.backIn) html += '<div class="psrow"><span>+ Handover cash put back</span><b>'+rupee(m.backIn)+'</b></div>';
+  if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
   html += '<div class="psrow"><span><b>Should be in counter</b></span><b>'+rupee(exp)+'</b></div></div>';
 
@@ -8019,7 +8214,7 @@ function openForm(type, item, defaultDate, prefill){
     html += '<div class="field"><label>Description</label><input type="text" id="f_desc" placeholder="e.g. Rent - September 2026" value="'+esc(item?item.description:(pf.description||""))+'"></div>';
     html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:(pf.amount||""))+'"></div>';
     html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Card","Bank Transfer"].map(function(m){return '<option '+(item&&item.mode===m?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
-    var curPaid = item ? (item.paidBy || (item.mode==="Cash" ? "Cafe cash" : "Cafe UPI/bank")) : "Cafe cash";
+    var curPaid = item ? (item.paidBy || (item.mode==="Cash" ? "Cafe cash" : "Cafe UPI/bank")) : (pf.paidBy || "Cafe cash");
     html += '<div class="field"><label>Paid by</label><select id="f_paidby">'+payerOptions().map(function(o){
       return '<option value="'+esc(o.value)+'" '+(curPaid===o.value?"selected":"")+'>'+esc(o.label)+'</option>'; }).join("")+'</select></div>';
     html += '<div class="backupnote" id="f_paidnote" style="margin-top:-4px;display:'+(payerIsPersonal(curPaid)?"block":"none")+';">Paid from a partner’s own pocket - the cafe owes this back. It shows under <b>Money owed to partners</b> until settled, and it does not come out of the cash counter.</div>';
@@ -8039,11 +8234,11 @@ function openForm(type, item, defaultDate, prefill){
     var fm = document.getElementById("f_mode");
     fpb.addEventListener("change", function(){
       document.getElementById("f_paidnote").style.display = payerIsPersonal(fpb.value) ? "block" : "none";
-      if(fpb.value==="Cafe cash") fm.value = "Cash";
+      if(fpb.value==="Cafe cash" || payerHeldBy(fpb.value)) fm.value = "Cash";
       else if(fpb.value==="Cafe UPI/bank" && fm.value==="Cash") fm.value = "UPI";
     });
     fm.addEventListener("change", function(){
-      if(payerIsPersonal(fpb.value)) return;
+      if(payerIsPersonal(fpb.value) || payerHeldBy(fpb.value)) return;
       fpb.value = fm.value==="Cash" ? "Cafe cash" : "Cafe UPI/bank";
     });
   }
