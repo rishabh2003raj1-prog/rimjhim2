@@ -508,6 +508,7 @@
         <button data-r="cash">Cash</button>
         <button data-r="handover">Handover</button>
         <button data-r="bank">Bank</button>
+        <button data-r="review">Cash review</button>
         <button data-r="partners">Partners</button>
       </div>
       <div id="salesList" class="reclist"></div>
@@ -524,6 +525,7 @@
       <div id="partnersView" class="reclist" style="display:none;"></div>
       <div id="handoverView" class="reclist" style="display:none;"></div>
       <div id="bankView" class="reclist" style="display:none;"></div>
+      <div id="reviewView" class="reclist" style="display:none;"></div>
     </div>
 
     <div class="view" id="view-notes">
@@ -1573,6 +1575,7 @@ function renderAll(){
   renderCashView();
   renderHandoverView();
   renderBankView();
+  renderCashReviewView();
   renderPartnersView();
   renderStaffSection();
   renderNotes();
@@ -2656,9 +2659,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -2672,6 +2675,7 @@ function updateRecordsTotal(){
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
   else if(recSub==="bank"){ lbl.textContent = rupee(bankBalanceNow())+" now"; }
+  else if(recSub==="review"){ var cr = cashReview(crMonth); lbl.textContent = cr.future ? "" : rupee(cr.end)+" total"; }
   else if(recSub==="cash"){ lbl.textContent = rupee(cashInHand())+" in hand · "+rupee(bankBalanceNow())+" bank"; }
   else if(recSub==="customers"){ var due=customers.reduce(function(a,c){return a+customerDue(c);},0);
     lbl.textContent = customers.length+" customer"+(customers.length!==1?"s":"")+(due>0?" · "+rupee(due)+" due":""); }
@@ -6886,6 +6890,173 @@ function pdfFooter(doc, text){
   }
 }
 
+// ---------- MONTHLY CASH REVIEW ----------
+// All the cafe's money - counter, cash with people (handovers), bank - at the start
+// and end of a month, and what changed the total. Money moving between those
+// places (handovers, deposits, cash withdrawn from the bank) cancels out.
+var crMonth = fmtDate(new Date()).slice(0,7);
+function cashReview(mKey){
+  var today = fmtDate(new Date()), first = mKey+"-01", lastDay = mKey+"-"+String(daysInMonthOf(mKey)).padStart(2,"0");
+  var cur = mKey === today.slice(0,7), future = mKey > today.slice(0,7);
+  var upto = cur ? today : lastDay;
+  var nextFirst = fmtDate(new Date(+mKey.slice(0,4), +mKey.slice(5,7), 1));
+  var R = { month:mKey, current:cur, future:future, upto:upto, places:[], ext:{}, transfers:{}, countDays:[] };
+  function add(k, v){ R.ext[k] = r2((R.ext[k]||0) + v); }
+  function tr(k, v){ R.transfers[k] = r2((R.transfers[k]||0) + v); }
+  if(future) return R;
+
+  // Counter
+  var cStart = openingCashFor(first), cEnd = cur ? cashInHand() : openingCashFor(nextFirst);
+  var flows = 0, handed = 0;
+  datesBetween(first, upto).forEach(function(d){
+    var m = cashMovement(d);
+    var cashSales = r2(m.inflow - m.inCredit - m.backIn);
+    add("cashSales", cashSales); add("udhaar", m.inCredit);
+    add("purchases", -m.outPurch); add("expenses", -m.outExp); add("repaid", -m.repaid);
+    flows += m.inflow - m.outflow;
+    var rec = cashDayFor(d);
+    if(rec && rec.counted!==null && rec.counted!==undefined && rec.counted!==""){
+      var diff = r2(+rec.counted - expectedCash(d));
+      if(Math.abs(diff) >= 1) R.countDays.push({ date:d, diff:diff, incharge:rec.incharge||"" });
+      handed += handoverAmount(rec);
+    }
+  });
+  if(handed) tr("Counter cash handed to people", handed);
+  var counterResidual = r2(cEnd - cStart - (flows - handed));
+  add("countDiff", counterResidual);
+  R.places.push({ name:"Counter", start:r2(cStart), end:r2(cEnd) });
+
+  // Cash with people
+  handoverLedger(mKey).forEach(function(r){
+    if(!r.opening && !r.received && !r.used && !r.closing) return;
+    R.places.push({ name:"With "+r.holder, start:r.opening, end:r.closing, holder:r.holder });
+    add("expenses", -r.expenses); add("purchases", -r.purchases); add("withdraw", -r.withdraw); add("repaid", -r.repay);
+    if(r.bank) tr("Handover cash deposited in bank", r.bank);
+    if(r.counter) tr("Handover cash put back in the counter", r.counter);
+    if(r.pass) tr("Cash passed between people", r.pass);
+  });
+
+  // Bank
+  var bd = bankMonthData(mKey);
+  R.places.push({ name:"Bank / UPI account", start:bd.opening, end:bd.closing });
+  var t = bd.tot;
+  add("upiSales", t.sales||0); add("udhaar", t.udhaar||0); add("invest", t.invest||0); add("interest", t.interest||0);
+  add("expenses", -((t.bills||0) + (t.charges||0))); add("purchases", -(t.purchases||0)); add("withdraw", -(t.withdraw||0)); add("repaid", -(t.repaid||0));
+  add("bankAdj", (t.adjIn||0) - (t.adjOut||0));
+  if(t.atm) tr("Cash withdrawn from the bank", t.atm);
+
+  R.start = r2(R.places.reduce(function(a,p){ return a+p.start; },0));
+  R.end = r2(R.places.reduce(function(a,p){ return a+p.end; },0));
+  R.change = r2(R.end - R.start);
+  R.extTotal = r2(Object.keys(R.ext).reduce(function(a,k){ return a+R.ext[k]; },0));
+  // Partner-paid bills not yet repaid: a cost, but no cafe money has moved yet.
+  R.owedNow = r2(pendingReimbursements().reduce(function(a,g){ return a+g.amount; },0));
+  return R;
+}
+var CR_LINES = [
+  ["cashSales","Cash sales"],["upiSales","UPI / card sales"],["udhaar","Udhaar collected"],["invest","Partner investments"],["interest","Bank interest"],
+  ["purchases","Purchases paid"],["expenses","Bills & expenses paid"],["withdraw","Partner withdrawals"],["repaid","Partners repaid"],
+  ["countDiff","Counter short / over at counts"],["bankAdj","Bank adjustments"]
+];
+
+function renderCashReviewView(){
+  var el = document.getElementById("reviewView");
+  if(!el) return;
+  var first = parseDate(crMonth+"-01");
+  var R = cashReview(crMonth);
+  var html = '<div class="calhead" style="margin-bottom:10px;"><button id="crPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
+             first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="crNext">›</button></div>';
+  if(R.future){ el.innerHTML = html + '<div class="empty">This month hasn’t started yet.</div>'; wire(); return; }
+  html += '<div class="kpis fckpis" style="margin-bottom:12px;">'+
+    '<div class="kpi"><div class="lbl">At the start</div><div class="val">'+rupee(R.start)+'</div><div class="sub2">'+fmtD(crMonth+"-01")+'</div></div>'+
+    '<div class="kpi"><div class="lbl">'+(R.current?'Now':'At the end')+'</div><div class="val">'+rupee(R.end)+'</div><div class="sub2">'+fmtD(R.upto)+'</div></div>'+
+    '<div class="kpi"><div class="lbl">Change</div><div class="val '+(R.change<0?"neg":"pos")+'">'+rupeeSigned(R.change)+'</div><div class="sub2">this month</div></div></div>';
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Where the cafe’s money is</h3>'+
+    '<div class="psrow" style="font-size:11px;color:var(--soft);"><span>Place</span><b style="font-weight:600;">start → '+(R.current?'now':'end')+'</b></div>';
+  R.places.forEach(function(pl){
+    html += '<div class="psrow"><span>'+esc(pl.name)+'</span><b>'+rupee(pl.start)+' → <span class="'+(pl.end<0?"bad":"")+'">'+rupee(pl.end)+'</span></b></div>';
+  });
+  html += '<div class="psrow"><span><b>Total cafe money</b></span><b>'+rupee(R.start)+' → '+rupee(R.end)+'</b></div></div>';
+  html += '<div class="card" style="margin-bottom:12px;"><h3>What changed it</h3>';
+  CR_LINES.forEach(function(l){
+    var v = R.ext[l[0]] || 0;
+    if(Math.abs(v) < 0.005) return;
+    html += '<div class="psrow"><span>'+(v>=0?'+ ':'− ')+l[1]+'</span><b class="'+(v<0?"bad":"ok")+'">'+rupeeP(Math.abs(v))+'</b></div>';
+  });
+  html += '<div class="psrow"><span><b>Change in total cafe money</b></span><b class="'+(R.change<0?"bad":"ok")+'">'+rupeeSigned(R.change)+'</b></div>';
+  var tk = Object.keys(R.transfers);
+  if(tk.length) html += '<div class="backupnote" style="margin:8px 0 0;">Moved between places (no change to the total): '+tk.map(function(k){ return esc(k)+' '+rupee(R.transfers[k]); }).join(' · ')+'.</div>';
+  html += '</div>';
+  if(R.countDays.length){
+    var short = R.countDays.filter(function(c){ return c.diff<0; }), over = R.countDays.filter(function(c){ return c.diff>0; });
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Counter counts that didn’t tally</h3>'+
+      '<div class="backupnote" style="margin:0 0 6px;">'+short.length+' short ('+rupee(-short.reduce(function(a,c){ return a+c.diff; },0))+') · '+over.length+' over ('+rupee(over.reduce(function(a,c){ return a+c.diff; },0))+')</div>'+
+      R.countDays.map(function(c){ return '<div class="psrow" data-crday="'+c.date+'" style="cursor:pointer;"><span>'+fmtD(c.date)+(c.incharge?' · '+esc(c.incharge):'')+'</span><b class="'+(c.diff<0?"bad":"warnamt")+'">'+rupeeSigned(c.diff)+(c.diff<0?' short':' over')+'</b></div>'; }).join("")+'</div>';
+  }
+  if(R.owedNow) html += '<div class="backupnote" style="margin:0 0 10px;">Also owed to partners for bills they paid from their own money (not yet repaid): <b>'+rupee(R.owedNow)+'</b>. That isn’t in the totals above because no cafe money has moved yet.</div>';
+  html += '<button class="btn-save" id="cr_pdf" style="width:100%;margin-bottom:72px;">Download cash review PDF · '+esc(monthLabel(crMonth))+'</button>';
+  el.innerHTML = html;
+  wire();
+  function wire(){
+    function shift(n){ crMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderCashReviewView(); updateRecordsTotal(); }
+    document.getElementById("crPrev").addEventListener("click", function(){ shift(-1); });
+    document.getElementById("crNext").addEventListener("click", function(){ shift(1); });
+    var b = document.getElementById("cr_pdf"); if(b) b.addEventListener("click", function(){ exportCashReview(crMonth, b); });
+    Array.prototype.forEach.call(el.querySelectorAll("[data-crday]"), function(r){ r.addEventListener("click", function(){ openCalendarOn(r.getAttribute("data-crday")); }); });
+    if(recSub==="review") updateRecordsTotal();
+  }
+}
+
+function exportCashReview(mKey, btn){
+  var label = btn ? btn.textContent : "";
+  if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var R = cashReview(mKey);
+    var doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4" });
+    var M = 40, y = 46, teal = [31,92,82];
+    doc.setFont("helvetica","bold"); doc.setFontSize(17); doc.setTextColor(36,26,18); doc.text(pdfClean(OUTLET.name), M, y); y += 18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(91,80,68); doc.text("Monthly cash review - "+monthLabel(mKey), M, y); y += 14;
+    doc.setFontSize(9);
+    doc.text("From "+pdfDate(mKey+"-01")+" to "+pdfDate(R.upto)+(R.current?" (month in progress)":"")+"   |   Generated "+new Date().toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}), M, y); y += 12;
+    doc.text("All the cafe's money: counter cash, cash held by people from handovers, and the bank / UPI account.", M, y); y += 14;
+    var head = { fillColor:teal, textColor:255, fontStyle:"bold" };
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Where the money is","Start","End","Change"]], headStyles:head,
+      styles:{ fontSize:9.5, cellPadding:4 }, columnStyles:{ 1:{halign:"right"}, 2:{halign:"right"}, 3:{halign:"right"} },
+      didParseCell: function(d){ if(d.section==="head" && d.column.index>=1) d.cell.styles.halign = "right";
+                                 if(d.section==="body" && d.row.index===R.places.length) d.cell.styles.fontStyle = "bold"; },
+      body: R.places.map(function(p){ return [pdfClean(p.name), pdfMoneyP(p.start), pdfMoneyP(p.end), pdfMoneyP(p.end-p.start)]; })
+              .concat([["Total cafe money", pdfMoneyP(R.start), pdfMoneyP(R.end), pdfMoneyP(R.change)]]) });
+    y = doc.lastAutoTable.finalY + 18;
+    var body = [];
+    CR_LINES.forEach(function(l){ var v = R.ext[l[0]]||0; if(Math.abs(v) >= 0.005) body.push([(v>=0?"+ ":"- ")+l[1], pdfMoneyP(Math.abs(v))]); });
+    body.push(["Change in total cafe money", pdfMoneyP(R.change)]);
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["What changed it",""]], headStyles:head, theme:"plain",
+      styles:{ fontSize:9.5, cellPadding:4 }, columnStyles:{ 1:{halign:"right"} },
+      didParseCell: function(d){ if(d.section==="body" && d.row.index===body.length-1) d.cell.styles.fontStyle = "bold"; }, body: body });
+    y = doc.lastAutoTable.finalY + 10;
+    var tk = Object.keys(R.transfers);
+    if(tk.length){
+      doc.setFontSize(8.5); doc.setTextColor(91,80,68);
+      var lines = doc.splitTextToSize("Moved between places (no change to the total): "+tk.map(function(k){ return k+" "+pdfMoneyP(R.transfers[k]); }).join("; ")+".", doc.internal.pageSize.getWidth()-2*M);
+      doc.text(lines, M, y+8); y += 8 + lines.length*11;
+    }
+    if(R.countDays.length){
+      y += 10;
+      doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Counter counts that didn't tally","Incharge","Difference"]], headStyles:head,
+        styles:{ fontSize:9, cellPadding:3.5 }, columnStyles:{ 2:{halign:"right"} },
+        didParseCell: function(d){ if(d.section==="head" && d.column.index===2) d.cell.styles.halign = "right"; },
+        body: R.countDays.map(function(c){ return [pdfDate(c.date), pdfClean(c.incharge||"-"), pdfMoneyP(c.diff)+(c.diff<0?" short":" over")]; }) });
+      y = doc.lastAutoTable.finalY + 10;
+    }
+    if(R.owedNow){ y += 10; doc.setFontSize(8.5); doc.setTextColor(91,80,68);
+      doc.text("Owed to partners for bills paid from their own money (not yet repaid): "+pdfMoneyP(R.owedNow)+". Not in the totals above.", M, y); }
+    pdfFooter(doc, OUTLET.name+" - cash review "+monthLabel(mKey));
+    done();
+    sharePdf(doc, (OUTLET.name+"_Cash_Review_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
+  }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
+}
+
 // Monthly statement of handover cash: for everyone, or one person.
 function exportHandoverStatement(mKey, holder, btn){
   var label = btn ? btn.textContent : "";
@@ -7266,6 +7437,7 @@ function renderCashView(){
   }
   html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" id="bk_int">+ Interest received</button><button class="btn-additem" id="bk_chg">+ Bank charge</button></div>';
   html += '<div class="psrow"><span>Float kept in counter nightly</span><b>'+(settings.defaultFloat===null||settings.defaultFloat===undefined?'—':rupee(settings.defaultFloat))+'</b></div>';
+  html += '<button class="btn-additem" id="cash_cr" style="margin-top:10px;">Monthly cash review (counter + people + bank)</button>';
   html += '<button class="btn-additem" id="cash_setup" style="margin-top:10px;">'+((settings.openingCash===null||settings.openingCash===undefined)?'Set opening balances':'Update opening balances')+'</button></div>';
 
   var exp = expectedCash(today);
@@ -7339,6 +7511,8 @@ function renderCashView(){
     });
   });
   document.getElementById("cash_close").addEventListener("click", function(){ openCashDayForm(today); });
+  var crb = document.getElementById("cash_cr");
+  if(crb) crb.addEventListener("click", function(){ crMonth = today.slice(0,7); switchRecordsSub("review"); renderCashReviewView(); window.scrollTo(0,0); });
   var cho = document.getElementById("cash_ho");
   if(cho) cho.addEventListener("click", function(){ hoMonth = today.slice(0,7); switchRecordsSub("handover"); renderHandoverView(); window.scrollTo(0,0); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-cash]"), function(b){

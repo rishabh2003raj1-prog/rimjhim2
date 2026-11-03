@@ -90,6 +90,16 @@ Records → **Bank** reviews the cafe bank / UPI account month by month, like th
 - **Mark month as reviewed** once it matches the statement.
 - **Download statement PDF**: an A4 statement for the month with the summary, every entry with money in / out and running balance, and spending by category. On a phone it opens the share sheet (WhatsApp, Drive, email).
 
+## Monthly cash review
+
+Records → **Cash review** (also from the Cash tab) shows all the cafe's money for a month:
+- **Where it is:** counter, cash with each person (handovers), and the bank / UPI account, at the start and end of the month (or now, for the current month), with the total.
+- **What changed it:** cash sales, UPI / card sales, udhaar collected, partner investments, bank interest, purchases paid, bills & expenses paid, partner withdrawals, partners repaid, counter short / over at counts, and bank adjustments. These always add up to the change in the total.
+- Money moved between places (handovers, deposits, cash withdrawn from the bank) is listed separately, since it doesn't change the total.
+- Counter counts that didn't tally, with the incharge; tap one to open that day.
+- What is owed to partners for bills they paid themselves (not in the totals, as no cafe money has moved yet).
+- **Download cash review PDF** for the month.
+
 ## Cash handover
 
 Records → **Handover** follows the counter cash handed to each partner (or staff member) at the daily count, month by month:
