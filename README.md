@@ -88,6 +88,7 @@ Records → **Bank** reviews the cafe bank / UPI account month by month, like th
 - Every entry, newest first, with the running balance; tap one to open it (UPI sales open that day on the calendar).
 - **Cash withdrawn** (into the counter, or kept by a partner, which shows in their Handover balance), **Adjustment** (add or take off, with a note, to match the bank statement; doesn't change profit), **+ Interest**, **+ Bank charge**.
 - **Mark month as reviewed** once it matches the statement.
+- **Download statement PDF**: an A4 statement for the month with the summary, every entry with money in / out and running balance, and spending by category. On a phone it opens the share sheet (WhatsApp, Drive, email).
 
 ## Cash handover
 

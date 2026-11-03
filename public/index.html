@@ -6587,7 +6587,9 @@ function bankRows(){
   expenses.forEach(function(x){
     if(!(x.date && cafePaid(x) && x.mode!=="Cash" && x.mode!=="Credit")) return;
     var ch = x.category==="Bank charges";
-    rows.push({ date:x.date, kind: ch ? "charges" : "bills", amt:-expAmt(x), text:(x.category||"Expense")+(x.description?" · "+x.description:"")+" ("+(x.mode||"")+")", ref:x.id, cat:x.category||"Other" });
+    var cat = x.category||"Expense", ds = x.description||"";
+    var txt = ds && ds.toLowerCase().indexOf(cat.toLowerCase())===0 ? ds : cat+(ds?" · "+ds:"");
+    rows.push({ date:x.date, kind: ch ? "charges" : "bills", amt:-expAmt(x), text:txt+" ("+(x.mode||"")+")", ref:x.id, cat:x.category||"Other" });
   });
   var seen = {};
   purchases.forEach(function(x){
@@ -6755,22 +6757,27 @@ var BANK_GROUPS = [
   ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],
   ["repaid","Partners repaid",-1],["atm","Cash withdrawn",-1],["adjOut","Adjustments out",-1]
 ];
-function renderBankView(){
-  var el = document.getElementById("bankView");
-  if(!el) return;
-  var first = parseDate(bkMonth+"-01"), days = daysInMonthOf(bkMonth);
-  var last = bkMonth+"-"+String(days).padStart(2,"0");
+// One month of the bank account: opening, entries, totals by type, closing, spending by category.
+function bankMonthData(mKey){
   var all = bankRows();
-  var rows = all.filter(function(r){ return r.date.slice(0,7)===bkMonth; });
-  var opening = bankBalanceAt(bkMonth+"-01", all);
-  var tot = {}, inn = 0, out = 0;
+  var rows = all.filter(function(r){ return r.date.slice(0,7)===mKey; });
+  var opening = bankBalanceAt(mKey+"-01", all);
+  var tot = {}, inn = 0, out = 0, cats = {};
   rows.forEach(function(r){
     var k = r.kind==="adj" ? (r.amt>=0?"adjIn":"adjOut") : r.kind;
     tot[k] = r2((tot[k]||0) + Math.abs(r.amt));
     if(r.amt>=0) inn += r.amt; else out -= r.amt;
+    if(r.amt<0 && r.cat) cats[r.cat] = r2((cats[r.cat]||0) - r.amt);
   });
   inn = r2(inn); out = r2(out);
-  var closing = r2(opening + inn - out);
+  return { rows:rows, opening:opening, tot:tot, inn:inn, out:out, closing:r2(opening + inn - out), cats:cats };
+}
+function renderBankView(){
+  var el = document.getElementById("bankView");
+  if(!el) return;
+  var first = parseDate(bkMonth+"-01");
+  var bd = bankMonthData(bkMonth);
+  var rows = bd.rows, opening = bd.opening, tot = bd.tot, inn = bd.inn, out = bd.out, closing = bd.closing;
   var noted = settings.bankBalance!==null && settings.bankBalance!==undefined;
   var reviewed = settings.bankReviewed && settings.bankReviewed[bkMonth];
   var html = '<div class="calhead" style="margin-bottom:10px;"><button id="bkPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
@@ -6787,8 +6794,7 @@ function renderBankView(){
   if(settings.bankDate && settings.bankDate.slice(0,7)===bkMonth) html += '<div class="barsub" style="margin-top:6px;">Balance noted: '+rupee(settings.bankBalance||0)+' on '+fmtD(settings.bankDate)+'.</div>';
   html += '</div>';
   // Spending by category, for reviewing where the account money went.
-  var cats = {};
-  rows.forEach(function(r){ if(r.amt<0 && r.cat) cats[r.cat] = r2((cats[r.cat]||0) - r.amt); });
+  var cats = bd.cats;
   var ck = Object.keys(cats).sort(function(a,b){ return cats[b]-cats[a]; });
   if(ck.length){
     var spent = ck.reduce(function(a,k){ return a+cats[k]; },0);
@@ -6811,6 +6817,7 @@ function renderBankView(){
   html += '</div>';
   html += '<div class="billbtns"><button class="btn-additem" id="bk_atm">Cash withdrawn</button><button class="btn-additem" id="bk_adj">Adjustment</button></div>';
   html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" id="bk_int2">+ Interest</button><button class="btn-additem" id="bk_chg2">+ Bank charge</button></div>';
+  html += '<button class="btn-save" id="bk_pdf" style="width:100%;margin-top:8px;">Download statement PDF · '+esc(monthLabel(bkMonth))+'</button>';
   html += '<button class="btn-additem" id="bk_rev" style="margin-top:8px;">'+(reviewed ? 'Reviewed on '+fmtD(reviewed)+' · tap to undo' : 'Mark '+esc(monthLabel(bkMonth))+' as reviewed')+'</button>';
   html += '<div class="backupnote" style="margin-top:8px;">Compare the month-end balance with your bank statement. If it differs, add an Adjustment with a note (or the missing entry) so it matches.</div>';
   el.innerHTML = html;
@@ -6823,6 +6830,7 @@ function renderBankView(){
   document.getElementById("bk_chg2").addEventListener("click", function(){
     openForm("expense", null, billDefaultDate(bkMonth), { category:"Bank charges", paidBy:"Cafe UPI/bank", mode:"Bank Transfer", description:"Bank charges" });
   });
+  document.getElementById("bk_pdf").addEventListener("click", function(){ exportBankStatement(bkMonth, this); });
   document.getElementById("bk_rev").addEventListener("click", function(){
     var rv = Object.assign({}, settings.bankReviewed || {});
     if(rv[bkMonth]) delete rv[bkMonth]; else rv[bkMonth] = fmtDate(new Date());
@@ -6845,6 +6853,87 @@ function renderBankView(){
     });
   });
   if(recSub==="bank") updateRecordsTotal();
+}
+
+// Monthly statement of the cafe bank / UPI account as a PDF.
+function exportBankStatement(mKey, btn){
+  var label = btn ? btn.textContent : "";
+  if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var bd = bankMonthData(mKey);
+    var money = function(n){ n = r2(n); return (n<0?"-":"")+"Rs. "+Math.abs(n).toLocaleString("en-IN",{ minimumFractionDigits:2, maximumFractionDigits:2 }); };
+    var clean = function(t){ return String(t||"").replace(/₹/g,"Rs. ").replace(/→/g,"->").replace(/·/g,"-").replace(/[^\x20-\x7E]/g,""); };
+    var doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4" });
+    var W = doc.internal.pageSize.getWidth(), M = 40, y = 46;
+    var teal = [31,92,82], soft = [91,80,68];
+    doc.setFont("helvetica","bold"); doc.setFontSize(17); doc.setTextColor(36,26,18); doc.text(clean(OUTLET.name), M, y); y += 18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor.apply(doc, soft);
+    doc.text("Bank / UPI account statement - "+monthLabel(mKey), M, y); y += 14;
+    var last = mKey+"-"+String(daysInMonthOf(mKey)).padStart(2,"0");
+    doc.setFontSize(9);
+    doc.text("Period: "+pdfDate(mKey+"-01")+" to "+pdfDate(last)+"   |   Generated "+new Date().toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}), M, y); y += 12;
+    var rv = settings.bankReviewed && settings.bankReviewed[mKey];
+    if(rv) { doc.text("Reviewed on "+pdfDate(rv), M, y); y += 12; }
+    if(settings.bankDate) { doc.text("Balances worked out from "+money(settings.bankBalance||0)+" noted on "+pdfDate(settings.bankDate)+".", M, y); y += 12; }
+    y += 6;
+
+    // Summary
+    var sum = [["Opening balance ("+pdfDate(mKey+"-01")+")", money(bd.opening)]];
+    BANK_GROUPS.forEach(function(g){ if(bd.tot[g[0]]) sum.push([(g[2]>0?"+ ":"- ")+g[1], money(bd.tot[g[0]])]); });
+    sum.push(["Total money in", money(bd.inn)], ["Total money out", money(bd.out)], ["Closing balance ("+pdfDate(last)+")", money(bd.closing)]);
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, theme:"plain", head:[["Summary",""]],
+      headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" }, styles:{ fontSize:9.5, cellPadding:4 },
+      body: sum, columnStyles:{ 1:{ halign:"right" } },
+      didParseCell: function(d){ if(d.section==="body" && /^Opening|^Closing/.test(d.row.raw[0])) d.cell.styles.fontStyle = "bold"; } });
+    y = doc.lastAutoTable.finalY + 18;
+
+    // Transactions, oldest first, with running balance
+    var run = bd.opening;
+    var body = [["", "Opening balance", "", "", money(bd.opening)]];
+    bd.rows.forEach(function(r){
+      run = r2(run + r.amt);
+      body.push([pdfDate(r.date), clean(r.text), r.amt>=0 ? money(r.amt) : "", r.amt<0 ? money(-r.amt) : "", money(run)]);
+    });
+    body.push(["", "Closing balance", money(bd.inn), money(bd.out), money(bd.closing)]);
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Date","Details","Money in","Money out","Balance"]],
+      headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" }, styles:{ fontSize:8.5, cellPadding:3.5, overflow:"linebreak" },
+      alternateRowStyles:{ fillColor:[246,244,236] },
+      columnStyles:{ 0:{ cellWidth:68 }, 2:{ halign:"right", cellWidth:72 }, 3:{ halign:"right", cellWidth:72 }, 4:{ halign:"right", cellWidth:80 } },
+      body: body,
+      didParseCell: function(d){
+        if(d.section==="head" && d.column.index>=2) d.cell.styles.halign = "right";
+        if(d.section==="body" && (d.row.index===0 || d.row.index===body.length-1)) d.cell.styles.fontStyle = "bold";
+      } });
+    y = doc.lastAutoTable.finalY + 18;
+
+    // Spending by category
+    var ck = Object.keys(bd.cats).sort(function(a,b){ return bd.cats[b]-bd.cats[a]; });
+    if(ck.length){
+      var spent = ck.reduce(function(a,k){ return a+bd.cats[k]; },0);
+      doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Spent from the account, by category","Amount","Share"]],
+        headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" }, styles:{ fontSize:9, cellPadding:3.5 },
+        columnStyles:{ 1:{ halign:"right" }, 2:{ halign:"right", cellWidth:50 } },
+        didParseCell: function(d){ if(d.section==="head" && d.column.index>=1) d.cell.styles.halign = "right"; },
+        body: ck.map(function(k){ return [clean(k), money(bd.cats[k]), Math.round(bd.cats[k]/spent*100)+"%"]; }) });
+    }
+    var pages = doc.internal.getNumberOfPages();
+    for(var i=1;i<=pages;i++){
+      doc.setPage(i); doc.setFontSize(8); doc.setTextColor.apply(doc, soft);
+      doc.text(clean(OUTLET.name)+" - bank statement "+monthLabel(mKey), M, doc.internal.pageSize.getHeight()-20);
+      doc.text("Page "+i+" of "+pages, W-M, doc.internal.pageSize.getHeight()-20, { align:"right" });
+    }
+    var fname = (OUTLET.name+"_Bank_Statement_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf";
+    var blob = doc.output("blob");
+    done();
+    try{
+      var file = new File([blob], fname, { type:"application/pdf" });
+      if(navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){ navigator.share({ files:[file], title:fname }).catch(function(){}); return; }
+    }catch(e){}
+    var url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = fname; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 8000);
+  }).catch(function(e){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
 }
 
 // Cash taken out of the bank (into the counter or to a person), or a correction.
