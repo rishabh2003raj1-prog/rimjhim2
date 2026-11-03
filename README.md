@@ -80,6 +80,15 @@ When the cafe repays a partner (Expenses → Money owed to partners → Settle, 
 
 Compare the balance with the bank app now and then; if it still differs (a missed entry), note the real balance and the count starts again from that date.
 
+### Bank tab
+
+Records → **Bank** reviews the cafe bank / UPI account month by month, like the Handover tab:
+- Balance at the start of the month, money in and out by type, and the balance at the end (worked forwards or backwards from the balance last noted).
+- Where the account money was spent, by category.
+- Every entry, newest first, with the running balance; tap one to open it (UPI sales open that day on the calendar).
+- **Cash withdrawn** (into the counter, or kept by a partner, which shows in their Handover balance), **Adjustment** (add or take off, with a note, to match the bank statement; doesn't change profit), **+ Interest**, **+ Bank charge**.
+- **Mark month as reviewed** once it matches the statement.
+
 ## Cash handover
 
 Records → **Handover** follows the counter cash handed to each partner (or staff member) at the daily count, month by month:

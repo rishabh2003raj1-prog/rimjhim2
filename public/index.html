@@ -507,6 +507,7 @@
         <button data-r="stock">Stock</button>
         <button data-r="cash">Cash</button>
         <button data-r="handover">Handover</button>
+        <button data-r="bank">Bank</button>
         <button data-r="partners">Partners</button>
       </div>
       <div id="salesList" class="reclist"></div>
@@ -522,6 +523,7 @@
       <div id="cashView" class="reclist" style="display:none;"></div>
       <div id="partnersView" class="reclist" style="display:none;"></div>
       <div id="handoverView" class="reclist" style="display:none;"></div>
+      <div id="bankView" class="reclist" style="display:none;"></div>
     </div>
 
     <div class="view" id="view-notes">
@@ -1570,6 +1572,7 @@ function renderAll(){
   renderStockView();
   renderCashView();
   renderHandoverView();
+  renderBankView();
   renderPartnersView();
   renderStaffSection();
   renderNotes();
@@ -2653,9 +2656,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -2668,6 +2671,7 @@ function updateRecordsTotal(){
   else if(recSub==="expenses"){ var t4=expenses.reduce(function(a,x){return a+expAmt(x);},0); lbl.textContent = expenses.length+" entries · "+rupee(t4); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
+  else if(recSub==="bank"){ lbl.textContent = rupee(bankBalanceNow())+" now"; }
   else if(recSub==="cash"){ lbl.textContent = rupee(cashInHand())+" in hand · "+rupee(bankBalanceNow())+" bank"; }
   else if(recSub==="customers"){ var due=customers.reduce(function(a,c){return a+customerDue(c);},0);
     lbl.textContent = customers.length+" customer"+(customers.length!==1?"s":"")+(due>0?" · "+rupee(due)+" due":""); }
@@ -6556,29 +6560,66 @@ var MOVE_TYPES = [
 // Out of the bank: bills and purchases the cafe paid by anything but cash (not
 // udhaar, not a partner's own money, not handover cash), partner withdrawals not
 // taken in cash.
+// Every movement of the cafe bank / UPI account, as dated +in / -out rows.
+// UPI/card sales are grouped into one row per day.
+function bankRows(){
+  var rows = [];
+  function cafePaid(x){ return !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); }
+  var byDay = {};
+  sales.forEach(function(x){ if(x.date && (x.mode==="UPI" || x.mode==="Card")) byDay[x.date] = (byDay[x.date]||0) + saleTotal(x); });
+  Object.keys(byDay).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:byDay[d], text:"UPI / card sales", ref:d }); });
+  creditPayments.forEach(function(x){
+    if(x.date && x.mode && x.mode!=="Cash"){ var c = custById ? custById(x.customerId) : null;
+      rows.push({ date:x.date, kind:"udhaar", amt:+x.amount||0, text:"Udhaar paid back"+(c?" · "+c.name:"")+" ("+x.mode+")", ref:x.customerId||"" }); }
+  });
+  investments.forEach(function(v){
+    if(!v.date || (v.mode||"Cash")==="Cash") return;
+    var w = v.invType==="Withdrawal";
+    rows.push({ date:v.date, kind: w ? "withdraw" : "invest", amt: w ? -(+v.amount||0) : (+v.amount||0), text:(w?"Partner withdrawal · ":"Partner investment · ")+v.partner, ref:v.id });
+  });
+  cashMoves.forEach(function(x){
+    var a = +x.amount||0;
+    if(x.type==="bank") rows.push({ date:x.date, kind:"deposits", amt:a, text:"Handover cash deposited · "+x.holder+(x.note?" · "+x.note:""), ref:x.id });
+    else if(x.type==="interest") rows.push({ date:x.date, kind:"interest", amt:a, text:"Interest"+(x.note?" · "+x.note:""), ref:x.id });
+    else if(x.type==="atm" || x.type==="atmheld") rows.push({ date:x.date, kind:"atm", amt:-a, text:"Cash withdrawn → "+(x.type==="atm"?"counter":x.holder)+(x.note?" · "+x.note:""), ref:x.id });
+    else if(x.type==="bankadj") rows.push({ date:x.date, kind:"adj", amt:+x.amount||0, text:"Adjustment"+(x.note?" · "+x.note:""), ref:x.id });
+  });
+  expenses.forEach(function(x){
+    if(!(x.date && cafePaid(x) && x.mode!=="Cash" && x.mode!=="Credit")) return;
+    var ch = x.category==="Bank charges";
+    rows.push({ date:x.date, kind: ch ? "charges" : "bills", amt:-expAmt(x), text:(x.category||"Expense")+(x.description?" · "+x.description:"")+" ("+(x.mode||"")+")", ref:x.id, cat:x.category||"Other" });
+  });
+  var seen = {};
+  purchases.forEach(function(x){
+    if(!(x.date && cafePaid(x) && x.mode!=="Credit" && !paidFromTill(x))) return;
+    var bid = x.billId||x.id;
+    if(!seen[bid]){ seen[bid] = { date:x.date, kind:"purchases", amt:0, text:"Purchase"+(x.vendor?" · "+x.vendor:"")+" ("+(x.mode||"")+")", ref:x.id, cat:"Purchases" }; rows.push(seen[bid]); }
+    seen[bid].amt -= purchTotal(x);
+  });
+  partnerRepayments().forEach(function(r){ if(r.mode==="bank") rows.push({ date:r.date, kind:"repaid", amt:-r.amount, text:"Repaid "+r.partner+" · "+r.what, ref:"" }); });
+  rows.forEach(function(r){ r.amt = r2(r.amt); });
+  return rows.sort(function(a,b){ return a.date.localeCompare(b.date); });
+}
+// Bank balance at the START of a date, worked out from the balance last noted.
+function bankBalanceAt(dateStr, rows){
+  rows = rows || bankRows();
+  var base = +settings.bankBalance||0, from = settings.bankDate || "";
+  if(!from) return r2(base + rows.filter(function(r){ return r.date < dateStr; }).reduce(function(a,r){ return a+r.amt; },0));
+  if(dateStr >= from) return r2(base + rows.filter(function(r){ return r.date >= from && r.date < dateStr; }).reduce(function(a,r){ return a+r.amt; },0));
+  return r2(base - rows.filter(function(r){ return r.date >= dateStr && r.date < from; }).reduce(function(a,r){ return a+r.amt; },0));
+}
+// Totals by kind since the balance was last noted (up to today).
 function bankMovements(){
   var from = settings.bankDate || "", today = fmtDate(new Date());
-  function inRange(d){ return d && (!from || d >= from) && d <= today; }
-  function cafePaid(x){ return !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); }
-  var m = { sales:0, udhaar:0, invest:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, repaid:0 };
-  cashMoves.forEach(function(x){ if(inRange(x.date) && x.type==="interest") m.interest += (+x.amount||0); });
-  partnerRepayments().forEach(function(r){ if(r.mode==="bank" && inRange(r.date)) m.repaid += r.amount; });
-  sales.forEach(function(x){ if(inRange(x.date) && (x.mode==="UPI" || x.mode==="Card")) m.sales += saleTotal(x); });
-  creditPayments.forEach(function(x){ if(inRange(x.date) && x.mode && x.mode!=="Cash") m.udhaar += (+x.amount||0); });
-  investments.forEach(function(v){
-    if(!inRange(v.date) || (v.mode||"Cash")==="Cash") return;
-    if(v.invType==="Withdrawal") m.withdraw += (+v.amount||0); else m.invest += (+v.amount||0);
+  var m = { sales:0, udhaar:0, invest:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, repaid:0, atm:0, adjIn:0, adjOut:0 };
+  bankRows().forEach(function(r){
+    if(!(r.date && (!from || r.date >= from) && r.date <= today)) return;
+    if(r.kind==="adj"){ if(r.amt>=0) m.adjIn += r.amt; else m.adjOut -= r.amt; return; }
+    m[r.kind] += Math.abs(r.amt);
   });
-  cashMoves.forEach(function(x){ if(inRange(x.date) && x.type==="bank") m.deposits += (+x.amount||0); });
-  // Everything the cafe paid that did not come out of the till came out of the bank.
-  expenses.forEach(function(x){
-    if(!(inRange(x.date) && cafePaid(x) && x.mode!=="Cash" && x.mode!=="Credit")) return;
-    if(x.category==="Bank charges") m.charges += expAmt(x); else m.bills += expAmt(x);
-  });
-  purchases.forEach(function(x){ if(inRange(x.date) && cafePaid(x) && x.mode!=="Credit" && !paidFromTill(x)) m.purchases += purchTotal(x); });
   Object.keys(m).forEach(function(k){ m[k] = r2(m[k]); });
-  m.in = r2(m.sales + m.udhaar + m.invest + m.deposits + m.interest);
-  m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.repaid);
+  m.in = r2(m.sales + m.udhaar + m.invest + m.deposits + m.interest + m.adjIn);
+  m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.repaid + m.atm + m.adjOut);
   return m;
 }
 function bankDepositsSince(){ return bankMovements().deposits; }
@@ -6601,6 +6642,7 @@ function handoverRows(holder){
     var a = +m.amount||0;
     if(m.holder===holder){
       if(m.type==="taken") rows.push({ date:m.date, kind:"taken", amt:a, text:moveLabel(m.type)+(m.note?" · "+m.note:""), ref:m.id });
+      else if(m.type==="atmheld") rows.push({ date:m.date, kind:"frombank", amt:a, text:"Cash withdrawn from the bank"+(m.note?" · "+m.note:""), ref:m.id });
       else rows.push({ date:m.date, kind:m.type, amt:-a, text:moveLabel(m.type)+(m.type==="pass"&&m.to?" → "+m.to:"")+(m.note?" · "+m.note:""), ref:m.id });
     }
     if(m.type==="pass" && m.to===holder) rows.push({ date:m.date, kind:"passin", amt:a, text:"Received from "+m.holder+(m.note?" · "+m.note:""), ref:m.id });
@@ -6630,12 +6672,14 @@ function handoverLedger(mKey){
       if(x.kind==="handover") r.fromCounter += x.amt;
       else if(x.kind==="passin") r.fromOthers += x.amt;
       else if(x.kind==="taken") r.taken += x.amt;
+      else if(x.kind==="frombank") r.fromBank = (r.fromBank||0) + x.amt;
       else if(x.kind==="expense") r.expenses -= x.amt;
       else if(x.kind==="purchase") r.purchases -= x.amt;
       else r[x.kind] = (r[x.kind]||0) - x.amt;
     });
     r.opening = r2(r.opening);
-    r.received = r2(r.fromCounter + r.fromOthers + r.taken);
+    r.fromBank = r2(r.fromBank||0);
+    r.received = r2(r.fromCounter + r.fromOthers + r.taken + r.fromBank);
     r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw + r.repay);
     r.closing = r2(r.opening + r.received - r.used);
     return r;
@@ -6661,7 +6705,7 @@ function renderHandoverView(){
     var line = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+lbl+'</span><b>'+(sign||"")+rupeeP(v)+'</b></div>' : ''; };
     html += '<div class="card" style="margin-bottom:12px;"><h3>'+esc(r.holder)+'</h3>'+
       '<div class="psrow"><span>With them at the start of the month</span><b>'+rupeeP(r.opening)+'</b></div>'+
-      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Received from others", r.fromOthers)+
+      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Received from others", r.fromOthers)+
       line("− Spent on expenses", r.expenses)+line("− Spent on purchases", r.purchases)+line("− Deposited in bank", r.bank)+
       line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+
       '<div class="psrow"><span><b>Still with '+esc(r.holder)+'</b></span><b class="'+(r.closing<0?"bad":r.closing>0?"warnamt":"ok")+'">'+rupeeP(r.closing)+'</b></div>';
@@ -6690,6 +6734,8 @@ function renderHandoverView(){
       if(k==="handover"){ openCashDayForm(ref); return; }
       if(k==="expense"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
       if(k==="purchase"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
+      var mm = cashMoves.find(function(e){ return e.id===ref; });
+      if(mm && mm.type==="atmheld"){ openBankAdjForm(mm); return; }
       if(k==="repay"){ appAlert("This is a partner repayment. To change it, find the bill or expense it repaid (Expenses or Purchases tab)."); return; }
       var m = cashMoves.find(function(e){ return e.id===ref; }); if(m) openCashMoveForm(m);
     });
@@ -6701,6 +6747,146 @@ function renderHandoverView(){
 function otherIncomeIn(test){
   return r2(cashMoves.filter(function(m){ return m.type==="interest" && test(m.date); }).reduce(function(a,m){ return a+(+m.amount||0); },0));
 }
+// ---------- BANK / UPI ACCOUNT ----------
+var bkMonth = fmtDate(new Date()).slice(0,7);
+var BANK_GROUPS = [
+  ["sales","UPI / card sales",1],["udhaar","Udhaar paid back by UPI / bank",1],["invest","Partner investments",1],["deposits","Handover cash deposited",1],
+  ["interest","Interest",1],["adjIn","Adjustments in",1],
+  ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],
+  ["repaid","Partners repaid",-1],["atm","Cash withdrawn",-1],["adjOut","Adjustments out",-1]
+];
+function renderBankView(){
+  var el = document.getElementById("bankView");
+  if(!el) return;
+  var first = parseDate(bkMonth+"-01"), days = daysInMonthOf(bkMonth);
+  var last = bkMonth+"-"+String(days).padStart(2,"0");
+  var all = bankRows();
+  var rows = all.filter(function(r){ return r.date.slice(0,7)===bkMonth; });
+  var opening = bankBalanceAt(bkMonth+"-01", all);
+  var tot = {}, inn = 0, out = 0;
+  rows.forEach(function(r){
+    var k = r.kind==="adj" ? (r.amt>=0?"adjIn":"adjOut") : r.kind;
+    tot[k] = r2((tot[k]||0) + Math.abs(r.amt));
+    if(r.amt>=0) inn += r.amt; else out -= r.amt;
+  });
+  inn = r2(inn); out = r2(out);
+  var closing = r2(opening + inn - out);
+  var noted = settings.bankBalance!==null && settings.bankBalance!==undefined;
+  var reviewed = settings.bankReviewed && settings.bankReviewed[bkMonth];
+  var html = '<div class="calhead" style="margin-bottom:10px;"><button id="bkPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
+             first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="bkNext">›</button></div>';
+  html += '<div class="kpis fckpis" style="margin-bottom:12px;">'+
+    '<div class="kpi"><div class="lbl">Money in</div><div class="val pos">'+rupee(inn)+'</div><div class="sub2">'+rows.filter(function(r){return r.amt>=0;}).length+' entries</div></div>'+
+    '<div class="kpi"><div class="lbl">Money out</div><div class="val neg">'+rupee(out)+'</div><div class="sub2">'+rows.filter(function(r){return r.amt<0;}).length+' entries</div></div>'+
+    '<div class="kpi"><div class="lbl">'+(bkMonth===fmtDate(new Date()).slice(0,7)?'Balance now':'Month end')+'</div><div class="val '+(closing<0?"neg":"")+'">'+rupee(closing)+'</div><div class="sub2">'+(reviewed?'reviewed ✓':'&nbsp;')+'</div></div></div>';
+  if(!noted) html += '<div class="attmwarn">No bank balance noted yet, so balances start from ₹0. Set it in Cash → Opening balances.</div>';
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Summary</h3>'+
+    '<div class="psrow"><span>Balance at the start of the month</span><b>'+rupeeP(opening)+'</b></div>';
+  BANK_GROUPS.forEach(function(g){ if(tot[g[0]]) html += '<div class="psrow"><span>'+(g[2]>0?'+ ':'− ')+g[1]+'</span><b>'+rupeeP(tot[g[0]])+'</b></div>'; });
+  html += '<div class="psrow"><span><b>Balance at the end of the month</b></span><b class="'+(closing<0?"bad":"")+'">'+rupeeP(closing)+'</b></div>';
+  if(settings.bankDate && settings.bankDate.slice(0,7)===bkMonth) html += '<div class="barsub" style="margin-top:6px;">Balance noted: '+rupee(settings.bankBalance||0)+' on '+fmtD(settings.bankDate)+'.</div>';
+  html += '</div>';
+  // Spending by category, for reviewing where the account money went.
+  var cats = {};
+  rows.forEach(function(r){ if(r.amt<0 && r.cat) cats[r.cat] = r2((cats[r.cat]||0) - r.amt); });
+  var ck = Object.keys(cats).sort(function(a,b){ return cats[b]-cats[a]; });
+  if(ck.length){
+    var spent = ck.reduce(function(a,k){ return a+cats[k]; },0);
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Where the account money was spent</h3>'+ck.map(function(k){
+      return '<div class="barrow"><div class="barlbl"><span>'+esc(k)+'</span><b>'+rupee(cats[k])+'</b></div>'+
+             '<div class="stockbar"><i style="width:'+Math.round(cats[k]/spent*100)+'%;background:#A6402D"></i></div></div>';
+    }).join("")+'</div>';
+  }
+  // Every entry, newest first, with the running balance.
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Entries</h3>';
+  if(!rows.length) html += '<div class="backupnote" style="margin:0;">Nothing went in or out of the account this month.</div>';
+  else {
+    var run = opening, withBal = rows.map(function(r){ run = r2(run + r.amt); return { r:r, bal:run }; }).reverse();
+    html += '<div class="billpays" style="margin-top:4px;">'+withBal.map(function(x){
+      var r = x.r;
+      return '<button class="bpedit" style="margin:4px 0;width:100%;" data-bkk="'+r.kind+'" data-bkr="'+esc(r.ref)+'"><b class="'+(r.amt<0?"bad":"ok")+'">'+(r.amt<0?"−":"+")+rupeeP(Math.abs(r.amt))+'</b> · '+fmtD(r.date)+' · '+esc(r.text)+
+             '<span class="bphint">bal '+rupee(x.bal)+'</span></button>';
+    }).join("")+'</div>';
+  }
+  html += '</div>';
+  html += '<div class="billbtns"><button class="btn-additem" id="bk_atm">Cash withdrawn</button><button class="btn-additem" id="bk_adj">Adjustment</button></div>';
+  html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" id="bk_int2">+ Interest</button><button class="btn-additem" id="bk_chg2">+ Bank charge</button></div>';
+  html += '<button class="btn-additem" id="bk_rev" style="margin-top:8px;">'+(reviewed ? 'Reviewed on '+fmtD(reviewed)+' · tap to undo' : 'Mark '+esc(monthLabel(bkMonth))+' as reviewed')+'</button>';
+  html += '<div class="backupnote" style="margin-top:8px;">Compare the month-end balance with your bank statement. If it differs, add an Adjustment with a note (or the missing entry) so it matches.</div>';
+  el.innerHTML = html;
+  function shift(n){ bkMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderBankView(); updateRecordsTotal(); }
+  document.getElementById("bkPrev").addEventListener("click", function(){ shift(-1); });
+  document.getElementById("bkNext").addEventListener("click", function(){ shift(1); });
+  document.getElementById("bk_atm").addEventListener("click", function(){ openBankAdjForm(null, "atm"); });
+  document.getElementById("bk_adj").addEventListener("click", function(){ openBankAdjForm(null, "bankadj"); });
+  document.getElementById("bk_int2").addEventListener("click", function(){ openInterestForm(null); });
+  document.getElementById("bk_chg2").addEventListener("click", function(){
+    openForm("expense", null, billDefaultDate(bkMonth), { category:"Bank charges", paidBy:"Cafe UPI/bank", mode:"Bank Transfer", description:"Bank charges" });
+  });
+  document.getElementById("bk_rev").addEventListener("click", function(){
+    var rv = Object.assign({}, settings.bankReviewed || {});
+    if(rv[bkMonth]) delete rv[bkMonth]; else rv[bkMonth] = fmtDate(new Date());
+    settings.bankReviewed = rv; saveSettings(); renderBankView();
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-bkk]"), function(b){
+    b.addEventListener("click", function(){
+      var k = b.getAttribute("data-bkk"), ref = b.getAttribute("data-bkr");
+      if(k==="sales"){ openCalendarOn(ref); return; }
+      if(k==="bills" || k==="charges"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
+      if(k==="purchases"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
+      if(k==="invest" || k==="withdraw"){ var v = investments.find(function(e){ return e.id===ref; }); if(v) openForm("investment", v, v.date); return; }
+      if(k==="udhaar"){ if(ref && typeof openCustomerDetail==="function") openCustomerDetail(ref); return; }
+      if(k==="repaid"){ appAlert("This is a partner repayment. To change it, find the bill or expense it repaid."); return; }
+      var m = cashMoves.find(function(e){ return e.id===ref; });
+      if(!m) return;
+      if(m.type==="interest") openInterestForm(m);
+      else if(m.type==="bank") openCashMoveForm(m);
+      else openBankAdjForm(m);
+    });
+  });
+  if(recSub==="bank") updateRecordsTotal();
+}
+
+// Cash taken out of the bank (into the counter or to a person), or a correction.
+function openBankAdjForm(rec, kind){
+  kind = rec ? (rec.type==="bankadj" ? "bankadj" : "atm") : kind;
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+(kind==="atm" ? "Cash withdrawn from the bank" : "Bank adjustment")+'</h2>';
+  if(kind==="atm"){
+    html += '<div class="field"><label>Where did the cash go?</label><select id="ba_to"><option value="">Into the counter</option>'+
+            cashHolders().map(function(h){ return '<option value="'+esc(h)+'"'+(rec&&rec.holder===h?" selected":"")+'>Kept by '+esc(h)+'</option>'; }).join("")+'</select></div>';
+    html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="ba_amt2" value="'+(rec?rec.amount:"")+'"></div>';
+  } else {
+    html += '<div class="field"><label>Direction</label><select id="ba_dir"><option value="in"'+(rec&&rec.amount<0?"":" selected")+'>Add to the bank balance</option><option value="out"'+(rec&&rec.amount<0?" selected":"")+'>Take off the bank balance</option></select></div>';
+    html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="ba_amt2" value="'+(rec?Math.abs(rec.amount):"")+'"></div>';
+  }
+  html += '<div><label>Date</label><input type="date" id="ba_date" value="'+(rec?rec.date:billDefaultDate(bkMonth))+'"></div></div>';
+  html += '<div class="field"><label>Note'+(kind==="bankadj"?' (what this is for)':' (optional)')+'</label><input type="text" id="ba_note" value="'+esc(rec&&rec.note||"")+'" placeholder="'+(kind==="atm"?"e.g. ATM, for change":"e.g. matched to bank statement, refund from vendor")+'"></div>';
+  html += '<div class="backupnote">'+(kind==="atm" ? "Comes off the bank balance. Into the counter: that day's expected counter cash goes up. Kept by a person: it shows in their Handover balance." :
+          "Use this to make the app match your bank statement, e.g. a refund or a payment that isn't recorded anywhere else. It changes the bank balance only, not profit.")+'</div>';
+  html += '<div class="err" id="ba_err2"></div><div class="sheetbtns"><button class="btn-cancel" id="ba_cancel2">Cancel</button>'+(rec?'<button class="btn-del" id="ba_del2">Delete</button>':'')+'<button class="btn-save" id="ba_save2">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("ba_cancel2").addEventListener("click", closeForm);
+  if(rec) document.getElementById("ba_del2").addEventListener("click", function(){
+    askConfirm("Delete this entry?", function(){ cashMoves = cashMoves.filter(function(m){ return m.id!==rec.id; }); saveCashMoves(); closeForm(); renderAll(); });
+  });
+  document.getElementById("ba_save2").addEventListener("click", function(){
+    var err = document.getElementById("ba_err2"), amt = parseFloat(document.getElementById("ba_amt2").value), note = document.getElementById("ba_note").value.trim();
+    if(isNaN(amt) || amt<=0){ err.textContent = "Enter an amount greater than 0."; err.style.display = "block"; return; }
+    if(kind==="bankadj" && !note){ err.textContent = "Add a note saying what the adjustment is for."; err.style.display = "block"; return; }
+    var r = { id: rec ? rec.id : uid(), date: document.getElementById("ba_date").value || fmtDate(new Date()), note: note };
+    if(kind==="atm"){
+      var to = document.getElementById("ba_to").value;
+      r.type = to ? "atmheld" : "atm"; r.amount = amt; if(to) r.holder = to;
+    } else {
+      r.type = "bankadj"; r.amount = document.getElementById("ba_dir").value==="out" ? -amt : amt;
+    }
+    if(rec) cashMoves[cashMoves.findIndex(function(m){ return m.id===rec.id; })] = r; else cashMoves.push(r);
+    saveCashMoves(); closeForm(); renderAll();
+  });
+}
+
 // Interest the bank credited to the cafe account.
 function openInterestForm(rec){
   var sheet = document.getElementById("sheet");
@@ -6812,7 +6998,7 @@ function cashMovement(dateStr){
   var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash" && !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); })
                     .reduce(function(a,x){ return a+expAmt(x); },0);
   // Handed-over cash put back in the counter, or cash taken out without a count.
-  var backIn = cashMoves.filter(function(m){ return m.date===dateStr && m.type==="counter"; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
+  var backIn = cashMoves.filter(function(m){ return m.date===dateStr && (m.type==="counter" || m.type==="atm"); }).reduce(function(a,m){ return a+(+m.amount||0); },0);
   var takenOut = cashMoves.filter(function(m){ return m.date===dateStr && m.type==="taken"; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
   inflow += backIn;
   var repaid = partnerRepayments().filter(function(r){ return r.mode==="cash" && r.date===dateStr; }).reduce(function(a,r){ return a+r.amount; },0);
@@ -6884,7 +7070,8 @@ function renderCashView(){
     html += '<div class="backupnote" style="margin:8px 0 4px;">Since '+(settings.bankDate ? fmtD(settings.bankDate) : 'then')+':</div>'+
       bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner investments (not cash)", bm.invest, "+")+
       bl("Handover cash deposited", bm.deposits, "+")+bl("Interest received", bm.interest, "+")+bl("Bills paid by UPI / bank", bm.bills, "−")+bl("Bank charges", bm.charges, "−")+bl("Purchases paid by UPI / bank", bm.purchases, "−")+
-      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+
+      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+bl("Cash withdrawn from the bank", bm.atm, "−")+
+      bl("Adjustments in", bm.adjIn, "+")+bl("Adjustments out", bm.adjOut, "−")+
       '<div class="psrow"><span><b>Cafe bank account now</b></span><b class="'+(bankBalanceNow()<0?"bad":"")+'">'+rupee(bankBalanceNow())+'</b></div>'+
       '<div class="backupnote" style="margin:6px 0 0;">Check this against your bank app now and then. If it still differs (a missed entry), update the balance above and the count starts again from that date.</div>';
   }
@@ -6909,7 +7096,7 @@ function renderCashView(){
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(today))+'</b></div>';
   html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
-  if(m.backIn) html += '<div class="psrow"><span>+ Handover cash put back</span><b>'+rupee(m.backIn)+'</b></div>';
+  if(m.backIn) html += '<div class="psrow"><span>+ Cash put back / withdrawn from bank</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
   if(m.repaid) html += '<div class="psrow"><span>− Partner repaid in cash</span><b>'+rupee(m.repaid)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
@@ -7027,7 +7214,7 @@ function openCashDayForm(dateStr){
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(dateStr))+'</b></div>';
   html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
-  if(m.backIn) html += '<div class="psrow"><span>+ Handover cash put back</span><b>'+rupee(m.backIn)+'</b></div>';
+  if(m.backIn) html += '<div class="psrow"><span>+ Cash put back / withdrawn from bank</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
   if(m.repaid) html += '<div class="psrow"><span>− Partner repaid in cash</span><b>'+rupee(m.repaid)+'</b></div>';
   html += '<div class="psrow"><span>− Paid from till</span><b>'+rupee(m.outflow)+'</b></div>';
