@@ -68,6 +68,14 @@ Records → **Bills** shows one month's rent, electricity, other monthly costs a
 - Rent, bills and salaries count in the month they are for, on every screen that shows profit (Dashboard, reports, outlet totals). August salary paid on 3 September counts as an August expense. Cash in the counter and bank still go by the day the money actually left.
 - The Calendar and the Bills tab always show the same month. Under the calendar is a summary of that month's bills; purple dots mark days a bill or salary was paid. The Dashboard's fixed cost card has a button to open that month's bills.
 
+## Bank balance
+
+The bank balance in the Cash tab and on the Dashboard is the balance last noted in Cash → Opening balances, plus everything since that date:
+- **In:** UPI and card sales, udhaar paid back by UPI/card/bank, partner investments not made in cash, handover cash deposited.
+- **Out:** bills and purchases the cafe paid by UPI, card or bank (not udhaar purchases, a partner's own money, or handover cash), and partner withdrawals not taken in cash.
+
+Compare it with the bank app now and then; if it differs (charges, interest, a missed entry), note the real balance and the count starts again from that date.
+
 ## Cash handover
 
 Records → **Handover** follows the counter cash handed to each partner (or staff member) at the daily count, month by month:
@@ -75,7 +83,7 @@ Records → **Handover** follows the counter cash handed to each partner (or sta
 - **Where it went:** bills and purchases paid from it (choose "*name* - from cafe cash they hold" as **Paid by**), deposits in the cafe bank, cash put back in the counter, cash given to someone else, and cash kept as a partner withdrawal (also shown on the Partners tab).
 - **Still with them:** carried forward to the next month. A warning appears if more was used than was handed over.
 
-Cash put back in, or taken out of, the counter changes that day's expected counter cash. Bank deposits are added to the bank balance (the balance last noted in the Cash tab, plus deposits made on or after that date), shown in the Cash tab and on the Dashboard. Tap any line to edit it.
+Cash put back in, or taken out of, the counter changes that day's expected counter cash. Tap any line to edit it.
 
 ## Staff salary
 
