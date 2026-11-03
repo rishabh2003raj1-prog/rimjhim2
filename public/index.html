@@ -1254,7 +1254,8 @@ function monthTotalsFor(items){
   var s = val(SALES_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+saleTotal(x); },0);
   var p = val(PURCH_KEY).filter(function(x){ return (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+purchTotal(x); },0);
   var e = val(EXPENSE_KEY).filter(function(x){ return expBookDate(x).slice(0,7)===mk; }).reduce(function(a,x){ return a+expAmt(x); },0);
-  return { sales:s, costs:p+e, net:s-p-e };
+  var o = val(CASHMOVE_KEY).filter(function(x){ return x.type==="interest" && (x.date||"").slice(0,7)===mk; }).reduce(function(a,x){ return a+(+x.amount||0); },0);
+  return { sales:s, costs:p+e, net:s-p-e+o };
 }
 
 function openOutletSheet(){
@@ -1631,8 +1632,9 @@ function renderDashboard(){
   function sumExp(set){ return expenses.filter(function(x){return set[expBookDate(x)];}).reduce(function(a,x){return a+expAmt(x);},0); }
 
   var totalSales = sumSales(dateSet), totalPurch = sumPurch(dateSet), totalExp = sumExp(dateSet);
-  var net = totalSales - totalPurch - totalExp;
-  var pSales = sumSales(prevSet), pNet = pSales - sumPurch(prevSet) - sumExp(prevSet);
+  var otherInc = otherIncomeIn(function(d){ return dateSet[d]; });
+  var net = totalSales - totalPurch - totalExp + otherInc;
+  var pSales = sumSales(prevSet), pNet = pSales - sumPurch(prevSet) - sumExp(prevSet) + otherIncomeIn(function(d){ return prevSet[d]; });
 
   var rangeLabel = cr.label;
   document.getElementById("rangeBar").innerHTML =
@@ -1661,6 +1663,7 @@ function renderDashboard(){
     '<div class="psrow"><span>− Ingredients &amp; purchases</span><b>'+rupee(totalPurch)+'</b></div>'+
     '<div class="psrow"><span><b>Gross profit</b></span><b>'+rupee(gross)+(totalSales>0?' · '+Math.round(gross/totalSales*100)+'%':'')+'</b></div>'+
     '<div class="psrow"><span>− Running expenses</span><b>'+rupee(totalExp)+'</b></div>'+
+    (otherInc ? '<div class="psrow"><span>+ Other income (bank interest)</span><b class="ok">'+rupeeP(otherInc)+'</b></div>' : '')+
     '<div class="psrow"><span><b>Net profit</b></span><b class="'+(net>=0?"ok":"bad")+'">'+rupeeSigned(net)+(totalSales>0?' · '+Math.round(net/totalSales*100)+'%':'')+'</b></div>';
 
   // --- trend ---
@@ -5835,7 +5838,8 @@ function buildReportPdf(rr, chosen, Ctor){
   var sTot = S.reduce(function(a,x){ return a+saleTotal(x); },0);
   var pTot = P.reduce(function(a,x){ return a+purchTotal(x); },0);
   var eTot = E.reduce(function(a,x){ return a+expAmt(x); },0);
-  var gross = sTot - pTot, net = gross - eTot;
+  var oTot = otherIncomeIn(function(d){ return inRange(d,F,T); });
+  var gross = sTot - pTot, net = gross - eTot + oTot;
 
   chosen.forEach(function(sec){
 
@@ -5846,12 +5850,12 @@ function buildReportPdf(rr, chosen, Ctor){
         ["Sales", pdfMoney(sTot)],
         ["Purchases (ingredients, supplies, delivery)", pdfMoney(pTot)],
         ["Gross profit" + (sTot>0 ? "  ("+Math.round(gross/sTot*100)+"%)" : ""), pdfMoney(gross)],
-        ["Running expenses", pdfMoney(eTot)],
+        ["Running expenses", pdfMoney(eTot)]].concat(oTot ? [["Other income (bank interest)", pdfMoney(oTot)]] : []).concat([
         ["Net profit" + (sTot>0 ? "  ("+Math.round(net/sTot*100)+"%)" : ""), pdfMoney(net)],
         ["Recorded wastage", pdfMoney(wv)],
         ["Days in period", String(datesBetween(F,T).length)],
         ["Average sales per day", pdfMoney(sTot / Math.max(1, datesBetween(F,T).length))]
-      ]);
+      ]));
       var modes = {};
       S.forEach(function(x){ modes[x.mode||"Other"] = (modes[x.mode||"Other"]||0) + saleTotal(x); });
       var mk = Object.keys(modes);
@@ -6693,6 +6697,10 @@ function renderHandoverView(){
   if(recSub==="handover") updateRecordsTotal();
 }
 
+// Other income: bank interest, counted in profit on the day it was credited.
+function otherIncomeIn(test){
+  return r2(cashMoves.filter(function(m){ return m.type==="interest" && test(m.date); }).reduce(function(a,m){ return a+(+m.amount||0); },0));
+}
 // Interest the bank credited to the cafe account.
 function openInterestForm(rec){
   var sheet = document.getElementById("sheet");

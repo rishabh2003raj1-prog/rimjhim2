@@ -76,7 +76,7 @@ The bank balance in the Cash tab and on the Dashboard is the balance last noted 
 
 When the cafe repays a partner (Expenses → Money owed to partners → Settle, or "Repay all"), pick how: UPI/bank (comes off the bank balance), cash from the counter (comes off that day's counter cash), cash another partner holds from handovers (comes off their Handover balance), or count it as their investment.
 
-**+ Interest received** and **+ Bank charge** on the Cash tab's bank card record those too. Interest adds to the bank balance; a bank charge is saved as a "Bank charges" expense paid from the cafe account, so it lowers the bank balance and counts as a cost. Tap either in the list to edit it.
+**+ Interest received** and **+ Bank charge** on the Cash tab's bank card record those too. Interest adds to the bank balance and counts as other income in profit (Dashboard, PDF report, outlet totals) on the day it was credited; a bank charge is saved as a "Bank charges" expense paid from the cafe account, so it lowers the bank balance and counts as a cost. Tap either in the list to edit it.
 
 Compare the balance with the bank app now and then; if it still differs (a missed entry), note the real balance and the count starts again from that date.
 
