@@ -97,6 +97,8 @@ Records → **Handover** follows the counter cash handed to each partner (or sta
 - **Where it went:** bills and purchases paid from it (choose "*name* - from cafe cash they hold" as **Paid by**), deposits in the cafe bank, cash put back in the counter, cash given to someone else, and cash kept as a partner withdrawal (also shown on the Partners tab).
 - **Still with them:** carried forward to the next month. A warning appears if more was used than was handed over.
 
+**Download handover statement PDF** creates the month's statement for everyone (a table of who holds what, then each person's summary and entries with a running balance); **Statement PDF** on a person's card does the same for just them, with signature lines.
+
 Cash put back in, or taken out of, the counter changes that day's expected counter cash. Tap any line to edit it.
 
 ## Staff salary

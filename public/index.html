@@ -6560,6 +6560,11 @@ var MOVE_TYPES = [
 // Out of the bank: bills and purchases the cafe paid by anything but cash (not
 // udhaar, not a partner's own money, not handover cash), partner withdrawals not
 // taken in cash.
+// "Rent - October 2026" rather than "Rent · Rent - October 2026".
+function expLabel(x){
+  var cat = x.category||"Expense", ds = x.description||"";
+  return ds && ds.toLowerCase().indexOf(cat.toLowerCase())===0 ? ds : cat+(ds?" · "+ds:"");
+}
 // Every movement of the cafe bank / UPI account, as dated +in / -out rows.
 // UPI/card sales are grouped into one row per day.
 function bankRows(){
@@ -6587,9 +6592,7 @@ function bankRows(){
   expenses.forEach(function(x){
     if(!(x.date && cafePaid(x) && x.mode!=="Cash" && x.mode!=="Credit")) return;
     var ch = x.category==="Bank charges";
-    var cat = x.category||"Expense", ds = x.description||"";
-    var txt = ds && ds.toLowerCase().indexOf(cat.toLowerCase())===0 ? ds : cat+(ds?" · "+ds:"");
-    rows.push({ date:x.date, kind: ch ? "charges" : "bills", amt:-expAmt(x), text:txt+" ("+(x.mode||"")+")", ref:x.id, cat:x.category||"Other" });
+    rows.push({ date:x.date, kind: ch ? "charges" : "bills", amt:-expAmt(x), text:expLabel(x)+" ("+(x.mode||"")+")", ref:x.id, cat:x.category||"Other" });
   });
   var seen = {};
   purchases.forEach(function(x){
@@ -6653,7 +6656,7 @@ function handoverRows(holder){
     if(r.mode==="held" && r.from===holder) rows.push({ date:r.date, kind:"repay", amt:-r.amount, text:"Repaid "+r.partner+" · "+r.what, ref:"" });
   });
   var pv = holder+" (cafe cash held)";
-  expenses.forEach(function(x){ if(x.paidBy===pv) rows.push({ date:x.date, kind:"expense", amt:-expAmt(x), text:(x.category||"Expense")+(x.description?" · "+x.description:""), ref:x.id }); });
+  expenses.forEach(function(x){ if(x.paidBy===pv) rows.push({ date:x.date, kind:"expense", amt:-expAmt(x), text:expLabel(x), ref:x.id }); });
   var seen = {};
   purchases.forEach(function(p){
     if(p.paidBy!==pv) return;
@@ -6719,12 +6722,19 @@ function renderHandoverView(){
     }
     html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" data-hobank="'+esc(r.holder)+'">Deposit in bank</button>'+
             '<button class="btn-additem" data-homove="'+esc(r.holder)+'">Other use / return</button></div>'+
-            '<button class="btn-additem" data-hoexp="'+esc(r.holder)+'" style="margin-top:8px;">+ Expense paid from this cash</button></div>';
+            '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" data-hoexp="'+esc(r.holder)+'">+ Expense paid from this cash</button>'+
+            '<button class="btn-additem" data-hopdf="'+esc(r.holder)+'">Statement PDF</button></div></div>';
   });
+  if(led.length) html += '<button class="btn-save" id="ho_pdf" style="width:100%;margin-top:4px;">Download handover statement PDF · '+esc(monthLabel(hoMonth))+'</button>';
   el.innerHTML = html;
   function shift(n){ hoMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderHandoverView(); updateRecordsTotal(); }
   document.getElementById("hoPrev").addEventListener("click", function(){ shift(-1); });
   document.getElementById("hoNext").addEventListener("click", function(){ shift(1); });
+  var hop = document.getElementById("ho_pdf");
+  if(hop) hop.addEventListener("click", function(){ exportHandoverStatement(hoMonth, null, hop); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-hopdf]"), function(b){
+    b.addEventListener("click", function(){ exportHandoverStatement(hoMonth, b.getAttribute("data-hopdf"), b); });
+  });
   Array.prototype.forEach.call(el.querySelectorAll("[data-hobank]"), function(b){ b.addEventListener("click", function(){ openCashMoveForm(null, b.getAttribute("data-hobank"), "bank"); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-homove]"), function(b){ b.addEventListener("click", function(){ openCashMoveForm(null, b.getAttribute("data-homove"), "counter"); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-hoexp]"), function(b){
@@ -6855,6 +6865,94 @@ function renderBankView(){
   if(recSub==="bank") updateRecordsTotal();
 }
 
+// Hand a finished PDF to the phone's share sheet, or download it.
+function sharePdf(doc, fname){
+  var blob = doc.output("blob");
+  try{
+    var file = new File([blob], fname, { type:"application/pdf" });
+    if(navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){ navigator.share({ files:[file], title:fname }).catch(function(){}); return; }
+  }catch(e){}
+  var url = URL.createObjectURL(blob), a = document.createElement("a");
+  a.href = url; a.download = fname; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 8000);
+}
+function pdfMoneyP(n){ n = r2(n); return (n<0?"-":"")+"Rs. "+Math.abs(n).toLocaleString("en-IN",{ minimumFractionDigits:2, maximumFractionDigits:2 }); }
+function pdfClean(t){ return String(t||"").replace(/₹/g,"Rs. ").replace(/→/g,"->").replace(/·/g,"-").replace(/[^\x20-\x7E]/g,""); }
+function pdfFooter(doc, text){
+  var pages = doc.internal.getNumberOfPages(), W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight();
+  for(var i=1;i<=pages;i++){
+    doc.setPage(i); doc.setFontSize(8); doc.setTextColor(91,80,68);
+    doc.text(pdfClean(text), 40, H-20); doc.text("Page "+i+" of "+pages, W-40, H-20, { align:"right" });
+  }
+}
+
+// Monthly statement of handover cash: for everyone, or one person.
+function exportHandoverStatement(mKey, holder, btn){
+  var label = btn ? btn.textContent : "";
+  if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var led = handoverLedger(mKey).filter(function(r){ return !holder || r.holder===holder; });
+    var doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4" });
+    var M = 40, y = 46, teal = [31,92,82];
+    var last = mKey+"-"+String(daysInMonthOf(mKey)).padStart(2,"0");
+    doc.setFont("helvetica","bold"); doc.setFontSize(17); doc.setTextColor(36,26,18); doc.text(pdfClean(OUTLET.name), M, y); y += 18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(91,80,68);
+    doc.text("Cash handover statement - "+monthLabel(mKey)+(holder ? " - "+pdfClean(holder) : ""), M, y); y += 14;
+    doc.setFontSize(9);
+    doc.text("Period: "+pdfDate(mKey+"-01")+" to "+pdfDate(last)+"   |   Generated "+new Date().toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}), M, y); y += 12;
+    doc.text("Counter cash handed over at the daily count, and where it went.", M, y); y += holder ? 26 : 16;
+
+    if(!holder && led.length > 1){
+      var T = { open:0, rec:0, used:0, close:0 };
+      led.forEach(function(r){ T.open += r.opening; T.rec += r.received; T.used += r.used; T.close += r.closing; });
+      doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Person","At start","Received","Used","Still with them"]],
+        headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" }, styles:{ fontSize:9, cellPadding:4 },
+        columnStyles:{ 1:{halign:"right"}, 2:{halign:"right"}, 3:{halign:"right"}, 4:{halign:"right"} },
+        didParseCell: function(d){ if(d.section==="head" && d.column.index>=1) d.cell.styles.halign = "right";
+                                   if(d.section==="body" && d.row.index===led.length) d.cell.styles.fontStyle = "bold"; },
+        body: led.map(function(r){ return [pdfClean(r.holder), pdfMoneyP(r.opening), pdfMoneyP(r.received), pdfMoneyP(r.used), pdfMoneyP(r.closing)]; })
+                 .concat([["All", pdfMoneyP(T.open), pdfMoneyP(T.rec), pdfMoneyP(T.used), pdfMoneyP(T.close)]]) });
+      y = doc.lastAutoTable.finalY + 20;
+    }
+    if(!led.length){ doc.setFontSize(10); doc.text("No handover cash this month.", M, y); }
+    led.forEach(function(r){
+      if(y > 700){ doc.addPage(); y = 46; }
+      doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(36,26,18); doc.text(pdfClean(r.holder), M, y); y += 8;
+      var sum = [["With them at the start ("+pdfDate(mKey+"-01")+")", pdfMoneyP(r.opening)]];
+      [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Received from others", r.fromOthers],
+       ["- Spent on expenses", r.expenses], ["- Spent on purchases", r.purchases], ["- Deposited in bank", r.bank], ["- Put back in the counter", r.counter],
+       ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
+      sum.push(["Still with "+pdfClean(r.holder)+" ("+pdfDate(last)+")", pdfMoneyP(r.closing)]);
+      doc.autoTable({ startY:y, margin:{left:M,right:M}, theme:"plain", styles:{ fontSize:9.5, cellPadding:3.5 }, body: sum,
+        columnStyles:{ 1:{ halign:"right" } },
+        didParseCell: function(d){ if(d.row.index===0 || d.row.index===sum.length-1) d.cell.styles.fontStyle = "bold";
+                                   if(d.row.index===sum.length-1 && r.closing < -0.5) d.cell.styles.textColor = [166,64,45]; } });
+      y = doc.lastAutoTable.finalY + 6;
+      if(r.rows.length){
+        var run = r.opening, body = [["", "At the start of the month", "", "", pdfMoneyP(r.opening)]];
+        r.rows.forEach(function(x){ run = r2(run + x.amt); body.push([pdfDate(x.date), pdfClean(x.text), x.amt>=0 ? pdfMoneyP(x.amt) : "", x.amt<0 ? pdfMoneyP(-x.amt) : "", pdfMoneyP(run)]); });
+        body.push(["", "End of the month", pdfMoneyP(r.received), pdfMoneyP(r.used), pdfMoneyP(r.closing)]);
+        doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Date","Details","In","Out","With them"]],
+          headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" }, styles:{ fontSize:8.5, cellPadding:3.5, overflow:"linebreak" },
+          alternateRowStyles:{ fillColor:[246,244,236] },
+          columnStyles:{ 0:{ cellWidth:68 }, 2:{ halign:"right", cellWidth:72 }, 3:{ halign:"right", cellWidth:72 }, 4:{ halign:"right", cellWidth:80 } },
+          didParseCell: function(d){ if(d.section==="head" && d.column.index>=2) d.cell.styles.halign = "right";
+                                     if(d.section==="body" && (d.row.index===0 || d.row.index===body.length-1)) d.cell.styles.fontStyle = "bold"; },
+          body: body });
+        y = doc.lastAutoTable.finalY;
+      }
+      if(r.closing < -0.5){ y += 12; doc.setFontSize(8.5); doc.setTextColor(166,64,45); doc.text("More was used than handed over: a handover is missing, or this was the person's own money.", M, y); }
+      y += 24;
+    });
+    if(holder){ y = Math.min(y + 10, doc.internal.pageSize.getHeight()-60); doc.setFontSize(9); doc.setTextColor(36,26,18);
+      doc.text("Signature: "+pdfClean(holder), M, y); doc.text("Checked by", doc.internal.pageSize.getWidth()-M, y, { align:"right" }); }
+    pdfFooter(doc, OUTLET.name+" - cash handover "+monthLabel(mKey)+(holder?" - "+holder:""));
+    done();
+    sharePdf(doc, (OUTLET.name+"_Handover_"+(holder?holder+"_":"")+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
+  }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
+}
+
 // Monthly statement of the cafe bank / UPI account as a PDF.
 function exportBankStatement(mKey, btn){
   var label = btn ? btn.textContent : "";
@@ -6923,16 +7021,8 @@ function exportBankStatement(mKey, btn){
       doc.text(clean(OUTLET.name)+" - bank statement "+monthLabel(mKey), M, doc.internal.pageSize.getHeight()-20);
       doc.text("Page "+i+" of "+pages, W-M, doc.internal.pageSize.getHeight()-20, { align:"right" });
     }
-    var fname = (OUTLET.name+"_Bank_Statement_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf";
-    var blob = doc.output("blob");
     done();
-    try{
-      var file = new File([blob], fname, { type:"application/pdf" });
-      if(navigator.share && navigator.canShare && navigator.canShare({ files:[file] })){ navigator.share({ files:[file], title:fname }).catch(function(){}); return; }
-    }catch(e){}
-    var url = URL.createObjectURL(blob), a = document.createElement("a");
-    a.href = url; a.download = fname; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    setTimeout(function(){ URL.revokeObjectURL(url); }, 8000);
+    sharePdf(doc, (OUTLET.name+"_Bank_Statement_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
   }).catch(function(e){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
 }
 
