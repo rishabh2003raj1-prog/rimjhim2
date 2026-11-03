@@ -738,7 +738,64 @@ function rupeeSigned(n){ n = Math.round(n||0); return (n<0?"-":"") + "₹" + Mat
 function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 function saleTotal(s){ return (s.amount||0) * (1 + (s.gst||0)/100); }
 function purchTotal(p){ return (p.qty||0) * (p.rate||0) * (1 + (p.gst||0)/100); }
-function investAmt(v){ return (v.invType==="Withdrawal") ? -(v.amount||0) : (v.amount||0); }
+// Partner money, kept apart from the cafe's own earnings:
+//  capital  - money put into the business for good (shop purchase, renovation...)
+//  loan     - working capital lent to the cafe, repaid from profit over time
+//  repay    - the cafe paying a partner's loan back
+//  withdraw - profit share / personal drawings
+var CAPITAL_CATS = ["Shop purchase","Shop renovation / interiors","Equipment / furniture","Rent / security deposit","Other capital"];
+var WITHDRAW_CATS = ["Profit share","Personal use"];
+var INV_TYPES = [["Investment","Capital investment"],["Loan","Loan to the cafe (working capital)"],["Loan repayment","Loan repaid by the cafe"],["Withdrawal","Withdrawal (profit share / personal)"]];
+function invKind(v){
+  if(v.invType==="Loan repayment") return "repay";
+  if(v.invType==="Withdrawal") return "withdraw";
+  if(v.invType==="Loan" || v.purpose==="Working capital") return "loan";
+  return "capital";
+}
+function invIsIn(v){ var k = invKind(v); return k==="capital" || k==="loan"; }
+function invCategory(v){
+  var k = invKind(v), p = v.purpose||"";
+  if(k==="loan" || k==="repay") return "Working capital loan";
+  if(k==="withdraw") return p==="Personal use" ? "Personal use" : "Profit share";
+  if(CAPITAL_CATS.indexOf(p)>=0) return p;
+  return ({"Cafe purchase price":"Shop purchase","Renovation / interiors":"Shop renovation / interiors","Equipment / furniture":"Equipment / furniture","Rent deposit":"Rent / security deposit"})[p] || "Other capital";
+}
+// Where the money went (or came from): "direct" = paid straight to a seller,
+// contractor or vendor, never through the cafe; "bank"; "counter"; "held:<name>".
+function invDest(v){
+  if(v.via) return v.via;
+  if(v.viaBill || / from own pocket$/.test(v.notes||"")) return "direct";
+  // Older capital entries (before cash destinations were recorded): paid for the shop directly.
+  if(invKind(v)==="capital" && !Object.prototype.hasOwnProperty.call(v, "cashTo")) return "direct";
+  if((v.mode||"Cash")!=="Cash") return "bank";
+  return v.cashTo ? "held:"+v.cashTo : "counter";
+}
+function invDestLabel(v){
+  var d = invDest(v), inn = invIsIn(v);
+  if(d==="direct") return "paid directly (not through the cafe)";
+  if(d==="bank") return inn ? "into cafe bank" : "from cafe bank";
+  if(d==="counter") return inn ? "into the counter" : "from the counter";
+  return (inn ? "kept by " : "from cash held by ")+d.slice(5);
+}
+function investAmt(v){ return invIsIn(v) ? (v.amount||0) : -(v.amount||0); }
+// Per-partner totals for all time.
+function partnerMoney(name){
+  var r = { capital:0, byCat:{}, loan:0, repaid:0, withdrawn:0 };
+  investments.forEach(function(v){
+    if(v.partner!==name) return;
+    var a = +v.amount||0, k = invKind(v);
+    if(k==="capital"){ r.capital += a; var c = invCategory(v); r.byCat[c] = (r.byCat[c]||0) + a; }
+    else if(k==="loan") r.loan += a; else if(k==="repay") r.repaid += a; else r.withdrawn += a;
+  });
+  cashMoves.forEach(function(m){ if(m.type==="withdraw" && m.holder===name) r.withdrawn += +m.amount||0; });
+  r.outstanding = r2(r.loan - r.repaid);
+  return r;
+}
+function allTimeProfit(){
+  var s1 = sales.reduce(function(a,x){ return a+saleTotal(x); },0), p1 = purchases.reduce(function(a,x){ return a+purchTotal(x); },0);
+  var e1 = expenses.reduce(function(a,x){ return a+expAmt(x); },0), o1 = otherIncomeIn(function(){ return true; });
+  return r2(s1 - p1 - e1 + o1);
+}
 function expAmt(x){ return x.amount||0; }
 
 function seedData(){
@@ -1812,17 +1869,16 @@ function renderDashboard(){
     '<div class="psrow"><span>Owed to partners</span><b class="'+(owed>0?"bad":"")+'">'+rupee(owed)+'</b></div>';
 
   // --- investments ---
-  var invByPartner = {};
-  investments.forEach(function(v){ invByPartner[v.partner] = (invByPartner[v.partner]||0) + investAmt(v); });
-  var totalCap = Object.keys(invByPartner).reduce(function(a,k){ return a+invByPartner[k]; },0);
-  var periodInv = investments.filter(function(v){ return dateSet[v.date]; }).reduce(function(a,v){ return a+investAmt(v); },0);
+  var pms = PARTNERS.map(function(n){ return { n:n, m:partnerMoney(n) }; });
+  var totalCap = pms.reduce(function(a,x){ return a+x.m.capital; },0), totalLoan = pms.reduce(function(a,x){ return a+x.m.outstanding; },0);
   document.getElementById("investSummary").innerHTML =
-    Object.keys(invByPartner).map(function(k){
-      var share = totalCap>0 ? Math.round(invByPartner[k]/totalCap*100) : 0;
-      return '<div class="psrow"><span>'+esc(k)+'</span><b>'+rupee(invByPartner[k])+' · '+share+'%</b></div>';
+    pms.map(function(x){
+      var share = totalCap>0 ? Math.round(x.m.capital/totalCap*100) : 0;
+      return '<div class="psrow"><span>'+esc(x.n)+'</span><b>'+rupee(x.m.capital)+' · '+share+'%'+(x.m.outstanding>0?' <span class="muted">+ loan '+rupee(x.m.outstanding)+'</span>':'')+'</b></div>';
     }).join("") +
     '<div class="psrow"><span><b>Total capital</b></span><b>'+rupee(totalCap)+'</b></div>'+
-    (periodInv!==0 ? '<div class="psrow"><span>In this range</span><b>'+rupeeSigned(periodInv)+'</b></div>' : '');
+    (totalLoan ? '<div class="psrow"><span>Working capital loans outstanding</span><b class="warnamt">'+rupee(totalLoan)+'</b></div>' : '')+
+    '<div class="barsub" style="margin-top:6px;">Partner money is kept apart from sales and profit. See Records → Partners.</div>';
 
   renderFoodDrinkSplit(dateList, totalSales, totalPurch);
   renderFixedCosts(dateList);
@@ -2630,12 +2686,13 @@ function entryRow(item, type){
   } else if(type==="purchase"){
     return '<div class="entry" data-type="purchase" data-id="'+item.id+'"><div><div class="who">'+esc(item.item)+'</div><div class="meta">'+esc(item.vendor)+' · '+item.qty+' '+item.unit+'</div></div><div class="amt purch">'+rupee(purchTotal(item))+'</div></div>';
   } else if(type==="investment"){
-    var neg = item.invType==="Withdrawal";
-    return '<div class="entry" data-type="investment" data-id="'+item.id+'"><div><div class="who">'+esc(item.partner)+' · '+esc(item.invType)+'</div><div class="meta">'+esc(item.purpose||"")+'</div></div><div class="amt '+(neg?"purch":"sale")+'">'+rupeeSigned(investAmt(item))+'</div></div>';
+    var neg = !invIsIn(item), kk = invKind(item);
+    var kl = {capital:"Capital", loan:"Loan to cafe", repay:"Loan repaid", withdraw:"Withdrawal"}[kk];
+    return '<div class="entry" data-type="investment" data-id="'+item.id+'"><div><div class="who">'+esc(item.partner)+' · '+kl+'</div><div class="meta">'+esc(invCategory(item))+' · '+esc(invDestLabel(item))+(item.notes?' · '+esc(item.notes):'')+'</div></div><div class="amt '+(neg?"purch":"sale")+'">'+rupeeSigned(investAmt(item))+'</div></div>';
   } else {
     var pp = payerIsPersonal(item.paidBy);
     return '<div class="entry" data-type="expense" data-id="'+item.id+'"><div><div class="who">'+esc(item.category)+'</div><div class="meta">'+esc(item.description||"")+' · '+esc(item.mode)+
-      (pp ? ' · paid by '+esc(payerPartner(item.paidBy))+' (own) '+(item.settled?'<span class="pill ok">'+({bank:"repaid by UPI/bank",cash:"repaid in cash",held:"repaid from handover cash",invest:"counted as investment"}[item.settleMode]||"settled")+'</span>':'<span class="pill bad">owed</span>') : '')+
+      (pp ? ' · paid by '+esc(payerPartner(item.paidBy))+' (own) '+(item.settled?'<span class="pill ok">'+({bank:"repaid by UPI/bank",cash:"repaid in cash",held:"repaid from handover cash",invest:"counted as their loan"}[item.settleMode]||"settled")+'</span>':'<span class="pill bad">owed</span>') : '')+
       (payerHeldBy(item.paidBy) ? ' · from '+esc(payerHeldBy(item.paidBy))+'\u2019s handover cash' : '')+
       '</div></div><div class="amt purch">'+rupee(expAmt(item))+'</div></div>';
   }
@@ -2788,7 +2845,7 @@ function openSettleSheet(ids){
           '<option value="bank">UPI / bank transfer from the cafe account</option>'+
           '<option value="cash">Cash from the counter</option>'+
           holders.map(function(h){ return '<option value="held:'+esc(h)+'">Cash '+esc(h)+' holds from handovers</option>'; }).join("")+
-          '<option value="invest">Not repaid - count it as their investment</option></select></div>';
+          '<option value="invest">Not repaid now - count it as their loan to the cafe</option></select></div>';
   html += '<div class="field"><label>Date repaid</label><input type="date" id="rp_date" value="'+fmtDate(new Date())+'"></div>';
   html += '<div class="backupnote" id="rp_hint"></div>';
   html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="st_back">Back</button><button class="btn-save" id="rp_go">Save</button></div>';
@@ -2799,7 +2856,7 @@ function openSettleSheet(ids){
     document.getElementById("rp_hint").textContent =
       v==="bank" ? "Comes off the cafe bank balance on that date." :
       v==="cash" ? "Comes out of the counter: that day's expected counter cash goes down by "+rupee(total)+"." :
-      v==="invest" ? "Adds "+rupee(total)+" to "+partner+"'s capital in Investments instead of repaying it." :
+      v==="invest" ? "Adds "+rupee(total)+" to "+partner+"'s working capital loan to the cafe, to be repaid later from profit (Partners tab)." :
       "Comes out of the handover cash "+v.slice(5)+" is holding (Handover tab).";
   }
   document.getElementById("rp_mode").addEventListener("change", hint); hint();
@@ -2808,7 +2865,7 @@ function openSettleSheet(ids){
     var v = document.getElementById("rp_mode").value, d = document.getElementById("rp_date").value || fmtDate(new Date());
     items.forEach(function(g){
       if(v==="invest"){
-        investments.push({ id:uid(), date:g.date, partner:g.partner, invType:"Investment", purpose:"Working capital",
+        investments.push({ id:uid(), date:g.date, partner:g.partner, invType:"Loan", purpose:"Working capital", via:"direct",
                            amount:g.amount, mode:"Cash", viaBill:true, notes:"Paid "+g.vendor+" from own pocket" });
         markSettled(g.id, { mode:"invest", date:d }, true);
       } else {
@@ -2955,22 +3012,47 @@ function renderPartnersView(){
   if(PARTNERS.length===0){
     html += '<div class="empty">No partners yet.</div>';
   } else {
-    html += PARTNERS.map(function(name){
-      var inv = investments.filter(function(v){return v.partner===name;});
-      var invested = inv.reduce(function(a,v){return a + (v.invType==="Investment"?v.amount:0);},0);
-      var withdrawn = inv.reduce(function(a,v){return a + (v.invType==="Withdrawal"?v.amount:0);},0) +
-                      cashMoves.filter(function(m){ return m.type==="withdraw" && m.holder===name; }).reduce(function(a,m){ return a+(+m.amount||0); },0);
-      var net = invested - withdrawn;
-      return '<div class="entry partnercard" data-partner="'+esc(name)+'">'+
-        '<div><div class="who">'+esc(name)+'</div><div class="meta">Invested '+rupee(invested)+(withdrawn>0?" · Withdrawn "+rupee(withdrawn):"")+'</div></div>'+
-        '<div style="display:flex;align-items:center;gap:10px;"><div class="amt sale">'+rupeeSigned(net)+'</div><button class="ndel" data-delpartner="'+esc(name)+'" aria-label="Remove partner">×</button></div>'+
-        '</div>';
+    var all = PARTNERS.map(function(n){ return { name:n, m:partnerMoney(n) }; });
+    var capTot = all.reduce(function(a,x){ return a+x.m.capital; },0), loanOut = all.reduce(function(a,x){ return a+x.m.outstanding; },0);
+    var repaidTot = all.reduce(function(a,x){ return a+x.m.repaid; },0), wdTot = all.reduce(function(a,x){ return a+x.m.withdrawn; },0);
+    var profit = allTimeProfit(), avail = r2(profit - repaidTot - wdTot);
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Partner money <span class="muted">· kept apart from cafe sales</span></h3>'+
+      '<div class="psrow"><span>Capital in the business</span><b>'+rupee(capTot)+'</b></div>'+
+      '<div class="psrow"><span>Working capital loans outstanding</span><b class="'+(loanOut>0?"warnamt":"")+'">'+rupee(loanOut)+'</b></div>'+
+      '<div class="psrow"><span>Cafe profit so far (all time)</span><b class="'+(profit<0?"bad":"ok")+'">'+rupeeSigned(profit)+'</b></div>'+
+      '<div class="psrow"><span>− Loans repaid + withdrawals so far</span><b>'+rupee(repaidTot + wdTot)+'</b></div>'+
+      '<div class="psrow"><span><b>Profit available to repay loans</b></span><b class="'+(avail<0?"bad":"ok")+'">'+rupeeSigned(avail)+'</b></div>'+
+      '<div class="backupnote" style="margin:6px 0 0;">Loans are repaid from the cafe’s profit over time. Repay only what the profit covers, so the cafe keeps enough cash to run.</div></div>';
+    html += all.map(function(x){
+      var m = x.m, share = capTot>0 ? Math.round(m.capital/capTot*100) : 0;
+      var cats = CAPITAL_CATS.filter(function(c){ return m.byCat[c]; });
+      return '<div class="card" style="margin-bottom:12px;"><div class="billtop"><div><b style="font-size:16px;">'+esc(x.name)+'</b><span>'+share+'% of capital</span></div>'+
+        '<button class="ndel" data-delpartner="'+esc(x.name)+'" aria-label="Remove partner">×</button></div>'+
+        '<div class="daygroup" style="margin:8px 0 2px;">Capital invested</div>'+
+        (cats.length ? cats.map(function(c){ return '<div class="psrow"><span>'+esc(c)+'</span><b>'+rupee(m.byCat[c])+'</b></div>'; }).join("") : '<div class="backupnote" style="margin:0;">None yet.</div>')+
+        '<div class="psrow"><span><b>Total capital</b></span><b>'+rupee(m.capital)+'</b></div>'+
+        '<div class="daygroup" style="margin:10px 0 2px;">Working capital loan to the cafe</div>'+
+        '<div class="psrow"><span>Lent</span><b>'+rupee(m.loan)+'</b></div>'+
+        '<div class="psrow"><span>Repaid by the cafe</span><b>'+rupee(m.repaid)+'</b></div>'+
+        '<div class="psrow"><span><b>Outstanding</b></span><b class="'+(m.outstanding>0?"warnamt":"ok")+'">'+rupee(m.outstanding)+'</b></div>'+
+        (m.withdrawn ? '<div class="psrow" style="margin-top:6px;"><span>Withdrawn (profit share / personal)</span><b>'+rupee(m.withdrawn)+'</b></div>' : '')+
+        '<div class="billbtns" style="margin-top:10px;"><button class="btn-additem" data-pinv="'+esc(x.name)+'">+ Add money</button>'+
+        (m.outstanding>0 ? '<button class="btn-additem" data-prepay="'+esc(x.name)+'">Repay loan</button>' : '')+'</div></div>';
     }).join("");
   }
   el.innerHTML = html;
   document.getElementById("partnerAddBtn").addEventListener("click", openPartnerForm);
   Array.prototype.forEach.call(el.querySelectorAll("[data-delpartner]"), function(b){
     b.addEventListener("click", function(){ deletePartner(b.getAttribute("data-delpartner")); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-pinv]"), function(b){
+    b.addEventListener("click", function(){ openForm("investment", null, fmtDate(new Date()), { partner: b.getAttribute("data-pinv") }); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-prepay]"), function(b){
+    b.addEventListener("click", function(){
+      var n = b.getAttribute("data-prepay");
+      openForm("investment", null, fmtDate(new Date()), { partner:n, invType:"Loan repayment", amount: partnerMoney(n).outstanding, via:"bank" });
+    });
   });
   if(recSub==="partners") updateRecordsTotal();
 }
@@ -5960,24 +6042,25 @@ function buildReportPdf(rr, chosen, Ctor){
     if(sec==="invest"){
       title("Partner investment report");
       note("Capital figures are for all time, so each partner's share is always complete. Entries below are for the selected period.");
-      var cap = {};
-      PARTNERS.forEach(function(p){ cap[p] = { inv:0, wd:0 }; });
-      investments.forEach(function(v){
-        cap[v.partner] = cap[v.partner] || { inv:0, wd:0 };
-        if(v.invType==="Withdrawal") cap[v.partner].wd += +v.amount||0; else cap[v.partner].inv += +v.amount||0;
-      });
-      var totNet = Object.keys(cap).reduce(function(a,k){ return a + cap[k].inv - cap[k].wd; },0);
       var owedBy = {};
       pendingReimbursements().forEach(function(g){ owedBy[g.partner] = (owedBy[g.partner]||0) + g.amount; });
-      table(["Partner","Invested","Withdrawn","Net capital","Share","Cafe owes them"],
-        Object.keys(cap).map(function(k){
-          var n = cap[k].inv - cap[k].wd;
-          return [k, pdfMoney(cap[k].inv), pdfMoney(cap[k].wd), pdfMoney(n), totNet>0?Math.round(n/totNet*100)+"%":"-", pdfMoney(owedBy[k]||0)];
-        }), { foot:["Total","","",pdfMoney(totNet),"",""], cols:{1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"}} });
+      var pm2 = PARTNERS.map(function(n){ return { n:n, m:partnerMoney(n) }; });
+      var capT = pm2.reduce(function(a,x){ return a+x.m.capital; },0), loanT = pm2.reduce(function(a,x){ return a+x.m.outstanding; },0);
+      table(["Partner","Capital","Share","Loan lent","Loan repaid","Loan outstanding","Withdrawn","Owed for bills"],
+        pm2.map(function(x){ var m = x.m;
+          return [x.n, pdfMoney(m.capital), capT>0?Math.round(m.capital/capT*100)+"%":"-", pdfMoney(m.loan), pdfMoney(m.repaid), pdfMoney(m.outstanding), pdfMoney(m.withdrawn), pdfMoney(owedBy[x.n]||0)]; }),
+        { foot:["Total",pdfMoney(capT),"","","",pdfMoney(loanT),"",""], cols:{1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"},6:{halign:"right"},7:{halign:"right"}} });
+      sub("Capital by category");
+      var byCat = {};
+      pm2.forEach(function(x){ Object.keys(x.m.byCat).forEach(function(c){ byCat[c] = (byCat[c]||0) + x.m.byCat[c]; }); });
+      table(["Category"].concat(PARTNERS).concat(["Total"]),
+        CAPITAL_CATS.filter(function(c){ return byCat[c]; }).map(function(c){ return [c].concat(pm2.map(function(x){ return pdfMoney(x.m.byCat[c]||0); })).concat([pdfMoney(byCat[c])]); }),
+        { cols:{} });
+      note("Cafe profit so far (all time): "+pdfMoney(allTimeProfit())+". Working capital loans are repaid from profit over time. Partner money is not cafe income and is kept apart from sales.");
       sub("Entries in this period");
-      table(["Date","Partner","Type","Purpose","Mode","Amount"],
+      table(["Date","Partner","Type","Category","Where","Amount"],
         investments.filter(function(v){ return inRange(v.date,F,T); }).sort(function(a,b){return a.date.localeCompare(b.date);}).map(function(v){
-          return [pdfDate(v.date), v.partner, v.invType, v.purpose||"", v.mode||"", pdfMoney(v.amount)]; }),
+          return [pdfDate(v.date), v.partner, {capital:"Capital",loan:"Loan to cafe",repay:"Loan repaid",withdraw:"Withdrawal"}[invKind(v)], invCategory(v), invDestLabel(v), pdfMoney(v.amount)]; }),
         { cols:{5:{halign:"right"}} });
     }
 
@@ -6582,9 +6665,11 @@ function bankRows(){
       rows.push({ date:x.date, kind:"udhaar", amt:+x.amount||0, text:"Udhaar paid back"+(c?" · "+c.name:"")+" ("+x.mode+")", ref:x.customerId||"" }); }
   });
   investments.forEach(function(v){
-    if(!v.date || (v.mode||"Cash")==="Cash") return;
-    var w = v.invType==="Withdrawal";
-    rows.push({ date:v.date, kind: w ? "withdraw" : "invest", amt: w ? -(+v.amount||0) : (+v.amount||0), text:(w?"Partner withdrawal · ":"Partner investment · ")+v.partner, ref:v.id });
+    if(!v.date || invDest(v)!=="bank") return;
+    var k = invKind(v), a = +v.amount||0;
+    if(k==="repay") rows.push({ date:v.date, kind:"loanrepay", amt:-a, text:"Loan repaid to "+v.partner, ref:v.id });
+    else if(k==="withdraw") rows.push({ date:v.date, kind:"withdraw", amt:-a, text:"Partner withdrawal · "+v.partner, ref:v.id });
+    else rows.push({ date:v.date, kind:"invest", amt:a, text:(k==="loan"?"Loan to the cafe · ":"Capital ("+invCategory(v)+") · ")+v.partner, ref:v.id });
   });
   cashMoves.forEach(function(x){
     var a = +x.amount||0;
@@ -6620,7 +6705,7 @@ function bankBalanceAt(dateStr, rows){
 // Totals by kind since the balance was last noted (up to today).
 function bankMovements(){
   var from = settings.bankDate || "", today = fmtDate(new Date());
-  var m = { sales:0, udhaar:0, invest:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, repaid:0, atm:0, adjIn:0, adjOut:0 };
+  var m = { sales:0, udhaar:0, invest:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, loanrepay:0, repaid:0, atm:0, adjIn:0, adjOut:0 };
   bankRows().forEach(function(r){
     if(!(r.date && (!from || r.date >= from) && r.date <= today)) return;
     if(r.kind==="adj"){ if(r.amt>=0) m.adjIn += r.amt; else m.adjOut -= r.amt; return; }
@@ -6628,7 +6713,7 @@ function bankMovements(){
   });
   Object.keys(m).forEach(function(k){ m[k] = r2(m[k]); });
   m.in = r2(m.sales + m.udhaar + m.invest + m.deposits + m.interest + m.adjIn);
-  m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.repaid + m.atm + m.adjOut);
+  m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.loanrepay + m.repaid + m.atm + m.adjOut);
   return m;
 }
 function bankDepositsSince(){ return bankMovements().deposits; }
@@ -6658,8 +6743,8 @@ function handoverRows(holder){
   });
   investments.forEach(function(v){
     if(!v.date || invCashTarget(v)!==holder) return;
-    if(v.invType==="Withdrawal") rows.push({ date:v.date, kind:"withdraw", amt:-(+v.amount||0), text:"Partner withdrawal · "+v.partner, ref:"inv:"+v.id });
-    else rows.push({ date:v.date, kind:"investin", amt:+v.amount||0, text:"Partner investment in cash · "+v.partner, ref:"inv:"+v.id });
+    if(!invIsIn(v)) rows.push({ date:v.date, kind:"invout", amt:-(+v.amount||0), text:(invKind(v)==="repay"?"Loan repaid to ":"Withdrawal · ")+v.partner, ref:"inv:"+v.id });
+    else rows.push({ date:v.date, kind:"investin", amt:+v.amount||0, text:(invKind(v)==="loan"?"Loan to the cafe · ":"Capital · ")+v.partner, ref:"inv:"+v.id });
   });
   partnerRepayments().forEach(function(r){
     if(r.mode==="held" && r.from===holder) rows.push({ date:r.date, kind:"repay", amt:-r.amount, text:"Repaid "+r.partner+" · "+r.what, ref:"" });
@@ -6677,7 +6762,7 @@ function handoverRows(holder){
 }
 function handoverLedger(mKey){
   return cashHolders().map(function(h){
-    var rows = handoverRows(h), r = { holder:h, opening:0, fromCounter:0, fromOthers:0, taken:0, expenses:0, purchases:0, bank:0, counter:0, pass:0, withdraw:0, repay:0, rows:[] };
+    var rows = handoverRows(h), r = { holder:h, opening:0, fromCounter:0, fromOthers:0, taken:0, expenses:0, purchases:0, bank:0, counter:0, pass:0, withdraw:0, repay:0, invOut:0, rows:[] };
     rows.forEach(function(x){
       var m = x.date.slice(0,7);
       if(m < mKey){ r.opening += x.amt; return; }
@@ -6688,6 +6773,7 @@ function handoverLedger(mKey){
       else if(x.kind==="taken") r.taken += x.amt;
       else if(x.kind==="frombank") r.fromBank = (r.fromBank||0) + x.amt;
       else if(x.kind==="investin") r.investIn = (r.investIn||0) + x.amt;
+      else if(x.kind==="invout") r.invOut = (r.invOut||0) - x.amt;
       else if(x.kind==="expense") r.expenses -= x.amt;
       else if(x.kind==="purchase") r.purchases -= x.amt;
       else r[x.kind] = (r[x.kind]||0) - x.amt;
@@ -6695,7 +6781,8 @@ function handoverLedger(mKey){
     r.opening = r2(r.opening);
     r.fromBank = r2(r.fromBank||0); r.investIn = r2(r.investIn||0);
     r.received = r2(r.fromCounter + r.fromOthers + r.taken + r.fromBank + r.investIn);
-    r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw + r.repay);
+    r.invOut = r2(r.invOut||0);
+    r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw + r.repay + r.invOut);
     r.closing = r2(r.opening + r.received - r.used);
     return r;
   }).filter(function(r){ return r.opening || r.received || r.used || PARTNERS.indexOf(r.holder)>=0; });
@@ -6720,9 +6807,9 @@ function renderHandoverView(){
     var line = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+lbl+'</span><b>'+(sign||"")+rupeeP(v)+'</b></div>' : ''; };
     html += '<div class="card" style="margin-bottom:12px;"><h3>'+esc(r.holder)+'</h3>'+
       '<div class="psrow"><span>With them at the start of the month</span><b>'+rupeeP(r.opening)+'</b></div>'+
-      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Partner investment in cash", r.investIn)+line("+ Received from others", r.fromOthers)+
+      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Partner money in (cash)", r.investIn)+line("+ Received from others", r.fromOthers)+
       line("− Spent on expenses", r.expenses)+line("− Spent on purchases", r.purchases)+line("− Deposited in bank", r.bank)+
-      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+
+      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+line("− Partner withdrawal / loan repaid", r.invOut)+
       '<div class="psrow"><span><b>Still with '+esc(r.holder)+'</b></span><b class="'+(r.closing<0?"bad":r.closing>0?"warnamt":"ok")+'">'+rupeeP(r.closing)+'</b></div>';
     if(r.closing < -0.5) html += '<div class="attmwarn" style="margin-top:8px;">More was spent than was handed over. Either a handover is missing, or '+esc(r.holder)+' added their own money (then change those entries to “own money” so the cafe owes it back).</div>';
     if(r.rows.length){
@@ -6773,9 +6860,9 @@ function otherIncomeIn(test){
 // ---------- BANK / UPI ACCOUNT ----------
 var bkMonth = fmtDate(new Date()).slice(0,7);
 var BANK_GROUPS = [
-  ["sales","UPI / card sales",1],["udhaar","Udhaar paid back by UPI / bank",1],["invest","Partner investments",1],["deposits","Handover cash deposited",1],
+  ["sales","UPI / card sales",1],["udhaar","Udhaar paid back by UPI / bank",1],["invest","Partner money in (capital / loans)",1],["deposits","Handover cash deposited",1],
   ["interest","Interest",1],["adjIn","Adjustments in",1],
-  ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],
+  ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],["loanrepay","Partner loans repaid",-1],
   ["repaid","Partners repaid",-1],["atm","Cash withdrawn",-1],["adjOut","Adjustments out",-1]
 ];
 // One month of the bank account: opening, entries, totals by type, closing, spending by category.
@@ -6863,7 +6950,7 @@ function renderBankView(){
       if(k==="sales"){ openCalendarOn(ref); return; }
       if(k==="bills" || k==="charges"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
       if(k==="purchases"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
-      if(k==="invest" || k==="withdraw"){ var v = investments.find(function(e){ return e.id===ref; }); if(v) openForm("investment", v, v.date); return; }
+      if(k==="invest" || k==="withdraw" || k==="loanrepay"){ var v = investments.find(function(e){ return e.id===ref; }); if(v) openForm("investment", v, v.date); return; }
       if(k==="udhaar"){ if(ref && typeof openCustomerDetail==="function") openCustomerDetail(ref); return; }
       if(k==="repaid"){ appAlert("This is a partner repayment. To change it, find the bill or expense it repaid."); return; }
       var m = cashMoves.find(function(e){ return e.id===ref; });
@@ -6918,7 +7005,7 @@ function cashReview(mKey){
   datesBetween(first, upto).forEach(function(d){
     var m = cashMovement(d);
     var cashSales = r2(m.inflow - m.inCredit - m.backIn - m.invIn);
-    add("cashSales", cashSales); add("udhaar", m.inCredit); add("invest", m.invIn); add("withdraw", -m.invOut);
+    add("cashSales", cashSales); add("udhaar", m.inCredit);
     add("purchases", -m.outPurch); add("expenses", -m.outExp); add("repaid", -m.repaid);
     flows += m.inflow - m.outflow;
     var rec = cashDayFor(d);
@@ -6937,7 +7024,7 @@ function cashReview(mKey){
   handoverLedger(mKey).forEach(function(r){
     if(!r.opening && !r.received && !r.used && !r.closing) return;
     R.places.push({ name:"With "+r.holder, start:r.opening, end:r.closing, holder:r.holder });
-    add("expenses", -r.expenses); add("purchases", -r.purchases); add("withdraw", -r.withdraw); add("repaid", -r.repay); add("invest", r.investIn);
+    add("expenses", -r.expenses); add("purchases", -r.purchases); add("pWithdraw", -r.withdraw); add("repaid", -r.repay);
     if(r.bank) tr("Handover cash deposited in bank", r.bank);
     if(r.counter) tr("Handover cash put back in the counter", r.counter);
     if(r.pass) tr("Cash passed between people", r.pass);
@@ -6947,8 +7034,18 @@ function cashReview(mKey){
   var bd = bankMonthData(mKey);
   R.places.push({ name:"Bank / UPI account", start:bd.opening, end:bd.closing });
   var t = bd.tot;
-  add("upiSales", t.sales||0); add("udhaar", t.udhaar||0); add("invest", t.invest||0); add("interest", t.interest||0);
-  add("expenses", -((t.bills||0) + (t.charges||0))); add("purchases", -(t.purchases||0)); add("withdraw", -(t.withdraw||0)); add("repaid", -(t.repaid||0));
+  add("upiSales", t.sales||0); add("udhaar", t.udhaar||0); add("interest", t.interest||0);
+  add("expenses", -((t.bills||0) + (t.charges||0))); add("purchases", -(t.purchases||0)); add("repaid", -(t.repaid||0));
+  // Partner money that went through the cafe's counter, bank or a person's cash.
+  investments.forEach(function(v){
+    var d = invDest(v);
+    if(!v.date || v.date.slice(0,7)!==mKey || d==="direct") return;
+    if(d==="counter" && v.date > upto) return;
+    var k = invKind(v), a = +v.amount||0;
+    add(k==="capital" ? "pCapital" : k==="loan" ? "pLoan" : k==="repay" ? "pRepay" : "pWithdraw", k==="capital"||k==="loan" ? a : -a);
+  });
+  // Partner money paid straight to sellers / contractors: shown, but not cafe money.
+  R.directIn = r2(investments.filter(function(v){ return v.date && v.date.slice(0,7)===mKey && invDest(v)==="direct" && invIsIn(v); }).reduce(function(a2,v){ return a2+(+v.amount||0); },0));
   add("bankAdj", (t.adjIn||0) - (t.adjOut||0));
   if(t.atm) tr("Cash withdrawn from the bank", t.atm);
 
@@ -6961,10 +7058,13 @@ function cashReview(mKey){
   return R;
 }
 var CR_LINES = [
-  ["cashSales","Cash sales"],["upiSales","UPI / card sales"],["udhaar","Udhaar collected"],["invest","Partner investments"],["interest","Bank interest"],
-  ["purchases","Purchases paid"],["expenses","Bills & expenses paid"],["withdraw","Partner withdrawals"],["repaid","Partners repaid"],
+  ["cashSales","Cash sales"],["upiSales","UPI / card sales"],["udhaar","Udhaar collected"],["interest","Bank interest"],
+  ["purchases","Purchases paid"],["expenses","Bills & expenses paid"],["repaid","Partners repaid for bills they paid"],
   ["countDiff","Counter short / over at counts"],["bankAdj","Bank adjustments"]
 ];
+// Partner money, shown apart from what the cafe earned and spent.
+var CR_PARTNER = [["pCapital","Capital put in by partners"],["pLoan","Loans from partners (working capital)"],["pRepay","Partner loans repaid"],["pWithdraw","Partner withdrawals"]];
+function crSum(keys, R){ return r2(keys.reduce(function(a,l){ return a+(R.ext[l[0]]||0); },0)); }
 
 function renderCashReviewView(){
   var el = document.getElementById("reviewView");
@@ -6985,12 +7085,25 @@ function renderCashReviewView(){
   });
   html += '<div class="psrow"><span><b>Total cafe money</b></span><b>'+rupee(R.start)+' → '+rupee(R.end)+'</b></div></div>';
   html += '<div class="card" style="margin-bottom:12px;"><h3>What changed it</h3>';
+  html += '<div class="daygroup" style="margin:2px 0 4px;">From running the cafe</div>';
   CR_LINES.forEach(function(l){
     var v = R.ext[l[0]] || 0;
     if(Math.abs(v) < 0.005) return;
     html += '<div class="psrow"><span>'+(v>=0?'+ ':'− ')+l[1]+'</span><b class="'+(v<0?"bad":"ok")+'">'+rupeeP(Math.abs(v))+'</b></div>';
   });
-  html += '<div class="psrow"><span><b>Change in total cafe money</b></span><b class="'+(R.change<0?"bad":"ok")+'">'+rupeeSigned(R.change)+'</b></div>';
+  var opRes = crSum(CR_LINES, R), pRes = crSum(CR_PARTNER, R);
+  html += '<div class="psrow"><span><b>Cafe\u2019s own cash result</b></span><b class="'+(opRes<0?"bad":"ok")+'">'+rupeeSigned(opRes)+'</b></div>';
+  if(CR_PARTNER.some(function(l){ return Math.abs(R.ext[l[0]]||0) >= 0.005; })){
+    html += '<div class="daygroup" style="margin:10px 0 4px;">Partner money (not cafe earnings)</div>';
+    CR_PARTNER.forEach(function(l){
+      var v = R.ext[l[0]] || 0;
+      if(Math.abs(v) < 0.005) return;
+      html += '<div class="psrow"><span>'+(v>=0?'+ ':'− ')+l[1]+'</span><b>'+rupeeP(Math.abs(v))+'</b></div>';
+    });
+    html += '<div class="psrow"><span><b>Net partner money</b></span><b>'+rupeeSigned(pRes)+'</b></div>';
+  }
+  html += '<div class="psrow" style="margin-top:6px;"><span><b>Change in total cafe money</b></span><b class="'+(R.change<0?"bad":"ok")+'">'+rupeeSigned(R.change)+'</b></div>';
+  if(R.directIn) html += '<div class="backupnote" style="margin:8px 0 0;">Partners also paid '+rupee(R.directIn)+' straight to sellers / contractors this month (shop purchase, renovation...). That never went through the cafe\u2019s cash or bank, so it isn\u2019t in these totals.</div>';
   var tk = Object.keys(R.transfers);
   if(tk.length) html += '<div class="backupnote" style="margin:8px 0 0;">Moved between places (no change to the total): '+tk.map(function(k){ return esc(k)+' '+rupee(R.transfers[k]); }).join(' · ')+'.</div>';
   html += '</div>';
@@ -7035,13 +7148,22 @@ function exportCashReview(mKey, btn){
       body: R.places.map(function(p){ return [pdfClean(p.name), pdfMoneyP(p.start), pdfMoneyP(p.end), pdfMoneyP(p.end-p.start)]; })
               .concat([["Total cafe money", pdfMoneyP(R.start), pdfMoneyP(R.end), pdfMoneyP(R.change)]]) });
     y = doc.lastAutoTable.finalY + 18;
-    var body = [];
+    var body = [["From running the cafe",""]];
     CR_LINES.forEach(function(l){ var v = R.ext[l[0]]||0; if(Math.abs(v) >= 0.005) body.push([(v>=0?"+ ":"- ")+l[1], pdfMoneyP(Math.abs(v))]); });
+    body.push(["Cafe's own cash result", pdfMoneyP(crSum(CR_LINES, R))]);
+    if(CR_PARTNER.some(function(l){ return Math.abs(R.ext[l[0]]||0) >= 0.005; })){
+      body.push(["Partner money (not cafe earnings)",""]);
+      CR_PARTNER.forEach(function(l){ var v = R.ext[l[0]]||0; if(Math.abs(v) >= 0.005) body.push([(v>=0?"+ ":"- ")+l[1], pdfMoneyP(Math.abs(v))]); });
+      body.push(["Net partner money", pdfMoneyP(crSum(CR_PARTNER, R))]);
+    }
     body.push(["Change in total cafe money", pdfMoneyP(R.change)]);
     doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["What changed it",""]], headStyles:head, theme:"plain",
       styles:{ fontSize:9.5, cellPadding:4 }, columnStyles:{ 1:{halign:"right"} },
-      didParseCell: function(d){ if(d.section==="body" && d.row.index===body.length-1) d.cell.styles.fontStyle = "bold"; }, body: body });
+      didParseCell: function(d){ var t0 = d.row.raw[0];
+        if(d.section==="body" && (d.row.index===body.length-1 || /^Cafe's own|^Net partner/.test(t0))) d.cell.styles.fontStyle = "bold";
+        if(d.section==="body" && (t0==="From running the cafe" || t0==="Partner money (not cafe earnings)")){ d.cell.styles.fontStyle = "bold"; d.cell.styles.textColor = [31,92,82]; } }, body: body });
     y = doc.lastAutoTable.finalY + 10;
+    if(R.directIn){ doc.setFontSize(8.5); doc.setTextColor(91,80,68); doc.text("Partners also paid "+pdfMoneyP(R.directIn)+" straight to sellers / contractors (not through cafe cash or bank).", M, y+4); y += 14; }
     var tk = Object.keys(R.transfers);
     if(tk.length){
       doc.setFontSize(8.5); doc.setTextColor(91,80,68);
@@ -7098,9 +7220,9 @@ function exportHandoverStatement(mKey, holder, btn){
       if(y > 700){ doc.addPage(); y = 46; }
       doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(36,26,18); doc.text(pdfClean(r.holder), M, y); y += 8;
       var sum = [["With them at the start ("+pdfDate(mKey+"-01")+")", pdfMoneyP(r.opening)]];
-      [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Partner investment in cash", r.investIn], ["+ Received from others", r.fromOthers],
+      [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Partner money in (cash)", r.investIn], ["+ Received from others", r.fromOthers],
        ["- Spent on expenses", r.expenses], ["- Spent on purchases", r.purchases], ["- Deposited in bank", r.bank], ["- Put back in the counter", r.counter],
-       ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
+       ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay], ["- Partner withdrawal / loan repaid", r.invOut]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
       sum.push(["Still with "+pdfClean(r.holder)+" ("+pdfDate(last)+")", pdfMoneyP(r.closing)]);
       doc.autoTable({ startY:y, margin:{left:M,right:M}, theme:"plain", styles:{ fontSize:9.5, cellPadding:3.5 }, body: sum,
         columnStyles:{ 1:{ halign:"right" } },
@@ -7347,8 +7469,10 @@ function paidFromTill(p){
 // holds (Handover tab), null = no cash moved (not cash, or a bill they paid that was
 // counted as their investment).
 function invCashTarget(v){
-  if((v.mode||"Cash")!=="Cash" || v.viaBill || / from own pocket$/.test(v.notes||"")) return null;
-  return v.cashTo || "";
+  var d = invDest(v);
+  if(d==="counter") return "";
+  if(d.indexOf("held:")===0) return d.slice(5);
+  return null;
 }
 function cashMovement(dateStr){
   var inflow = sales.filter(function(s){ return s.date===dateStr && s.mode==="Cash"; })
@@ -7369,7 +7493,7 @@ function cashMovement(dateStr){
   var invIn = 0, invOut = 0;
   investments.forEach(function(v){
     if(v.date!==dateStr || invCashTarget(v)!=="") return;
-    if(v.invType==="Withdrawal") invOut += (+v.amount||0); else invIn += (+v.amount||0);
+    if(!invIsIn(v)) invOut += (+v.amount||0); else invIn += (+v.amount||0);
   });
   inflow += invIn;
   return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, outflow: outPurch + outExp + takenOut + repaid + invOut, outPurch: outPurch, outExp: outExp };
@@ -7438,9 +7562,9 @@ function renderCashView(){
     var bm = bankMovements();
     var bl = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+sign+' '+lbl+'</span><b>'+rupee(v)+'</b></div>' : ''; };
     html += '<div class="backupnote" style="margin:8px 0 4px;">Since '+(settings.bankDate ? fmtD(settings.bankDate) : 'then')+':</div>'+
-      bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner investments (not cash)", bm.invest, "+")+
+      bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner money in (capital / loans)", bm.invest, "+")+
       bl("Handover cash deposited", bm.deposits, "+")+bl("Interest received", bm.interest, "+")+bl("Bills paid by UPI / bank", bm.bills, "−")+bl("Bank charges", bm.charges, "−")+bl("Purchases paid by UPI / bank", bm.purchases, "−")+
-      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+bl("Cash withdrawn from the bank", bm.atm, "−")+
+      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+bl("Partner loans repaid", bm.loanrepay, "−")+bl("Cash withdrawn from the bank", bm.atm, "−")+
       bl("Adjustments in", bm.adjIn, "+")+bl("Adjustments out", bm.adjOut, "−")+
       '<div class="psrow"><span><b>Cafe bank account now</b></span><b class="'+(bankBalanceNow()<0?"bad":"")+'">'+rupee(bankBalanceNow())+'</b></div>'+
       '<div class="backupnote" style="margin:6px 0 0;">Check this against your bank app now and then. If it still differs (a missed entry), update the balance above and the count starts again from that date.</div>';
@@ -8927,14 +9051,17 @@ function openForm(type, item, defaultDate, prefill){
     html += '<div class="field"><label>Payment mode</label><select id="f_mode">'+["Cash","UPI","Card","Credit"].map(function(m){return '<option '+(item&&item.mode===m?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div>';
   } else if(type==="investment"){
     html += '<div class="field"><label>Partner</label><select id="f_partner">'+PARTNERS.map(function(p){return '<option value="'+esc(p)+'" '+(item&&item.partner===p?"selected":"")+'>'+esc(p)+'</option>';}).join("")+'</select></div>';
-    html += '<div class="field"><label>Type</label><select id="f_invtype">'+["Investment","Withdrawal"].map(function(t){return '<option '+(item&&item.invType===t?"selected":"")+'>'+t+'</option>';}).join("")+'</select></div>';
-    html += '<div class="field"><label>Purpose</label><select id="f_purpose">'+INVEST_PURPOSES.map(function(p){return '<option '+(item&&item.purpose===p?"selected":"")+'>'+p+'</option>';}).join("")+'</select></div>';
-    html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:"")+'"></div>';
-    html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Bank Transfer"].map(function(m){return '<option '+(item&&item.mode===m?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
-    var viaBill = item && (item.viaBill || / from own pocket$/.test(item.notes||""));
-    html += '<div class="field" id="f_cashtowrap" style="display:'+((!item || item.mode==="Cash") && !viaBill ? "block" : "none")+';"><label id="f_cashtolbl">Cash went</label><select id="f_cashto">'+
-            '<option value="">Into / out of the counter</option>'+cashHolders().map(function(h){ return '<option value="'+esc(h)+'"'+(item&&item.cashTo===h?" selected":"")+'>Held by '+esc(h)+' (handover cash)</option>'; }).join("")+'</select></div>';
-    if(viaBill) html += '<div class="backupnote" style="margin-top:-4px;">This was a bill the partner paid, counted as their investment - no cash moved, so it doesn\u2019t change the counter.</div>';
+    var pfi = prefill || {};
+    var curType = item ? (invKind(item)==="loan" ? "Loan" : item.invType==="Loan repayment" ? "Loan repayment" : item.invType==="Withdrawal" ? "Withdrawal" : "Investment") : (pfi.invType || "Investment");
+    var curPartner = item ? item.partner : (pfi.partner || "");
+    if(curPartner) html = html.replace('value="'+esc(curPartner)+'" ', 'value="'+esc(curPartner)+'" selected ');
+    html += '<div class="field"><label>Type</label><select id="f_invtype">'+INV_TYPES.map(function(t){return '<option value="'+t[0]+'" '+(curType===t[0]?"selected":"")+'>'+t[1]+'</option>';}).join("")+'</select></div>';
+    var curCat = item ? invCategory(item) : "Shop purchase";
+    html += '<div class="field" id="f_purposewrap"><label id="f_purposelbl">Category</label><select id="f_purpose"></select></div>';
+    html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:(pfi.amount||""))+'"></div>';
+    html += '<div><label>Paid by (mode)</label><select id="f_mode">'+["Cash","UPI","Bank Transfer"].map(function(m){return '<option '+((item ? item.mode===m : (pfi.mode||"Bank Transfer")===m)?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
+    html += '<div class="field"><label id="f_vialbl">Where the money went</label><select id="f_via"></select></div>';
+    html += '<div class="backupnote" id="f_invnote" style="margin-top:-4px;"></div>';
     html += '<div class="field"><label>Notes</label><input type="text" id="f_notes" placeholder="Optional" value="'+esc(item?item.notes:"")+'"></div>';
   } else {
     var pf = prefill || {};
@@ -8974,12 +9101,32 @@ function openForm(type, item, defaultDate, prefill){
     });
   }
 
-  var fct = document.getElementById("f_cashtowrap");
-  if(fct && type==="investment" && !(item && (item.viaBill || / from own pocket$/.test(item.notes||"")))){
-    var fmi = document.getElementById("f_mode"), fit = document.getElementById("f_invtype");
-    var syncCashTo = function(){ fct.style.display = fmi.value==="Cash" ? "block" : "none";
-      document.getElementById("f_cashtolbl").textContent = fit.value==="Withdrawal" ? "Cash taken from" : "Cash went to"; };
-    fmi.addEventListener("change", syncCashTo); fit.addEventListener("change", syncCashTo); syncCashTo();
+  if(type==="investment"){
+    var fit = document.getElementById("f_invtype"), fpu = document.getElementById("f_purpose"), fvia = document.getElementById("f_via"), fmi = document.getElementById("f_mode");
+    var curVia = item ? invDest(item) : (pfi.via || "");
+    var syncInv = function(first){
+      var t = fit.value, inn = (t==="Investment" || t==="Loan");
+      var cats = t==="Investment" ? CAPITAL_CATS : t==="Withdrawal" ? WITHDRAW_CATS : ["Working capital"];
+      var keepCat = first ? curCat : fpu.value;
+      fpu.innerHTML = cats.map(function(c){ return '<option'+(c===keepCat?" selected":"")+'>'+esc(c)+'</option>'; }).join("");
+      document.getElementById("f_purposewrap").style.display = cats.length>1 ? "block" : "none";
+      var opts = (inn ? [["direct","Paid directly for the cafe (to a seller / contractor / vendor) - not through cafe cash or bank"]] : [])
+        .concat([["bank", inn ? "Into the cafe bank account" : "From the cafe bank account"], ["counter", inn ? "Into the cafe cash counter" : "From the cafe cash counter"]])
+        .concat(cashHolders().map(function(h){ return ["held:"+h, (inn ? "Cash kept by " : "From cafe cash held by ")+h]; }));
+      var want = first && curVia ? curVia : (fvia.value && opts.some(function(o){ return o[0]===fvia.value; }) && !first ? fvia.value : (t==="Investment" ? "direct" : "bank"));
+      if(!opts.some(function(o){ return o[0]===want; })) want = opts[0][0];
+      fvia.innerHTML = opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===want?" selected":"")+'>'+esc(o[1])+'</option>'; }).join("");
+      document.getElementById("f_vialbl").textContent = inn ? "Where the money went" : "Paid from";
+      var pm = partnerMoney(document.getElementById("f_partner").value);
+      document.getElementById("f_invnote").innerHTML =
+        t==="Investment" ? "Capital stays in the business. It is not cafe income and is kept apart from sales." :
+        t==="Loan" ? "Working capital lent to the cafe. The cafe repays it from profit over time (Partners tab). Not cafe income." :
+        t==="Loan repayment" ? "Loan still outstanding: <b>"+rupee(pm.outstanding + (item && invKind(item)==="repay" ? +item.amount||0 : 0))+"</b>." :
+        "Money a partner takes out (profit share or personal use).";
+    };
+    fit.addEventListener("change", function(){ syncInv(false); });
+    document.getElementById("f_partner").addEventListener("change", function(){ syncInv(false); });
+    syncInv(true);
   }
   document.getElementById("f_cancel").addEventListener("click", closeForm);
   if(isEdit){
@@ -9026,8 +9173,14 @@ function submitForm(type, item){
     var mode3 = document.getElementById("f_mode").value;
     var vnotes = document.getElementById("f_notes").value.trim();
     if(isNaN(amount3) || amount3<=0){ errEl.textContent = "Enter an amount greater than 0."; errEl.style.display="block"; return; }
+    if(invType==="Loan repayment"){
+      var left = partnerMoney(partner).outstanding + (item && invKind(item)==="repay" && item.partner===partner ? +item.amount||0 : 0);
+      if(amount3 > left + 0.5){ errEl.textContent = partner+"'s loan outstanding is only "+rupee(left)+"."; errEl.style.display="block"; return; }
+    }
+    if(invType==="Loan") purpose = "Working capital";
+    if(invType==="Loan repayment") purpose = "Working capital";
     var rec3 = {id: item?item.id:uid(), date:date, partner:partner, invType:invType, purpose:purpose, amount:amount3, mode:mode3, notes:vnotes,
-                cashTo: mode3==="Cash" ? (document.getElementById("f_cashto").value || "") : ""};
+                via: document.getElementById("f_via").value, cashTo:""};
     if(item){ var idx3 = investments.findIndex(function(x){return x.id===item.id;}); investments[idx3]=Object.assign({}, item, rec3); }
     else { investments.push(rec3); }
     saveInvest();

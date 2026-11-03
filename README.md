@@ -90,9 +90,19 @@ Records → **Bank** reviews the cafe bank / UPI account month by month, like th
 - **Mark month as reviewed** once it matches the statement.
 - **Download statement PDF**: an A4 statement for the month with the summary, every entry with money in / out and running balance, and spending by category. On a phone it opens the share sheet (WhatsApp, Drive, email).
 
-## Partner investments in cash
+## Partner money
 
-A partner investment or withdrawal made in **Cash** moves cash: by default into (or out of) the counter, changing that day's expected counter cash, or choose **Held by** a person to put it in (or take it from) their handover cash. UPI / bank investments go to the bank balance. A bill a partner paid that was settled as "count it as their investment" moves no cash.
+Partner money is kept apart from the cafe's own sales and profit. Each entry (Records → Invest, or + Add money on the Partners tab) is one of:
+- **Capital investment**, by category: Shop purchase, Shop renovation / interiors, Equipment / furniture, Rent / security deposit, Other capital.
+- **Loan to the cafe (working capital)**: repaid by the cafe from profit over time.
+- **Loan repaid by the cafe**: can't be more than what is outstanding.
+- **Withdrawal**: profit share or personal use.
+
+Each entry also says **where the money went**: *paid directly* to a seller, contractor or vendor (doesn't touch cafe cash or bank; the default for capital), into the cafe bank, into the counter, or kept by a person (handover cash). Withdrawals and loan repayments say where they were paid from. Older entries: "Working capital" became a loan; other capital entries count as paid directly; edit any that went through the cafe's bank or counter.
+
+**Records → Partners** shows, per partner: capital by category and share, the working capital loan (lent, repaid, outstanding) with a **Repay loan** button, and withdrawals. At the top: total capital, loans outstanding, cafe profit so far, and profit still available to repay loans. A bill a partner paid from their own money can be settled as "count it as their loan to the cafe".
+
+The monthly cash review shows partner money in its own section, separate from what the cafe earned and spent.
 
 ## Monthly cash review
 
