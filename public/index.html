@@ -3022,7 +3022,8 @@ function renderPartnersView(){
       '<div class="psrow"><span>Cafe profit so far (all time)</span><b class="'+(profit<0?"bad":"ok")+'">'+rupeeSigned(profit)+'</b></div>'+
       '<div class="psrow"><span>− Loans repaid + withdrawals so far</span><b>'+rupee(repaidTot + wdTot)+'</b></div>'+
       '<div class="psrow"><span><b>Profit available to repay loans</b></span><b class="'+(avail<0?"bad":"ok")+'">'+rupeeSigned(avail)+'</b></div>'+
-      '<div class="backupnote" style="margin:6px 0 0;">Loans are repaid from the cafe’s profit over time. Repay only what the profit covers, so the cafe keeps enough cash to run.</div></div>';
+      '<div class="backupnote" style="margin:6px 0 0;">Loans are repaid from the cafe’s profit over time. Repay only what the profit covers, so the cafe keeps enough cash to run.</div>'+
+      '<button class="btn-save" id="pm_pdf" style="width:100%;margin-top:10px;">Download partner money statement PDF</button></div>';
     html += all.map(function(x){
       var m = x.m, share = capTot>0 ? Math.round(m.capital/capTot*100) : 0;
       var cats = CAPITAL_CATS.filter(function(c){ return m.byCat[c]; });
@@ -3037,13 +3038,19 @@ function renderPartnersView(){
         '<div class="psrow"><span><b>Outstanding</b></span><b class="'+(m.outstanding>0?"warnamt":"ok")+'">'+rupee(m.outstanding)+'</b></div>'+
         (m.withdrawn ? '<div class="psrow" style="margin-top:6px;"><span>Withdrawn (profit share / personal)</span><b>'+rupee(m.withdrawn)+'</b></div>' : '')+
         '<div class="billbtns" style="margin-top:10px;"><button class="btn-additem" data-pinv="'+esc(x.name)+'">+ Add money</button>'+
-        (m.outstanding>0 ? '<button class="btn-additem" data-prepay="'+esc(x.name)+'">Repay loan</button>' : '')+'</div></div>';
+        (m.outstanding>0 ? '<button class="btn-additem" data-prepay="'+esc(x.name)+'">Repay loan</button>' : '')+'</div>'+
+        '<button class="btn-additem" data-ppdf="'+esc(x.name)+'" style="margin-top:8px;">Statement PDF · '+esc(x.name)+'</button></div>';
     }).join("");
   }
   el.innerHTML = html;
   document.getElementById("partnerAddBtn").addEventListener("click", openPartnerForm);
   Array.prototype.forEach.call(el.querySelectorAll("[data-delpartner]"), function(b){
     b.addEventListener("click", function(){ deletePartner(b.getAttribute("data-delpartner")); });
+  });
+  var pmp = document.getElementById("pm_pdf");
+  if(pmp) pmp.addEventListener("click", function(){ exportPartnerStatement(null, pmp); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ppdf]"), function(b){
+    b.addEventListener("click", function(){ exportPartnerStatement(b.getAttribute("data-ppdf"), b); });
   });
   Array.prototype.forEach.call(el.querySelectorAll("[data-pinv]"), function(b){
     b.addEventListener("click", function(){ openForm("investment", null, fmtDate(new Date()), { partner: b.getAttribute("data-pinv") }); });
@@ -7183,6 +7190,98 @@ function exportCashReview(mKey, btn){
     pdfFooter(doc, OUTLET.name+" - cash review "+monthLabel(mKey));
     done();
     sharePdf(doc, (OUTLET.name+"_Cash_Review_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
+  }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
+}
+
+// Statement of partner money, all time up to today: for every partner, or one.
+function exportPartnerStatement(holder, btn){
+  var label = btn ? btn.textContent : "";
+  if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var names = holder ? [holder] : PARTNERS.slice();
+    var all = PARTNERS.map(function(n){ return { n:n, m:partnerMoney(n) }; });
+    var capAll = all.reduce(function(a,x){ return a+x.m.capital; },0);
+    var doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4" });
+    var M = 40, y = 46, teal = [31,92,82], head = { fillColor:teal, textColor:255, fontStyle:"bold" };
+    var today = fmtDate(new Date());
+    var kindL = { capital:"Capital", loan:"Loan to cafe", repay:"Loan repaid", withdraw:"Withdrawal" };
+    doc.setFont("helvetica","bold"); doc.setFontSize(17); doc.setTextColor(36,26,18); doc.text(pdfClean(OUTLET.name), M, y); y += 18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(91,80,68);
+    doc.text("Partner money statement"+(holder ? " - "+pdfClean(holder) : ""), M, y); y += 14;
+    doc.setFontSize(9);
+    doc.text("All entries up to "+pdfDate(today)+"   |   Generated "+new Date().toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}), M, y); y += 12;
+    doc.text("Partner money is kept apart from the cafe's sales and profit. Working capital loans are repaid from cafe profit over time.", M, y); y += 16;
+
+    var rows = holder ? all.filter(function(x){ return x.n===holder; }) : all;
+    var T = { cap:0, loan:0, rep:0, out:0, wd:0 };
+    rows.forEach(function(x){ T.cap += x.m.capital; T.loan += x.m.loan; T.rep += x.m.repaid; T.out += x.m.outstanding; T.wd += x.m.withdrawn; });
+    var sumBody = rows.map(function(x){ var m = x.m;
+      return [pdfClean(x.n), pdfMoneyP(m.capital), capAll>0 ? Math.round(m.capital/capAll*100)+"%" : "-", pdfMoneyP(m.loan), pdfMoneyP(m.repaid), pdfMoneyP(m.outstanding), pdfMoneyP(m.withdrawn)]; });
+    if(!holder && rows.length>1) sumBody.push(["Total", pdfMoneyP(T.cap), "100%", pdfMoneyP(T.loan), pdfMoneyP(T.rep), pdfMoneyP(T.out), pdfMoneyP(T.wd)]);
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Partner","Capital","Share","Loan lent","Loan repaid","Loan owed","Withdrawn"]], headStyles:head,
+      styles:{ fontSize:8.8, cellPadding:4 }, columnStyles:{ 1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"},6:{halign:"right"} },
+      didParseCell: function(d){ if(d.section==="head" && d.column.index>=1) d.cell.styles.halign = "right";
+                                 if(d.section==="body" && d.row.raw[0]==="Total") d.cell.styles.fontStyle = "bold"; },
+      body: sumBody });
+    y = doc.lastAutoTable.finalY + 14;
+
+    var profit = allTimeProfit();
+    var repAll = all.reduce(function(a,x){ return a+x.m.repaid; },0), wdAll = all.reduce(function(a,x){ return a+x.m.withdrawn; },0);
+    var outAll = all.reduce(function(a,x){ return a+x.m.outstanding; },0);
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, theme:"plain", head:[["Cafe profit position (all partners)",""]], headStyles:{ fontStyle:"bold", textColor:teal },
+      styles:{ fontSize:9.5, cellPadding:3.5 }, columnStyles:{ 1:{ halign:"right" } },
+      didParseCell: function(d){ if(d.section==="body" && d.row.index===3) d.cell.styles.fontStyle = "bold"; },
+      body:[["Cafe profit so far (all time)", pdfMoneyP(profit)], ["- Loans repaid so far", pdfMoneyP(repAll)], ["- Withdrawals so far", pdfMoneyP(wdAll)],
+            ["Profit available to repay loans", pdfMoneyP(profit - repAll - wdAll)], ["Working capital loans still owed", pdfMoneyP(outAll)]] });
+    y = doc.lastAutoTable.finalY + 20;
+
+    names.forEach(function(n){
+      var m = partnerMoney(n);
+      var mine = investments.filter(function(v){ return v.partner===n && v.date && v.date <= today; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
+      var drawn = cashMoves.filter(function(c){ return c.type==="withdraw" && c.holder===n && c.date <= today; });
+      if(y > 690){ doc.addPage(); y = 46; }
+      doc.setFont("helvetica","bold"); doc.setFontSize(13); doc.setTextColor(36,26,18); doc.text(pdfClean(n), M, y); y += 6;
+      var cats = CAPITAL_CATS.filter(function(c){ return m.byCat[c]; });
+      doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Capital invested, by category","Amount"]], headStyles:head,
+        styles:{ fontSize:9, cellPadding:3.5 }, columnStyles:{ 1:{ halign:"right" } },
+        didParseCell: function(d){ if(d.section==="head" && d.column.index===1) d.cell.styles.halign = "right";
+                                   if(d.section==="body" && d.row.raw[0]==="Total capital") d.cell.styles.fontStyle = "bold"; },
+        body: (cats.length ? cats.map(function(c){ return [c, pdfMoneyP(m.byCat[c])]; }) : [["None yet",""]]).concat([["Total capital", pdfMoneyP(m.capital)]]) });
+      y = doc.lastAutoTable.finalY + 10;
+      var loanRows = mine.filter(function(v){ var k = invKind(v); return k==="loan" || k==="repay"; });
+      if(loanRows.length){
+        var owed = 0, lb = loanRows.map(function(v){
+          var lent = invKind(v)==="loan"; owed = r2(owed + (lent ? +v.amount||0 : -(+v.amount||0)));
+          return [pdfDate(v.date), pdfClean((lent ? "Lent - " : "Repaid - ")+invDestLabel(v)+(v.notes?" - "+v.notes:"")), lent ? pdfMoneyP(v.amount) : "", lent ? "" : pdfMoneyP(v.amount), pdfMoneyP(owed)];
+        });
+        lb.push(["", "Loan still owed to "+pdfClean(n), pdfMoneyP(m.loan), pdfMoneyP(m.repaid), pdfMoneyP(m.outstanding)]);
+        doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Date","Working capital loan","Lent","Repaid","Owed"]], headStyles:head,
+          styles:{ fontSize:8.5, cellPadding:3.5, overflow:"linebreak" }, alternateRowStyles:{ fillColor:[246,244,236] },
+          columnStyles:{ 0:{ cellWidth:68 }, 2:{ halign:"right", cellWidth:70 }, 3:{ halign:"right", cellWidth:70 }, 4:{ halign:"right", cellWidth:76 } },
+          didParseCell: function(d){ if(d.section==="head" && d.column.index>=2) d.cell.styles.halign = "right";
+                                     if(d.section==="body" && d.row.index===lb.length-1) d.cell.styles.fontStyle = "bold"; },
+          body: lb });
+        y = doc.lastAutoTable.finalY + 10;
+      }
+      var ent = mine.map(function(v){ return { d:v.date, r:[pdfDate(v.date), kindL[invKind(v)], pdfClean(invCategory(v)), pdfClean(invDestLabel(v)+(v.notes?" - "+v.notes:"")), (invIsIn(v)?"":"-")+pdfMoneyP(v.amount)] }; })
+        .concat(drawn.map(function(c){ return { d:c.date, r:[pdfDate(c.date), "Withdrawal", "Profit share", pdfClean("kept from handover cash"+(c.note?" - "+c.note:"")), "-"+pdfMoneyP(c.amount)] }; }))
+        .sort(function(a,b){ return a.d.localeCompare(b.d); });
+      if(ent.length){
+        doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Date","Type","Category","Where / notes","Amount"]], headStyles:head,
+          styles:{ fontSize:8.3, cellPadding:3.3, overflow:"linebreak" }, alternateRowStyles:{ fillColor:[246,244,236] },
+          columnStyles:{ 0:{ cellWidth:66 }, 1:{ cellWidth:66 }, 2:{ cellWidth:110 }, 4:{ halign:"right", cellWidth:78 } },
+          didParseCell: function(d){ if(d.section==="head" && d.column.index===4) d.cell.styles.halign = "right"; },
+          body: ent.map(function(e){ return e.r; }) });
+        y = doc.lastAutoTable.finalY;
+      }
+      y += 24;
+    });
+    if(holder){ y = Math.min(y + 10, doc.internal.pageSize.getHeight()-60); doc.setFontSize(9); doc.setTextColor(36,26,18);
+      doc.text("Partner: "+pdfClean(holder), M, y); doc.text("For "+pdfClean(OUTLET.name), doc.internal.pageSize.getWidth()-M, y, { align:"right" }); }
+    pdfFooter(doc, OUTLET.name+" - partner money statement"+(holder?" - "+holder:""));
+    done();
+    sharePdf(doc, (OUTLET.name+"_Partner_Statement_"+(holder?holder+"_":"")+today).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
   }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
 }
 

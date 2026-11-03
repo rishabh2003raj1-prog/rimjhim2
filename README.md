@@ -102,6 +102,8 @@ Each entry also says **where the money went**: *paid directly* to a seller, cont
 
 **Records → Partners** shows, per partner: capital by category and share, the working capital loan (lent, repaid, outstanding) with a **Repay loan** button, and withdrawals. At the top: total capital, loans outstanding, cafe profit so far, and profit still available to repay loans. A bill a partner paid from their own money can be settled as "count it as their loan to the cafe".
 
+**Download partner money statement PDF** (top of the Partners tab) gives every partner's capital, share, loan lent / repaid / owed and withdrawals, the cafe's profit position, then for each partner their capital by category, a loan ledger with the amount owed after each entry, and every entry with where the money went. **Statement PDF** on a partner's card does the same for one partner, with signature lines.
+
 The monthly cash review shows partner money in its own section, separate from what the cafe earned and spent.
 
 ## Monthly cash review
