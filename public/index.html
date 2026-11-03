@@ -1797,7 +1797,7 @@ function renderDashboard(){
   var owed = pendingReimbursements().reduce(function(a,g){ return a+g.amount; },0);
   document.getElementById("moneyPos").innerHTML =
     '<div class="psrow"><span>Cash in hand</span><b>'+rupee(cashInHand())+'</b></div>'+
-    '<div class="psrow"><span>Bank (last noted)</span><b>'+rupee(settings.bankBalance||0)+'</b></div>'+
+    '<div class="psrow"><span>Bank'+(bankDepositsSince() ? ' <span class="muted">(noted '+rupee(settings.bankBalance||0)+' + '+rupee(bankDepositsSince())+' deposited)</span>' : ' (last noted)')+'</span><b>'+rupee(bankBalanceNow())+'</b></div>'+
     '<div class="psrow"><span>Customer udhaar to collect</span><b class="'+(creditOut>0?"bad":"")+'">'+rupee(creditOut)+'</b></div>'+
     '<div class="psrow"><span>Vendor bills unpaid</span><b class="'+(vendorDue>0?"bad":"")+'">'+rupee(vendorDue)+'</b></div>'+
     '<div class="psrow"><span>Owed to partners</span><b class="'+(owed>0?"bad":"")+'">'+rupee(owed)+'</b></div>';
@@ -2665,7 +2665,7 @@ function updateRecordsTotal(){
   else if(recSub==="expenses"){ var t4=expenses.reduce(function(a,x){return a+expAmt(x);},0); lbl.textContent = expenses.length+" entries · "+rupee(t4); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
-  else if(recSub==="cash"){ lbl.textContent = rupee(cashInHand())+" in hand · "+rupee(settings.bankBalance||0)+" bank"; }
+  else if(recSub==="cash"){ lbl.textContent = rupee(cashInHand())+" in hand · "+rupee(bankBalanceNow())+" bank"; }
   else if(recSub==="customers"){ var due=customers.reduce(function(a,c){return a+customerDue(c);},0);
     lbl.textContent = customers.length+" customer"+(customers.length!==1?"s":"")+(due>0?" · "+rupee(due)+" due":""); }
   else if(recSub==="assets"){ lbl.textContent = assets.length+" asset"+(assets.length!==1?"s":"")+" · "+rupee(totalAssetValue()); }
@@ -6488,6 +6488,14 @@ var MOVE_TYPES = [
   { v:"withdraw", label:"Kept as partner withdrawal",  out:true },
   { v:"taken",    label:"Took cash from the counter",  out:false }
 ];
+// Bank balance now: the balance last noted in the Cash tab (as at the start of its
+// date) plus handover cash deposited since then.
+function bankDepositsSince(){
+  var from = settings.bankDate || "", today = fmtDate(new Date());
+  return r2(cashMoves.filter(function(m){ return m.type==="bank" && (!from || m.date >= from) && m.date <= today; })
+                     .reduce(function(a,m){ return a+(+m.amount||0); },0));
+}
+function bankBalanceNow(){ return r2((+settings.bankBalance||0) + bankDepositsSince()); }
 function moveLabel(t){ var m = MOVE_TYPES.find(function(x){ return x.v===t; }); return m ? m.label : t; }
 function cashHolders(){
   var names = PARTNERS.slice();
@@ -6617,7 +6625,7 @@ function openCashMoveForm(rec, holder, type){
     var t = document.getElementById("cm_type").value, h = document.getElementById("cm_holder").value;
     document.getElementById("cm_towrap").style.display = t==="pass" ? "block" : "none";
     var cur = handoverLedger(hoMonth).find(function(r){ return r.holder===h; });
-    var txt = { bank:"Cash taken to the cafe bank account.", counter:"Cash returned to the till. The counter's expected cash goes up by this amount on that day.",
+    var txt = { bank:"Cash taken to the cafe bank account. It is added to the bank balance in the Cash tab and on the Dashboard.", counter:"Cash returned to the till. The counter's expected cash goes up by this amount on that day.",
                 pass:"Cash handed from one person to another.", withdraw:"The partner keeps this as their withdrawal / profit share. It shows as withdrawn on the Partners tab.",
                 taken:"Cash taken out of the counter without a closing count. The counter's expected cash goes down by this amount on that day." }[t];
     document.getElementById("cm_hint").innerHTML = txt + (cur ? ' Currently with '+esc(h)+': <b>'+rupeeP(cur.closing)+'</b>.' : '');
@@ -6749,6 +6757,11 @@ function renderCashView(){
   var html = '<div class="card" style="margin-bottom:14px;"><h3>Opening balances</h3>';
   html += '<div class="psrow"><span>Cash in hand at start'+(settings.openingCashDate?' ('+parseDate(settings.openingCashDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+')':'')+'</span><b>'+(settings.openingCash===null||settings.openingCash===undefined?'—':rupee(settings.openingCash))+'</b></div>';
   html += '<div class="psrow"><span>Cafe bank account'+(settings.bankDate?' ('+parseDate(settings.bankDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+')':'')+'</span><b>'+(settings.bankBalance===null||settings.bankBalance===undefined?'—':rupee(settings.bankBalance))+'</b></div>';
+  var dep = bankDepositsSince();
+  if(dep){
+    html += '<div class="psrow"><span>+ Handover cash deposited since</span><b>'+rupee(dep)+'</b></div>';
+    html += '<div class="psrow"><span><b>Cafe bank account now</b></span><b>'+rupee(bankBalanceNow())+'</b></div>';
+  }
   html += '<div class="psrow"><span>Float kept in counter nightly</span><b>'+(settings.defaultFloat===null||settings.defaultFloat===undefined?'—':rupee(settings.defaultFloat))+'</b></div>';
   html += '<button class="btn-additem" id="cash_setup" style="margin-top:10px;">'+((settings.openingCash===null||settings.openingCash===undefined)?'Set opening balances':'Update opening balances')+'</button></div>';
 

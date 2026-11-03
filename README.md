@@ -75,7 +75,7 @@ Records → **Handover** follows the counter cash handed to each partner (or sta
 - **Where it went:** bills and purchases paid from it (choose "*name* - from cafe cash they hold" as **Paid by**), deposits in the cafe bank, cash put back in the counter, cash given to someone else, and cash kept as a partner withdrawal (also shown on the Partners tab).
 - **Still with them:** carried forward to the next month. A warning appears if more was used than was handed over.
 
-Cash put back in, or taken out of, the counter changes that day's expected counter cash. Tap any line to edit it.
+Cash put back in, or taken out of, the counter changes that day's expected counter cash. Bank deposits are added to the bank balance (the balance last noted in the Cash tab, plus deposits made on or after that date), shown in the Cash tab and on the Dashboard. Tap any line to edit it.
 
 ## Staff salary
 
