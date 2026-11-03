@@ -704,7 +704,7 @@ var customFrom = null, customTo = null;
 var recSub = "sales";
 var PARTNERS = [];
 var INVEST_PURPOSES = ["Cafe purchase price","Renovation / interiors","Equipment / furniture","Rent deposit","Working capital","Profit withdrawal","Personal use","Other"];
-var EXP_CATS = ["Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance","Rent","Electricity","Wifi / Internet","Mobile recharge","Maintenance","Other"];
+var EXP_CATS = ["Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance","Rent","Electricity","Wifi / Internet","Mobile recharge","Maintenance","Bank charges","Other"];
 // Overheads that land every month whether or not a single cup is sold.
 var BASE_FIXED_CATS = ["Rent","Electricity","Wifi / Internet","Mobile recharge"];
 EXP_CATS.splice(EXP_CATS.length-1, 0, "Staff Bonus");
@@ -6556,7 +6556,8 @@ function bankMovements(){
   var from = settings.bankDate || "", today = fmtDate(new Date());
   function inRange(d){ return d && (!from || d >= from) && d <= today; }
   function cafePaid(x){ return !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); }
-  var m = { sales:0, udhaar:0, invest:0, deposits:0, bills:0, purchases:0, withdraw:0, repaid:0 };
+  var m = { sales:0, udhaar:0, invest:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, repaid:0 };
+  cashMoves.forEach(function(x){ if(inRange(x.date) && x.type==="interest") m.interest += (+x.amount||0); });
   partnerRepayments().forEach(function(r){ if(r.mode==="bank" && inRange(r.date)) m.repaid += r.amount; });
   sales.forEach(function(x){ if(inRange(x.date) && (x.mode==="UPI" || x.mode==="Card")) m.sales += saleTotal(x); });
   creditPayments.forEach(function(x){ if(inRange(x.date) && x.mode && x.mode!=="Cash") m.udhaar += (+x.amount||0); });
@@ -6566,11 +6567,14 @@ function bankMovements(){
   });
   cashMoves.forEach(function(x){ if(inRange(x.date) && x.type==="bank") m.deposits += (+x.amount||0); });
   // Everything the cafe paid that did not come out of the till came out of the bank.
-  expenses.forEach(function(x){ if(inRange(x.date) && cafePaid(x) && x.mode!=="Cash" && x.mode!=="Credit") m.bills += expAmt(x); });
+  expenses.forEach(function(x){
+    if(!(inRange(x.date) && cafePaid(x) && x.mode!=="Cash" && x.mode!=="Credit")) return;
+    if(x.category==="Bank charges") m.charges += expAmt(x); else m.bills += expAmt(x);
+  });
   purchases.forEach(function(x){ if(inRange(x.date) && cafePaid(x) && x.mode!=="Credit" && !paidFromTill(x)) m.purchases += purchTotal(x); });
   Object.keys(m).forEach(function(k){ m[k] = r2(m[k]); });
-  m.in = r2(m.sales + m.udhaar + m.invest + m.deposits);
-  m.out = r2(m.bills + m.purchases + m.withdraw + m.repaid);
+  m.in = r2(m.sales + m.udhaar + m.invest + m.deposits + m.interest);
+  m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.repaid);
   return m;
 }
 function bankDepositsSince(){ return bankMovements().deposits; }
@@ -6687,6 +6691,31 @@ function renderHandoverView(){
     });
   });
   if(recSub==="handover") updateRecordsTotal();
+}
+
+// Interest the bank credited to the cafe account.
+function openInterestForm(rec){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+(rec?"Edit interest":"Interest received")+'</h2>';
+  html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="in_amt" value="'+(rec?rec.amount:"")+'"></div>'+
+          '<div><label>Date credited</label><input type="date" id="in_date" value="'+(rec?rec.date:fmtDate(new Date()))+'"></div></div>';
+  html += '<div class="field"><label>Note (optional)</label><input type="text" id="in_note" value="'+esc(rec&&rec.note||"")+'" placeholder="e.g. quarterly savings interest"></div>';
+  html += '<div class="backupnote">Added to the cafe bank balance.</div>';
+  html += '<div class="err" id="in_err"></div><div class="sheetbtns"><button class="btn-cancel" id="in_cancel">Cancel</button>'+(rec?'<button class="btn-del" id="in_del">Delete</button>':'')+'<button class="btn-save" id="in_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("in_cancel").addEventListener("click", closeForm);
+  if(rec) document.getElementById("in_del").addEventListener("click", function(){
+    askConfirm("Delete this interest entry?", function(){ cashMoves = cashMoves.filter(function(m){ return m.id!==rec.id; }); saveCashMoves(); closeForm(); renderAll(); });
+  });
+  document.getElementById("in_save").addEventListener("click", function(){
+    var amt = parseFloat(document.getElementById("in_amt").value);
+    if(isNaN(amt) || amt<=0){ var e = document.getElementById("in_err"); e.textContent = "Enter an amount greater than 0."; e.style.display = "block"; return; }
+    var r = { id: rec ? rec.id : uid(), type:"interest", date: document.getElementById("in_date").value || fmtDate(new Date()), amount:amt,
+              note: document.getElementById("in_note").value.trim() };
+    if(rec) cashMoves[cashMoves.findIndex(function(m){ return m.id===rec.id; })] = r; else cashMoves.push(r);
+    saveCashMoves(); closeForm(); renderAll();
+  });
 }
 
 function openCashMoveForm(rec, holder, type){
@@ -6846,11 +6875,22 @@ function renderCashView(){
     var bl = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+sign+' '+lbl+'</span><b>'+rupee(v)+'</b></div>' : ''; };
     html += '<div class="backupnote" style="margin:8px 0 4px;">Since '+(settings.bankDate ? fmtD(settings.bankDate) : 'then')+':</div>'+
       bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner investments (not cash)", bm.invest, "+")+
-      bl("Handover cash deposited", bm.deposits, "+")+bl("Bills paid by UPI / bank", bm.bills, "−")+bl("Purchases paid by UPI / bank", bm.purchases, "−")+
+      bl("Handover cash deposited", bm.deposits, "+")+bl("Interest received", bm.interest, "+")+bl("Bills paid by UPI / bank", bm.bills, "−")+bl("Bank charges", bm.charges, "−")+bl("Purchases paid by UPI / bank", bm.purchases, "−")+
       bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+
       '<div class="psrow"><span><b>Cafe bank account now</b></span><b class="'+(bankBalanceNow()<0?"bad":"")+'">'+rupee(bankBalanceNow())+'</b></div>'+
-      '<div class="backupnote" style="margin:6px 0 0;">Check this against your bank app now and then. If it differs (bank charges, interest, a missed entry), update the balance above and the count starts again from that date.</div>';
+      '<div class="backupnote" style="margin:6px 0 0;">Check this against your bank app now and then. If it still differs (a missed entry), update the balance above and the count starts again from that date.</div>';
   }
+  // Interest and bank charges since the noted date, tap to edit.
+  var bFrom = settings.bankDate || "";
+  var bEntries = cashMoves.filter(function(x){ return x.type==="interest" && (!bFrom || x.date>=bFrom); }).map(function(x){ return { kind:"interest", id:x.id, date:x.date, amt:+x.amount||0, note:x.note||"" }; })
+    .concat(expenses.filter(function(x){ return x.category==="Bank charges" && (!bFrom || x.date>=bFrom); }).map(function(x){ return { kind:"charge", id:x.id, date:x.date, amt:-expAmt(x), note:x.description||"" }; }))
+    .sort(function(a,b){ return b.date.localeCompare(a.date); });
+  if(bEntries.length){
+    html += '<div class="billpays" style="margin-top:10px;">'+bEntries.map(function(e){
+      return '<button class="bpedit" style="margin:4px 0;width:100%;" data-bke="'+e.kind+'" data-bkid="'+esc(e.id)+'"><b class="'+(e.amt<0?"bad":"ok")+'">'+(e.amt<0?"−":"+")+rupeeP(Math.abs(e.amt))+'</b> · '+fmtD(e.date)+' · '+(e.kind==="interest"?"Interest":"Bank charge")+(e.note?' · '+esc(e.note):'')+'<span class="bphint">Edit</span></button>';
+    }).join("")+'</div>';
+  }
+  html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" id="bk_int">+ Interest received</button><button class="btn-additem" id="bk_chg">+ Bank charge</button></div>';
   html += '<div class="psrow"><span>Float kept in counter nightly</span><b>'+(settings.defaultFloat===null||settings.defaultFloat===undefined?'—':rupee(settings.defaultFloat))+'</b></div>';
   html += '<button class="btn-additem" id="cash_setup" style="margin-top:10px;">'+((settings.openingCash===null||settings.openingCash===undefined)?'Set opening balances':'Update opening balances')+'</button></div>';
 
@@ -6913,6 +6953,17 @@ function renderCashView(){
 
   el.innerHTML = html;
   document.getElementById("cash_setup").addEventListener("click", openOpeningBalanceForm);
+  document.getElementById("bk_int").addEventListener("click", function(){ openInterestForm(null); });
+  document.getElementById("bk_chg").addEventListener("click", function(){
+    openForm("expense", null, fmtDate(new Date()), { category:"Bank charges", paidBy:"Cafe UPI/bank", mode:"Bank Transfer", description:"Bank charges" });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-bke]"), function(b){
+    b.addEventListener("click", function(){
+      var id = b.getAttribute("data-bkid");
+      if(b.getAttribute("data-bke")==="interest"){ var m = cashMoves.find(function(x){ return x.id===id; }); if(m) openInterestForm(m); }
+      else { var x = expenses.find(function(e){ return e.id===id; }); if(x) openForm("expense", x, x.date); }
+    });
+  });
   document.getElementById("cash_close").addEventListener("click", function(){ openCashDayForm(today); });
   var cho = document.getElementById("cash_ho");
   if(cho) cho.addEventListener("click", function(){ hoMonth = today.slice(0,7); switchRecordsSub("handover"); renderHandoverView(); window.scrollTo(0,0); });
@@ -8317,7 +8368,7 @@ function openForm(type, item, defaultDate, prefill){
     html += '<div class="field"><label>Category</label><select id="f_expcat">'+cats.map(function(c){return '<option value="'+esc(c)+'" '+(curCat===c?"selected":"")+'>'+esc(c)+'</option>';}).join("")+'</select></div>';
     html += '<div class="field"><label>Description</label><input type="text" id="f_desc" placeholder="e.g. Rent - September 2026" value="'+esc(item?item.description:(pf.description||""))+'"></div>';
     html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:(pf.amount||""))+'"></div>';
-    html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Card","Bank Transfer"].map(function(m){return '<option '+(item&&item.mode===m?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
+    html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Card","Bank Transfer"].map(function(m){return '<option '+((item ? item.mode===m : pf.mode===m)?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
     var curPaid = item ? (item.paidBy || (item.mode==="Cash" ? "Cafe cash" : "Cafe UPI/bank")) : (pf.paidBy || "Cafe cash");
     html += '<div class="field"><label>Paid by</label><select id="f_paidby">'+payerOptions().map(function(o){
       return '<option value="'+esc(o.value)+'" '+(curPaid===o.value?"selected":"")+'>'+esc(o.label)+'</option>'; }).join("")+'</select></div>';
