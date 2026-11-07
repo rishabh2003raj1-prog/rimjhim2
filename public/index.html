@@ -603,8 +603,9 @@
   <div class="dlgbg" id="dlgBg"><div class="dlg"><div class="dlgmsg" id="dlgMsg"></div><div class="dlgbtns" id="dlgBtns"></div></div></div>
   <div class="loginbg" id="loginBg"><div class="loginbox">
     <h2 class="serif">Rimjhim Cafe</h2>
-    <div class="backupnote">Enter the cafe PIN to open the books. You only need to do this once on each phone.</div>
-    <div class="field"><input type="password" id="loginPin" inputmode="numeric" autocomplete="current-password" placeholder="PIN"></div>
+    <div class="backupnote">Sign in to open the books. You only need to do this once on each phone.</div>
+    <div class="field"><label>Login ID</label><input type="text" id="loginId" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Owner: leave blank"></div>
+    <div class="field"><label>Password / PIN</label><input type="password" id="loginPin" autocomplete="current-password" placeholder="Password or owner PIN"></div>
     <div class="err" id="loginErr" style="display:block;"></div>
     <button class="btn-save" id="loginGo" style="width:100%;">Open</button>
   </div></div>
@@ -628,10 +629,14 @@ function cachedOutlets(){
   try{ var l = JSON.parse(localStorage.getItem(OUTLETS_CACHE) || "null"); if(Array.isArray(l) && l.length) return l; }catch(e){}
   return [MAIN_OUTLET];
 }
+// A store login is tied to one store: remembered here so the right books open.
+var STORE_LOGIN = "store_outlet_v1";
+function storeLogin(){ try{ var v = JSON.parse(localStorage.getItem(STORE_LOGIN) || "null"); return v && v.id ? v : null; }catch(e){ return null; } }
 var OUTLET = (function(){
   var cur = null;
   try{ cur = localStorage.getItem(CURRENT_OUTLET); }catch(e){}
-  var o = cachedOutlets().filter(function(x){ return x.id===cur; })[0] || MAIN_OUTLET;
+  var sl = storeLogin();
+  var o = sl || cachedOutlets().filter(function(x){ return x.id===cur; })[0] || MAIN_OUTLET;
   return { id: o.id, name: o.name, seedDemo: false, defaultPartners: ["Rishabh", "Dashrath Bhaiya"] };
 })();
 // In-app dialogs. Browser pop-ups (confirm/alert) are silently blocked when the
@@ -1160,16 +1165,51 @@ function showLogin(){
   document.getElementById("loginErr").textContent = "";
   setTimeout(function(){ try{ document.getElementById("loginPin").focus(); }catch(e){} }, 50);
 }
+// Remove offline copies of every store except keepId (or all of them).
+function purgeOutletCaches(keepId){
+  try{
+    var keys = [];
+    for(var i=0;i<localStorage.length;i++) keys.push(localStorage.key(i));
+    var names = SYNC_KEYS.concat(SYNC_KEYS.map(function(k){ return "__base_"+k; })).concat(["__sync_meta"]);
+    keys.forEach(function(key){
+      names.forEach(function(n){
+        var owner = key===n ? "rimjhim" : (key.slice(-(n.length+2))==="__"+n ? key.slice(0, key.length-n.length-2) : null);
+        if(owner!==null && owner!==keepId) localStorage.removeItem(key);
+      });
+    });
+  }catch(e){}
+}
+// Who is signed in decides which store this phone may open. Returns true when the
+// app is reloading to open the login's own store.
+function applyWho(w){
+  if(!w) return false;
+  cloud.who = w;
+  try{
+    if(w.role==="store"){
+      var prev = storeLogin();
+      localStorage.setItem(STORE_LOGIN, JSON.stringify({ id:w.outlet, name:w.outletName || w.outlet }));
+      if(!prev || prev.id!==w.outlet) purgeOutletCaches(w.outlet);
+      if(OUTLET.id!==w.outlet){ localStorage.setItem(CURRENT_OUTLET, w.outlet); location.reload(); return true; }
+      if(w.outletName && w.outletName!==OUTLET.name){ OUTLET.name = w.outletName; showOutletName(); }
+    } else {
+      localStorage.removeItem(STORE_LOGIN);
+    }
+  }catch(e){}
+  return false;
+}
+function isOwner(){ return !cloud.who || cloud.who.role!=="store"; }
 function submitLogin(){
   var pin = document.getElementById("loginPin").value.trim();
+  var lid = document.getElementById("loginId").value.trim();
   var err = document.getElementById("loginErr");
   var btn = document.getElementById("loginGo");
-  if(!pin){ err.textContent = "Enter the PIN."; return; }
+  if(!pin){ err.textContent = lid ? "Enter the password." : "Enter the PIN."; return; }
   btn.disabled = true; btn.textContent = "Checking…";
-  api("POST", "/api/login", { pin: pin }).then(function(r){
+  api("POST", "/api/login", { login: lid, password: pin }).then(function(r){
     btn.disabled = false; btn.textContent = "Open";
     if(!r.ok){ err.textContent = (r.data && r.data.error) || "Could not sign in."; return; }
     document.getElementById("loginPin").value = "";
+    if(applyWho(r.data)) return;
     document.getElementById("loginBg").classList.remove("on");
     cloud.state = "starting";
     if(loginDone){ var f = loginDone; loginDone = null; f(); }
@@ -1182,10 +1222,8 @@ function submitLogin(){
 function signOut(){
   askConfirm("Sign out on this phone? Your data stays safe on the server.", function(){
     api("POST", "/api/logout").then(function(){
-      try{
-        SYNC_KEYS.forEach(function(k){ localStorage.removeItem(storeKey(k)); localStorage.removeItem(storeKey("__base_"+k)); });
-        localStorage.removeItem(metaKey());
-      }catch(e){}
+      purgeOutletCaches(null);   // every store's offline copy, not just this one
+      try{ localStorage.removeItem(STORE_LOGIN); }catch(e){}
       location.reload();
     }).catch(function(){ appAlert("You need internet to sign out."); });
   });
@@ -1195,6 +1233,11 @@ function signOut(){
 function syncFromServer(done){
   api("GET", "/api/data"+API_Q).then(function(r){
     if(r.status===401){ loginDone = function(){ syncFromServer(done); }; showLogin(); return; }
+    if(r.status===403){
+      // A store login on a phone that was showing another store: open its own.
+      api("GET", "/api/session").then(function(sr){ if(!(sr.data && applyWho(sr.data))){ loginDone = function(){ syncFromServer(done); }; showLogin(); } });
+      return;
+    }
     if(!r.ok || !r.data) throw new Error("load");
     var items = r.data.items || {};
     cloud.state = "ok";
@@ -1236,7 +1279,7 @@ function syncFromServer(done){
 
 function startCloud(done){
   cacheRead();
-  api("GET", "/api/session").then(function(r){ if(r.data) cloud.ai = !!r.data.ai; }).catch(function(){});
+  api("GET", "/api/session").then(function(r){ if(r.data){ cloud.ai = !!r.data.ai; if(r.ok) applyWho(r.data); } }).catch(function(){});
   syncFromServer(function(){
     done();
     updateSaveIndicator();
@@ -1320,6 +1363,7 @@ function monthTotalsFor(items){
 }
 
 function openOutletSheet(){
+  if(!isOwner()){ openStoreAccountSheet(); return; }
   var sheet = document.getElementById("sheet");
   var monthName = new Date().toLocaleDateString("en-IN",{month:"long"});
   var html = '<h2 class="serif">Outlets</h2>';
@@ -1331,12 +1375,15 @@ function openOutletSheet(){
   }).join("");
   html += '<div class="card" id="oall" style="margin:4px 0 12px;display:none;"></div>';
   html += '<div class="addrow"><button class="sale" id="out_add">+ Add outlet</button><button class="expense" id="out_rename">Rename this outlet</button></div>';
+  html += '<button class="btn-additem" id="out_logins" style="margin-top:8px;">Store logins (separate ID & password for each store)</button>';
+  html += '<div class="backupnote" style="margin-top:8px;">Signed in as <b>owner</b> - can open every store.</div>';
   html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="out_close" style="flex:1;">Close</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("out_close").addEventListener("click", closeForm);
   document.getElementById("out_add").addEventListener("click", function(){ openOutletForm(null); });
   document.getElementById("out_rename").addEventListener("click", function(){ openOutletForm(OUTLET.id); });
+  document.getElementById("out_logins").addEventListener("click", openLoginsSheet);
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-outlet]"), function(r){
     r.addEventListener("click", function(){ switchOutlet(r.getAttribute("data-outlet")); });
   });
@@ -1362,6 +1409,107 @@ function openOutletSheet(){
           '<div class="psrow"><span>Net</span><b class="'+(all.net>=0?"ok":"bad")+'">'+rupeeSigned(all.net)+'</b></div>';
       }
     });
+  });
+}
+
+// A store login: its own store only, with password change and sign out.
+function openStoreAccountSheet(){
+  var w = cloud.who || {};
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+esc(OUTLET.name)+'</h2>';
+  html += '<div class="backupnote">Signed in as <b>'+esc(w.name || w.login || "")+'</b>'+(w.name && w.login ? ' ('+esc(w.login)+')' : '')+' - this login opens only this store.</div>';
+  html += '<button class="btn-additem" id="sa_pw">Change my password</button>';
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="sa_close">Close</button><button class="btn-del" id="sa_out">Sign out</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("sa_close").addEventListener("click", closeForm);
+  document.getElementById("sa_out").addEventListener("click", signOut);
+  document.getElementById("sa_pw").addEventListener("click", openOwnPasswordForm);
+}
+function openOwnPasswordForm(){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Change my password</h2>';
+  html += '<div class="field"><label>Current password</label><input type="password" id="pw_old" autocomplete="current-password"></div>';
+  html += '<div class="field"><label>New password (6+ characters)</label><input type="password" id="pw_new" autocomplete="new-password"></div>';
+  html += '<div class="field"><label>New password again</label><input type="password" id="pw_new2" autocomplete="new-password"></div>';
+  html += '<div class="backupnote">Other phones using this login will need the new password.</div>';
+  html += '<div class="err" id="pw_err"></div><div class="sheetbtns"><button class="btn-cancel" id="pw_back">Back</button><button class="btn-save" id="pw_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("pw_back").addEventListener("click", openStoreAccountSheet);
+  document.getElementById("pw_save").addEventListener("click", function(){
+    var err = document.getElementById("pw_err"); err.style.display = "none";
+    var a = document.getElementById("pw_new").value, b = document.getElementById("pw_new2").value;
+    if(a.length < 6){ err.textContent = "New password must be at least 6 characters."; err.style.display = "block"; return; }
+    if(a !== b){ err.textContent = "The two new passwords don't match."; err.style.display = "block"; return; }
+    api("POST", "/api/password", { old: document.getElementById("pw_old").value, new: a }).then(function(r){
+      if(!r.ok){ err.textContent = (r.data && r.data.error) || "Couldn't change it."; err.style.display = "block"; return; }
+      closeForm(); appAlert("Password changed.");
+    }).catch(function(){ err.textContent = "You need internet to change the password."; err.style.display = "block"; });
+  });
+}
+
+// Owner: a separate login ID & password for each store.
+function openLoginsSheet(){
+  var sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<h2 class="serif">Store logins</h2><div class="backupnote">Loading…</div>';
+  document.getElementById("sheetBg").classList.add("on");
+  api("GET", "/api/users").then(function(r){
+    if(!r.ok){ sheet.innerHTML = '<h2 class="serif">Store logins</h2><div class="err" style="display:block;">'+esc((r.data && r.data.error) || "Couldn't load logins.")+'</div><div class="sheetbtns"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
+      document.getElementById("lg_back").addEventListener("click", openOutletSheet); return; }
+    var users = r.data.users || [];
+    var html = '<h2 class="serif">Store logins</h2>';
+    html += '<div class="backupnote">Each login opens only its own store, with its own sales, stock, staff and cash. The owner PIN still opens every store. Give each store manager their own login.</div>';
+    outletList.forEach(function(o){
+      var mine = users.filter(function(u){ return u.outlet===o.id; });
+      html += '<div class="card" style="margin-bottom:10px;"><h3>'+esc(o.name)+'</h3>'+
+        (mine.length ? mine.map(function(u){
+          return '<div class="psrow" data-lgedit="'+esc(u.login)+'" style="cursor:pointer;"><span><b>'+esc(u.login)+'</b>'+(u.name?' · '+esc(u.name):'')+'</span><b class="muted" style="font-weight:500;">Edit ›</b></div>';
+        }).join("") : '<div class="backupnote" style="margin:0;">No login yet - only the owner can open this store.</div>')+
+        '<button class="btn-additem" data-lgadd="'+esc(o.id)+'" style="margin-top:8px;">+ Add login for '+esc(o.name)+'</button></div>';
+    });
+    var orphan = users.filter(function(u){ return !outletList.some(function(o){ return o.id===u.outlet; }); });
+    if(orphan.length) html += '<div class="card"><h3>Store no longer listed</h3>'+orphan.map(function(u){ return '<div class="psrow" data-lgedit="'+esc(u.login)+'" style="cursor:pointer;"><span>'+esc(u.login)+'</span><b class="muted">Edit ›</b></div>'; }).join("")+'</div>';
+    html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
+    sheet.innerHTML = html;
+    document.getElementById("lg_back").addEventListener("click", openOutletSheet);
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-lgadd]"), function(b){ b.addEventListener("click", function(){ openLoginForm(null, b.getAttribute("data-lgadd")); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-lgedit]"), function(b){
+      b.addEventListener("click", function(){ openLoginForm(users.find(function(u){ return u.login===b.getAttribute("data-lgedit"); })); });
+    });
+  }).catch(function(){
+    sheet.innerHTML = '<h2 class="serif">Store logins</h2><div class="err" style="display:block;">You need internet to manage logins.</div><div class="sheetbtns"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
+    document.getElementById("lg_back").addEventListener("click", openOutletSheet);
+  });
+}
+function openLoginForm(u, outletId){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+(u ? "Edit login" : "New store login")+'</h2>';
+  html += '<div class="field"><label>Login ID</label><input type="text" id="lf_id" autocapitalize="none" spellcheck="false" value="'+esc(u?u.login:"")+'" '+(u?'readonly style="opacity:.7;"':'placeholder="e.g. station-road"')+'></div>';
+  html += '<div class="field"><label>Name (who uses it)</label><input type="text" id="lf_name" value="'+esc(u?u.name:"")+'" placeholder="e.g. Manager - Ravi"></div>';
+  html += '<div class="field"><label>Store</label><select id="lf_outlet">'+outletList.map(function(o){ return '<option value="'+esc(o.id)+'"'+((u?u.outlet:outletId)===o.id?" selected":"")+'>'+esc(o.name)+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="field"><label>'+(u ? "New password (leave blank to keep the current one)" : "Password (6+ characters)")+'</label><input type="text" id="lf_pw" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>';
+  html += '<div class="backupnote">Login IDs use small letters, numbers, dot, dash or underscore. A new password or store signs this login out on every phone.</div>';
+  html += '<div class="err" id="lf_err"></div><div class="sheetbtns"><button class="btn-cancel" id="lf_back">Back</button>'+(u?'<button class="btn-del" id="lf_del">Delete</button>':'')+'<button class="btn-save" id="lf_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("lf_back").addEventListener("click", openLoginsSheet);
+  if(u) document.getElementById("lf_del").addEventListener("click", function(){
+    askConfirm("Delete the login "+u.login+"? Phones using it are signed out straight away.", function(){
+      api("DELETE", "/api/users/"+encodeURIComponent(u.login)).then(function(){ openLoginsSheet(); }).catch(function(){ appAlert("You need internet to delete a login."); });
+    });
+  });
+  document.getElementById("lf_save").addEventListener("click", function(){
+    var err = document.getElementById("lf_err"); err.style.display = "none";
+    var id = document.getElementById("lf_id").value.trim().toLowerCase(), pw = document.getElementById("lf_pw").value;
+    if(!/^[a-z0-9._-]{3,32}$/.test(id) || id==="owner" || id==="admin"){ err.textContent = "Login ID: 3-32 small letters, numbers, dot, dash or underscore (not owner/admin)."; err.style.display = "block"; return; }
+    if((!u || pw) && pw.length < 6){ err.textContent = "Password must be at least 6 characters."; err.style.display = "block"; return; }
+    var btn = document.getElementById("lf_save"); btn.disabled = true;
+    api("POST", "/api/users", { login:id, name:document.getElementById("lf_name").value.trim(), outlet:document.getElementById("lf_outlet").value, password: pw || null }).then(function(r){
+      btn.disabled = false;
+      if(!r.ok){ err.textContent = (r.data && r.data.error) || "Couldn't save."; err.style.display = "block"; return; }
+      if(!u && r.data && r.data.created===false){ /* an existing ID was updated */ }
+      openLoginsSheet();
+      if(!u || pw) appAlert("Saved. Login ID: "+id+(pw ? "\nPassword: "+pw+"\n\nShare these with the store manager." : ""));
+    }).catch(function(){ btn.disabled = false; err.textContent = "You need internet to save logins."; err.style.display = "block"; });
   });
 }
 
@@ -9974,6 +10122,7 @@ document.addEventListener("DOMContentLoaded", function(){
   document.getElementById("outletName").addEventListener("click", openOutletSheet);
   document.getElementById("loginGo").addEventListener("click", submitLogin);
   document.getElementById("loginPin").addEventListener("keydown", function(e){ if(e.key==="Enter") submitLogin(); });
+  document.getElementById("loginId").addEventListener("keydown", function(e){ if(e.key==="Enter") document.getElementById("loginPin").focus(); });
   document.getElementById("assetPhotoFile").addEventListener("change", function(e){
     if(e.target.files && e.target.files[0]){
       compressPhoto(e.target.files[0], function(data){ if(assetDraft){ assetDraft.photo = data; renderAssetForm(!!assetById(assetDraft.id)); } });

@@ -56,6 +56,13 @@ echo "APP_PIN=1234" > .dev.vars
 npm run dev     # http://localhost:8787
 ```
 
+## Logins
+
+- **Owner:** leave **Login ID** blank (or type `owner`) and enter the APP_PIN. The owner can open every store and manage logins.
+- **Store logins:** Outlets (tap the outlet name) → **Store logins** → **+ Add login** for a store: a Login ID, the person's name and a password (6+ characters). A store login opens only its own store. The server refuses its requests for any other store's data, the outlet list and login management, and it can change its own password (tap the store name). Passwords are stored hashed (PBKDF2), never in plain text.
+- Changing a login's password or store, or deleting it, signs that login out on every phone. Signing out removes every store's offline copy from the phone, and a store login signing in on a phone removes other stores' offline copies.
+- Wrong attempts are limited to 10 per 15 minutes per connection.
+
 ## Outlets
 
 Tap the outlet name at the top of the app to switch outlets, add a new one, or rename the current one. Each outlet keeps its own books: sales, purchases, expenses, stock, staff, cash and reports. The outlet list is shared, so both phones see the same outlets. The switcher also shows each outlet's figures for the current month, and a total across all outlets.
