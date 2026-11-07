@@ -603,9 +603,9 @@
   <div class="dlgbg" id="dlgBg"><div class="dlg"><div class="dlgmsg" id="dlgMsg"></div><div class="dlgbtns" id="dlgBtns"></div></div></div>
   <div class="loginbg" id="loginBg"><div class="loginbox">
     <h2 class="serif">Rimjhim Cafe</h2>
-    <div class="backupnote">Sign in to open the books. You only need to do this once on each phone.</div>
+    <div class="backupnote">Sign in to open the books. The app asks every time it is opened.</div>
     <div class="field"><label>Login ID</label><input type="text" id="loginId" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Owner: leave blank"></div>
-    <div class="field"><label>Password / PIN</label><input type="password" id="loginPin" autocomplete="current-password" placeholder="Password or owner PIN"></div>
+    <div class="field"><label>Password / PIN</label><input type="password" id="loginPin" autocomplete="off" placeholder="Password or owner PIN"></div>
     <div class="err" id="loginErr" style="display:block;"></div>
     <button class="btn-save" id="loginGo" style="width:100%;">Open</button>
   </div></div>
@@ -1189,7 +1189,11 @@ function applyWho(w){
       var prev = storeLogin();
       localStorage.setItem(STORE_LOGIN, JSON.stringify({ id:w.outlet, name:w.outletName || w.outlet }));
       if(!prev || prev.id!==w.outlet) purgeOutletCaches(w.outlet);
-      if(OUTLET.id!==w.outlet){ localStorage.setItem(CURRENT_OUTLET, w.outlet); location.reload(); return true; }
+      if(OUTLET.id!==w.outlet){
+        localStorage.setItem(CURRENT_OUTLET, w.outlet);
+        try{ sessionStorage.setItem("rj_fresh_login", String(Date.now())); }catch(e){}   // don't ask twice
+        location.reload(); return true;
+      }
       if(w.outletName && w.outletName!==OUTLET.name){ OUTLET.name = w.outletName; showOutletName(); }
     } else {
       localStorage.removeItem(STORE_LOGIN);
@@ -1198,6 +1202,51 @@ function applyWho(w){
   return false;
 }
 function isOwner(){ return !cloud.who || cloud.who.role!=="store"; }
+
+// ---- ask for the password every time ----
+// Each time the app opens (and after 5 minutes in the background) the phone is
+// signed out and the password asked again. So the app still opens without internet,
+// a scrambled check of the last correct password is kept on the phone (never the
+// password itself); only that same login can unlock offline.
+var LOCK_AFTER_MS = 5 * 60 * 1000, OFFLINE_UNLOCK = "offline_unlock_v1", LAST_LOGIN_ID = "last_login_id_v1";
+function pwCheck(password, saltHex){
+  var salt = new Uint8Array(saltHex.match(/../g).map(function(h){ return parseInt(h, 16); }));
+  return crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]).then(function(key){
+    return crypto.subtle.deriveBits({ name:"PBKDF2", hash:"SHA-256", salt:salt, iterations:100000 }, key, 256);
+  }).then(function(bits){ return Array.prototype.map.call(new Uint8Array(bits), function(b){ return ("0"+b.toString(16)).slice(-2); }).join(""); });
+}
+function rememberUnlock(loginId, password, who){
+  try{
+    if(!(window.crypto && crypto.subtle)) return;
+    var salt = Array.prototype.map.call(crypto.getRandomValues(new Uint8Array(16)), function(b){ return ("0"+b.toString(16)).slice(-2); }).join("");
+    pwCheck(password, salt).then(function(h){
+      try{ localStorage.setItem(OFFLINE_UNLOCK, JSON.stringify({ login:(loginId||"").toLowerCase(), salt:salt, hash:h, who:who||null })); }catch(e){}
+    }).catch(function(){});
+  }catch(e){}
+}
+function tryOfflineUnlock(loginId, password){
+  var rec = null;
+  try{ rec = JSON.parse(localStorage.getItem(OFFLINE_UNLOCK) || "null"); }catch(e){}
+  if(!rec || !(window.crypto && crypto.subtle) || rec.login !== (loginId||"").toLowerCase()) return Promise.resolve(null);
+  return pwCheck(password, rec.salt).then(function(h){ return h===rec.hash ? rec : null; }).catch(function(){ return null; });
+}
+// Sign this phone out on the server and ask for the password; then carry on with next().
+function lockApp(next){
+  function ask(){
+    api("POST", "/api/logout").catch(function(){}).then(function(){
+      loginDone = next;
+      showLogin();
+      try{ var id = localStorage.getItem(LAST_LOGIN_ID); if(id!==null) document.getElementById("loginId").value = id; }catch(e){}
+      setTimeout(function(){ try{ document.getElementById("loginPin").focus(); }catch(e){} }, 60);
+    });
+  }
+  try{ document.getElementById("sheetBg").classList.remove("on"); }catch(e){}
+  // Upload anything waiting first, so nothing sits on a locked phone.
+  if(typeof pendingCount==="function" && pendingCount() && cloud.state==="ok"){
+    flushNow();
+    var tries = 0, t = setInterval(function(){ if(!pendingCount() || ++tries > 12){ clearInterval(t); ask(); } }, 250);
+  } else ask();
+}
 function submitLogin(){
   var pin = document.getElementById("loginPin").value.trim();
   var lid = document.getElementById("loginId").value.trim();
@@ -1209,21 +1258,30 @@ function submitLogin(){
     btn.disabled = false; btn.textContent = "Open";
     if(!r.ok){ err.textContent = (r.data && r.data.error) || "Could not sign in."; return; }
     document.getElementById("loginPin").value = "";
+    try{ localStorage.setItem(LAST_LOGIN_ID, lid); }catch(e){}
+    rememberUnlock(lid, pin, r.data);
     if(applyWho(r.data)) return;
     document.getElementById("loginBg").classList.remove("on");
     cloud.state = "starting";
     if(loginDone){ var f = loginDone; loginDone = null; f(); }
     else { syncFromServer(function(){ renderAll(); scheduleFlush(0); }); }
   }).catch(function(){
-    btn.disabled = false; btn.textContent = "Open";
-    err.textContent = "No internet connection. Try again when you are online.";
+    tryOfflineUnlock(lid, pin).then(function(rec){
+      btn.disabled = false; btn.textContent = "Open";
+      if(!rec){ err.textContent = "No internet connection. Without internet, only the login last used on this phone can open the app."; return; }
+      document.getElementById("loginPin").value = "";
+      if(rec.who) cloud.who = rec.who;
+      document.getElementById("loginBg").classList.remove("on");
+      cloud.state = "offline"; updateSaveIndicator();
+      if(loginDone){ var f = loginDone; loginDone = null; f(); }
+    });
   });
 }
 function signOut(){
   askConfirm("Sign out on this phone? Your data stays safe on the server.", function(){
     api("POST", "/api/logout").then(function(){
       purgeOutletCaches(null);   // every store's offline copy, not just this one
-      try{ localStorage.removeItem(STORE_LOGIN); }catch(e){}
+      try{ localStorage.removeItem(STORE_LOGIN); localStorage.removeItem(OFFLINE_UNLOCK); }catch(e){}
       location.reload();
     }).catch(function(){ appAlert("You need internet to sign out."); });
   });
@@ -1279,18 +1337,29 @@ function syncFromServer(done){
 
 function startCloud(done){
   cacheRead();
-  api("GET", "/api/session").then(function(r){ if(r.data){ cloud.ai = !!r.data.ai; if(r.ok) applyWho(r.data); } }).catch(function(){});
+  function afterLogin(){ api("GET", "/api/session").then(function(r){ if(r.data){ cloud.ai = !!r.data.ai; if(r.ok) applyWho(r.data); } }).catch(function(){}); begin(); }
+  var fresh = 0;
+  try{ fresh = +sessionStorage.getItem("rj_fresh_login") || 0; sessionStorage.removeItem("rj_fresh_login"); }catch(e){}
+  if(fresh && Date.now() - fresh < 60000) afterLogin();   // reloaded straight after signing in to open the login's store
+  else lockApp(afterLogin);
+  function begin(){
   syncFromServer(function(){
     done();
     updateSaveIndicator();
     if(pendingCount()) scheduleFlush(0);
     setInterval(pollRemote, 4000); // near real time: the other phone's changes show within seconds
-    document.addEventListener("visibilitychange", function(){ if(!document.hidden){ pollRemote(); if(pendingCount()) scheduleFlush(0); } });
+    var hiddenAt = 0;
+    document.addEventListener("visibilitychange", function(){
+      if(document.hidden){ hiddenAt = Date.now(); if(pendingCount() && cloud.state==="ok") flushNow(); return; }
+      if(hiddenAt && Date.now() - hiddenAt > LOCK_AFTER_MS && cloud.state!=="login"){ hiddenAt = 0; lockApp(function(){ pollRemote(); if(pendingCount()) scheduleFlush(0); }); return; }
+      hiddenAt = 0; pollRemote(); if(pendingCount()) scheduleFlush(0);
+    });
     window.addEventListener("online", function(){ pollRemote(); scheduleFlush(0); });
     window.addEventListener("beforeunload", function(e){
       if(pendingCount() && cloud.state!=="offline"){ flushNow(); e.preventDefault(); e.returnValue = ""; }
     });
   });
+  }
 }
 
 function photoBytes(){

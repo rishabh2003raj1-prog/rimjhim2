@@ -43,7 +43,7 @@ npx wrangler secret put ANTHROPIC_API_KEY   # optional
 
 ## First use
 
-1. Open the app's address in **Chrome** on each phone and enter the PIN. Then use Chrome menu → **Add to Home screen**.
+1. Open the app's address in **Chrome** on each phone and sign in (owner: leave Login ID blank and enter the PIN). Then use Chrome menu → **Add to Home screen**.
 2. Move the existing records over: in the **old** app file, tap **Backup & restore → Download backup** (or **Copy backup text**). In the new app, tap **Backup & restore → Restore from backup file** (or **Restore from copied text**). Do this once, on one phone. Everything uploads, photos included, and the other phone gets it automatically.
 
 To change the PIN, run `npx wrangler secret put APP_PIN` again (or update the GitHub secret and re-run the workflow). Every phone is signed out and has to enter the new PIN.
@@ -62,6 +62,7 @@ npm run dev     # http://localhost:8787
 - **Store logins:** Outlets (tap the outlet name) → **Store logins** → **+ Add login** for a store: a Login ID, the person's name and a password (6+ characters). A store login opens only its own store. The server refuses its requests for any other store's data, the outlet list and login management, and it can change its own password (tap the store name). Passwords are stored hashed (PBKDF2), never in plain text.
 - Changing a login's password or store, or deleting it, signs that login out on every phone. Signing out removes every store's offline copy from the phone, and a store login signing in on a phone removes other stores' offline copies.
 - Wrong attempts are limited to 10 per 15 minutes per connection.
+- **The password is asked every time the app is opened**, on every phone, and again after 5 minutes in the background (anything waiting to upload is sent first). The login ID is filled in from the last sign-in; the password is never saved. Without internet, only the login last used on that phone can open the app (a scrambled check of its password is kept on the phone, never the password), and entries made offline upload once the phone is back online.
 
 ## Outlets
 

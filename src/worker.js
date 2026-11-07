@@ -162,7 +162,7 @@ async function handleLogin(req, env) {
   await env.DB.prepare("DELETE FROM login_fails WHERE ip = ?").bind(ip).run();
   const secure = new URL(req.url).protocol === "https:" ? "; Secure" : "";
   return json(Object.assign({ ok: true }, who), 200, {
-    "Set-Cookie": `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}`
+    "Set-Cookie": `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${secure}`
   });
 }
 
@@ -217,7 +217,7 @@ async function handleOwnPassword(req, env, who) {
   // Keep this phone signed in with the new version; others are signed out.
   const token = await storeToken(env, who.login, row.ver + 1);
   const secure = new URL(req.url).protocol === "https:" ? "; Secure" : "";
-  return json({ ok: true }, 200, { "Set-Cookie": `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000${secure}` });
+  return json({ ok: true }, 200, { "Set-Cookie": `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${secure}` });
 }
 
 // ---- data ----
