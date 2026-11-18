@@ -603,7 +603,7 @@
   <div class="dlgbg" id="dlgBg"><div class="dlg"><div class="dlgmsg" id="dlgMsg"></div><div class="dlgbtns" id="dlgBtns"></div></div></div>
   <div class="loginbg" id="loginBg"><div class="loginbox">
     <h2 class="serif">Rimjhim Cafe</h2>
-    <div class="backupnote">Sign in to open the books. The app asks every time it is opened.</div>
+    <div class="backupnote">Sign in to open the books. This phone stays signed in until 4 AM, then asks again.</div>
     <div class="field"><label>Login ID</label><input type="text" id="loginId" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Owner: leave blank"></div>
     <div class="field"><label>Password / PIN</label><input type="password" id="loginPin" autocomplete="off" placeholder="Password or owner PIN"></div>
     <div class="err" id="loginErr" style="display:block;"></div>
@@ -1191,7 +1191,6 @@ function applyWho(w){
       if(!prev || prev.id!==w.outlet) purgeOutletCaches(w.outlet);
       if(OUTLET.id!==w.outlet){
         localStorage.setItem(CURRENT_OUTLET, w.outlet);
-        try{ sessionStorage.setItem("rj_fresh_login", String(Date.now())); }catch(e){}   // don't ask twice
         location.reload(); return true;
       }
       if(w.outletName && w.outletName!==OUTLET.name){ OUTLET.name = w.outletName; showOutletName(); }
@@ -1203,12 +1202,15 @@ function applyWho(w){
 }
 function isOwner(){ return !cloud.who || cloud.who.role!=="store"; }
 
-// ---- ask for the password every time ----
-// Each time the app opens (and after 5 minutes in the background) the phone is
-// signed out and the password asked again. So the app still opens without internet,
-// a scrambled check of the last correct password is kept on the phone (never the
-// password itself); only that same login can unlock offline.
-var LOCK_AFTER_MS = 5 * 60 * 1000, OFFLINE_UNLOCK = "offline_unlock_v1", LAST_LOGIN_ID = "last_login_id_v1";
+// ---- daily sign-in ----
+// A phone signs in once a day and stays signed in until 4 AM (the server enforces
+// the expiry), so switching apps or reopening doesn't ask again. Once the day's
+// sign-in has run out, the app asks before showing anything - also offline, where
+// only the login last used on the phone can open it: a scrambled check of its last
+// correct password is kept on the phone (never the password itself).
+var SESSION_EXP = "session_exp_v1", OFFLINE_UNLOCK = "offline_unlock_v1", LAST_LOGIN_ID = "last_login_id_v1";
+function rememberSession(exp){ try{ if(exp) localStorage.setItem(SESSION_EXP, String(exp)); }catch(e){} }
+function sessionValid(){ var e = 0; try{ e = +localStorage.getItem(SESSION_EXP) || 0; }catch(x){} return e > Date.now(); }
 function pwCheck(password, saltHex){
   var salt = new Uint8Array(saltHex.match(/../g).map(function(h){ return parseInt(h, 16); }));
   return crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveBits"]).then(function(key){
@@ -1232,6 +1234,7 @@ function tryOfflineUnlock(loginId, password){
 }
 // Sign this phone out on the server and ask for the password; then carry on with next().
 function lockApp(next){
+  try{ localStorage.removeItem(SESSION_EXP); }catch(e){}
   function ask(){
     api("POST", "/api/logout").catch(function(){}).then(function(){
       loginDone = next;
@@ -1259,6 +1262,7 @@ function submitLogin(){
     if(!r.ok){ err.textContent = (r.data && r.data.error) || "Could not sign in."; return; }
     document.getElementById("loginPin").value = "";
     try{ localStorage.setItem(LAST_LOGIN_ID, lid); }catch(e){}
+    rememberSession(r.data && r.data.exp);
     rememberUnlock(lid, pin, r.data);
     if(applyWho(r.data)) return;
     document.getElementById("loginBg").classList.remove("on");
@@ -1281,7 +1285,7 @@ function signOut(){
   askConfirm("Sign out on this phone? Your data stays safe on the server.", function(){
     api("POST", "/api/logout").then(function(){
       purgeOutletCaches(null);   // every store's offline copy, not just this one
-      try{ localStorage.removeItem(STORE_LOGIN); localStorage.removeItem(OFFLINE_UNLOCK); }catch(e){}
+      try{ localStorage.removeItem(STORE_LOGIN); localStorage.removeItem(OFFLINE_UNLOCK); localStorage.removeItem(SESSION_EXP); }catch(e){}
       location.reload();
     }).catch(function(){ appAlert("You need internet to sign out."); });
   });
@@ -1337,22 +1341,20 @@ function syncFromServer(done){
 
 function startCloud(done){
   cacheRead();
-  function afterLogin(){ api("GET", "/api/session").then(function(r){ if(r.data){ cloud.ai = !!r.data.ai; if(r.ok) applyWho(r.data); } }).catch(function(){}); begin(); }
-  var fresh = 0;
-  try{ fresh = +sessionStorage.getItem("rj_fresh_login") || 0; sessionStorage.removeItem("rj_fresh_login"); }catch(e){}
-  if(fresh && Date.now() - fresh < 60000) afterLogin();   // reloaded straight after signing in to open the login's store
-  else lockApp(afterLogin);
+  function afterLogin(){ api("GET", "/api/session").then(function(r){ if(r.data){ cloud.ai = !!r.data.ai; if(r.ok){ applyWho(r.data); rememberSession(r.data.exp); } } }).catch(function(){}); begin(); }
+  // Signed in today: open straight away (the server still checks every request).
+  if(sessionValid()) afterLogin(); else lockApp(afterLogin);
   function begin(){
   syncFromServer(function(){
     done();
     updateSaveIndicator();
     if(pendingCount()) scheduleFlush(0);
     setInterval(pollRemote, 4000); // near real time: the other phone's changes show within seconds
-    var hiddenAt = 0;
     document.addEventListener("visibilitychange", function(){
-      if(document.hidden){ hiddenAt = Date.now(); if(pendingCount() && cloud.state==="ok") flushNow(); return; }
-      if(hiddenAt && Date.now() - hiddenAt > LOCK_AFTER_MS && cloud.state!=="login"){ hiddenAt = 0; lockApp(function(){ pollRemote(); if(pendingCount()) scheduleFlush(0); }); return; }
-      hiddenAt = 0; pollRemote(); if(pendingCount()) scheduleFlush(0);
+      if(document.hidden){ if(pendingCount() && cloud.state==="ok") flushNow(); return; }
+      // Back after 4 AM: the day's sign-in has ended, ask again.
+      if(!sessionValid() && cloud.state!=="login" && cloud.state!=="offline"){ lockApp(function(){ pollRemote(); if(pendingCount()) scheduleFlush(0); }); return; }
+      pollRemote(); if(pendingCount()) scheduleFlush(0);
     });
     window.addEventListener("online", function(){ pollRemote(); scheduleFlush(0); });
     window.addEventListener("beforeunload", function(e){
@@ -1445,7 +1447,8 @@ function openOutletSheet(){
   html += '<div class="card" id="oall" style="margin:4px 0 12px;display:none;"></div>';
   html += '<div class="addrow"><button class="sale" id="out_add">+ Add outlet</button><button class="expense" id="out_rename">Rename this outlet</button></div>';
   html += '<button class="btn-additem" id="out_logins" style="margin-top:8px;">Store logins (separate ID & password for each store)</button>';
-  html += '<div class="backupnote" style="margin-top:8px;">Signed in as <b>owner</b> - can open every store.</div>';
+  html += '<button class="btn-additem" id="out_logoutall" style="margin-top:8px;">Sign out all phones now</button>';
+  html += '<div class="backupnote" style="margin-top:8px;">Signed in as <b>owner</b> - can open every store. Each phone stays signed in until 4 AM; use “Sign out all phones” if a phone is lost or someone leaves.</div>';
   html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="out_close" style="flex:1;">Close</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
@@ -1453,6 +1456,16 @@ function openOutletSheet(){
   document.getElementById("out_add").addEventListener("click", function(){ openOutletForm(null); });
   document.getElementById("out_rename").addEventListener("click", function(){ openOutletForm(OUTLET.id); });
   document.getElementById("out_logins").addEventListener("click", openLoginsSheet);
+  document.getElementById("out_logoutall").addEventListener("click", function(){
+    askConfirm("Sign out every phone now, including store logins and this phone? Everyone will need to sign in again.", function(){
+      var go = function(){ api("POST", "/api/logout-all").then(function(r){
+        if(!r.ok){ appAlert((r.data && r.data.error) || "Couldn't sign everyone out."); return; }
+        try{ localStorage.removeItem(SESSION_EXP); }catch(e){}
+        location.reload();
+      }).catch(function(){ appAlert("You need internet to sign everyone out."); }); };
+      if(pendingCount() && cloud.state==="ok"){ flushNow(); setTimeout(go, 1500); } else go();
+    });
+  });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-outlet]"), function(r){
     r.addEventListener("click", function(){ switchOutlet(r.getAttribute("data-outlet")); });
   });
@@ -1486,7 +1499,7 @@ function openStoreAccountSheet(){
   var w = cloud.who || {};
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">'+esc(OUTLET.name)+'</h2>';
-  html += '<div class="backupnote">Signed in as <b>'+esc(w.name || w.login || "")+'</b>'+(w.name && w.login ? ' ('+esc(w.login)+')' : '')+' - this login opens only this store.</div>';
+  html += '<div class="backupnote">Signed in as <b>'+esc(w.name || w.login || "")+'</b>'+(w.name && w.login ? ' ('+esc(w.login)+')' : '')+' - this login opens only this store. This phone stays signed in until 4 AM.</div>';
   html += '<button class="btn-additem" id="sa_pw">Change my password</button>';
   html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="sa_close">Close</button><button class="btn-del" id="sa_out">Sign out</button></div>';
   sheet.innerHTML = html;

@@ -8,6 +8,7 @@
 //                               (owner: login blank or "owner", password = APP_PIN;
 //                                store logins: created by the owner, one store each)
 //   POST   /api/logout
+//   POST   /api/logout-all                       -> owner: sign every phone out now
 //   GET    /api/session                          -> { ok, ai, role, outlet, login, name }
 //   POST   /api/password       { old, new }      -> a store login changes its own password
 //   GET    /api/users                            -> owner: list store logins
@@ -34,6 +35,7 @@ const SCHEMA = [
   "CREATE TABLE IF NOT EXISTS kv_chunks (outlet TEXT NOT NULL, key TEXT NOT NULL, idx INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (outlet, key, idx))",
   "CREATE TABLE IF NOT EXISTS photos (id TEXT PRIMARY KEY, outlet TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL, created_at INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS login_fails (ip TEXT NOT NULL, ts INTEGER NOT NULL)",
+  "CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS users (login TEXT PRIMARY KEY, outlet TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', salt TEXT NOT NULL, hash TEXT NOT NULL, ver INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL DEFAULT 0)",
   "CREATE INDEX IF NOT EXISTS kv_updated ON kv (outlet, updated_at)",
   "CREATE INDEX IF NOT EXISTS login_fails_ip ON login_fails (ip, ts)"
@@ -74,14 +76,34 @@ function safeEqual(a, b) {
   for (let i = 0; i < a.length; i++) r |= a.charCodeAt(i) ^ b.charCodeAt(i);
   return r === 0;
 }
-// The session token is derived from the PIN, so changing APP_PIN signs everyone out.
-function sessionToken(env) {
-  return hmacHex(env.APP_PIN, "rimjhim-session-v1");
+// A phone signs in once a day: its session lasts until the next 4 AM (India time),
+// and the server refuses it after that. Tokens are signed with APP_PIN, so changing
+// the PIN signs everyone out. They also carry a "generation": the owner's "Sign out
+// all phones" bumps it, which ends every session at once.
+const DAY_START_HOUR = 4, TZ_OFFSET_MIN = 330;
+function sessionExpiry(now) {
+  const local = new Date(now + TZ_OFFSET_MIN * 60000);
+  let exp = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate(), DAY_START_HOUR) - TZ_OFFSET_MIN * 60000;
+  while (exp - now < 2 * 3600000) exp += 24 * 3600000;   // at least 2 hours, so a late-night sign-in isn't cut short
+  return exp;
 }
-// A store login's token names the login and its version; changing the password or
-// removing the login bumps / deletes the row, which signs that login out everywhere.
-async function storeToken(env, login, ver) {
-  return "u." + login + "." + ver + "." + await hmacHex(env.APP_PIN, "rimjhim-store-v1|" + login + "|" + ver);
+async function sessionGen(env) {
+  const r = await env.DB.prepare("SELECT v FROM meta WHERE k = 'session_gen'").first();
+  return r ? String(r.v) : "1";
+}
+// Owner: "o.<expiry>.<gen>.<sig>"; store login: "u.<login>.<ver>.<expiry>.<gen>.<sig>".
+// A store token also names the login's version, so a new password, a move to another
+// store or deleting the login signs that login out everywhere.
+async function ownerToken(env, exp, gen) {
+  return "o." + exp + "." + gen + "." + await hmacHex(env.APP_PIN, "rimjhim-owner-v2|" + exp + "|" + gen);
+}
+async function storeToken(env, login, ver, exp, gen) {
+  return "u." + login + "." + ver + "." + exp + "." + gen + "." + await hmacHex(env.APP_PIN, "rimjhim-store-v2|" + login + "|" + ver + "|" + exp + "|" + gen);
+}
+function sessionCookie(req, token, exp) {
+  const secure = new URL(req.url).protocol === "https:" ? "; Secure" : "";
+  const maxAge = Math.max(0, Math.floor((exp - Date.now()) / 1000));
+  return `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAge}${secure}`;
 }
 const PBKDF2_ITER = 100000;
 function hexOf(buf) { return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, "0")).join(""); }
@@ -105,13 +127,22 @@ function readCookie(req, name) {
 async function whoIs(req, env) {
   const got = readCookie(req, COOKIE);
   if (!got) return null;
-  if (safeEqual(got, await sessionToken(env))) return { role: "owner" };
-  const m = /^u\.([a-z0-9._-]{3,32})\.(\d+)\.[a-f0-9]{64}$/.exec(got);
+  const now = Date.now();
+  const o = /^o\.(\d{10,15})\.(\d+)\.[a-f0-9]{64}$/.exec(got);
+  if (o) {
+    const exp = +o[1];
+    if (exp <= now || o[2] !== await sessionGen(env)) return null;
+    if (!safeEqual(got, await ownerToken(env, exp, o[2]))) return null;
+    return { role: "owner", exp };
+  }
+  const m = /^u\.([a-z0-9._-]{3,32})\.(\d+)\.(\d{10,15})\.(\d+)\.[a-f0-9]{64}$/.exec(got);
   if (!m) return null;
+  const exp = +m[3];
+  if (exp <= now || m[4] !== await sessionGen(env)) return null;
   const row = await env.DB.prepare("SELECT login, outlet, name, ver FROM users WHERE login = ?").bind(m[1]).first();
   if (!row || String(row.ver) !== m[2]) return null;
-  if (!safeEqual(got, await storeToken(env, row.login, row.ver))) return null;
-  return { role: "store", outlet: row.outlet, login: row.login, name: row.name };
+  if (!safeEqual(got, await storeToken(env, row.login, row.ver, exp, m[4]))) return null;
+  return { role: "store", outlet: row.outlet, login: row.login, name: row.name, exp };
 }
 // The store's display name, from the shared outlet list (store logins can't read that list).
 async function outletNameOf(env, id) {
@@ -139,17 +170,18 @@ async function handleLogin(req, env) {
   const login = cleanLogin(body.login);
   const password = String(body.password !== undefined ? body.password : (body.pin || ""));
   let token = null, who = null;
+  const exp = sessionExpiry(Date.now()), gen = await sessionGen(env);
   if (!login || login === "owner" || login === "admin") {
     if (safeEqual(await hmacHex("pin-check", password), await hmacHex("pin-check", env.APP_PIN))) {
-      token = await sessionToken(env); who = { role: "owner" };
+      token = await ownerToken(env, exp, gen); who = { role: "owner", exp };
     }
   } else {
     const row = await env.DB.prepare("SELECT login, outlet, name, salt, hash, ver FROM users WHERE login = ?").bind(login).first();
     // Hash even when the login doesn't exist, so timing doesn't reveal valid IDs.
     const h = await hashPassword(password, row ? row.salt : "00000000000000000000000000000000");
     if (row && safeEqual(h, row.hash)) {
-      token = await storeToken(env, row.login, row.ver);
-      who = { role: "store", outlet: row.outlet, login: row.login, name: row.name, outletName: await outletNameOf(env, row.outlet) };
+      token = await storeToken(env, row.login, row.ver, exp, gen);
+      who = { role: "store", outlet: row.outlet, login: row.login, name: row.name, exp, outletName: await outletNameOf(env, row.outlet) };
     }
   }
   if (!token) {
@@ -160,10 +192,7 @@ async function handleLogin(req, env) {
     return json({ error: login ? "Wrong login ID or password." : "Wrong PIN." }, 401);
   }
   await env.DB.prepare("DELETE FROM login_fails WHERE ip = ?").bind(ip).run();
-  const secure = new URL(req.url).protocol === "https:" ? "; Secure" : "";
-  return json(Object.assign({ ok: true }, who), 200, {
-    "Set-Cookie": `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${secure}`
-  });
+  return json(Object.assign({ ok: true }, who), 200, { "Set-Cookie": sessionCookie(req, token, exp) });
 }
 
 // ---- store logins (owner only) ----
@@ -205,6 +234,12 @@ async function handleUsers(req, env, path) {
   return json({ error: "not found" }, 404);
 }
 
+async function handleLogoutAll(env) {
+  const gen = String((parseInt(await sessionGen(env), 10) || 1) + 1);
+  await env.DB.prepare("INSERT INTO meta (k, v) VALUES ('session_gen', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(gen).run();
+  return json({ ok: true }, 200, { "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
+}
+
 async function handleOwnPassword(req, env, who) {
   let body;
   try { body = await req.json(); } catch (e) { return json({ error: "bad json" }, 400); }
@@ -215,9 +250,9 @@ async function handleOwnPassword(req, env, who) {
   const salt = newSalt();
   await env.DB.prepare("UPDATE users SET salt = ?, hash = ?, ver = ver + 1 WHERE login = ?").bind(salt, await hashPassword(nw, salt), who.login).run();
   // Keep this phone signed in with the new version; others are signed out.
-  const token = await storeToken(env, who.login, row.ver + 1);
-  const secure = new URL(req.url).protocol === "https:" ? "; Secure" : "";
-  return json({ ok: true }, 200, { "Set-Cookie": `${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax${secure}` });
+  const exp = who.exp || sessionExpiry(Date.now());
+  const token = await storeToken(env, who.login, row.ver + 1, exp, await sessionGen(env));
+  return json({ ok: true }, 200, { "Set-Cookie": sessionCookie(req, token, exp) });
 }
 
 // ---- data ----
@@ -491,6 +526,10 @@ export default {
       if (path === "/api/data" || path.startsWith("/api/data/")) return await handleData(req, env, url, path, who);
       if (path === "/api/export" && req.method === "GET") return await handleExport(env, url, who);
       if (path === "/api/photos" && req.method === "POST") return await handlePhotoUpload(req, env, url, who);
+      if (path === "/api/logout-all" && req.method === "POST") {
+        if (who.role !== "owner") return json({ error: "Only the owner can sign out every phone." }, 403);
+        return await handleLogoutAll(env);
+      }
       if (path === "/api/password" && req.method === "POST") {
         if (who.role !== "store") return json({ error: "The owner PIN is changed with the APP_PIN secret." }, 400);
         return await handleOwnPassword(req, env, who);
