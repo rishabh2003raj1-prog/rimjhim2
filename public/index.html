@@ -6922,9 +6922,10 @@ function bankRows(){
   investments.forEach(function(v){
     if(!v.date || invDest(v)!=="bank") return;
     var k = invKind(v), a = +v.amount||0;
-    if(k==="repay") rows.push({ date:v.date, kind:"loanrepay", amt:-a, text:"Loan repaid to "+v.partner, ref:v.id });
+    if(k==="repay") rows.push({ date:v.date, kind:"loanrepay", amt:-a, text:"Loan repaid to "+v.partner, ref:v.id, who:v.partner });
     else if(k==="withdraw") rows.push({ date:v.date, kind:"withdraw", amt:-a, text:"Partner withdrawal · "+v.partner, ref:v.id });
-    else rows.push({ date:v.date, kind:"invest", amt:a, text:(k==="loan"?"Loan to the cafe · ":"Capital ("+invCategory(v)+") · ")+v.partner, ref:v.id });
+    else if(k==="loan") rows.push({ date:v.date, kind:"loanin", amt:a, text:"Loan from "+v.partner+" (working capital)", ref:v.id, who:v.partner });
+    else rows.push({ date:v.date, kind:"invest", amt:a, text:"Capital ("+invCategory(v)+") · "+v.partner, ref:v.id, who:v.partner });
   });
   cashMoves.forEach(function(x){
     var a = +x.amount||0;
@@ -6994,14 +6995,14 @@ function bankCheckResults(rows){
 function bankMovements(){
   var today = fmtDate(new Date()), anchors = bankAnchors().filter(function(a){ return a.date < today || a.date===today; });
   var base = anchors.length ? anchors[anchors.length-1] : null;
-  var m = { sales:0, udhaar:0, invest:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, loanrepay:0, repaid:0, atm:0, adjIn:0, adjOut:0 };
+  var m = { sales:0, udhaar:0, invest:0, loanin:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, loanrepay:0, repaid:0, atm:0, adjIn:0, adjOut:0 };
   bankRows().forEach(function(r){
     if(!(r.date && (!base || r.date > base.date) && r.date <= today)) return;
     if(r.kind==="adj"){ if(r.amt>=0) m.adjIn += r.amt; else m.adjOut -= r.amt; return; }
     m[r.kind] += Math.abs(r.amt);
   });
   Object.keys(m).forEach(function(k){ m[k] = r2(m[k]); });
-  m.in = r2(m.sales + m.udhaar + m.invest + m.deposits + m.interest + m.adjIn);
+  m.in = r2(m.sales + m.udhaar + m.invest + m.loanin + m.deposits + m.interest + m.adjIn);
   m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.loanrepay + m.repaid + m.atm + m.adjOut);
   m.base = base;
   return m;
@@ -7010,8 +7011,17 @@ function bankDepositsSince(){ return bankMovements().deposits; }
 function bankBalanceNow(){ return bankBalanceAt(addDays(fmtDate(new Date()), 1)); }
 
 // The day's bank working, like the counter's: opening + money in - paid from bank.
-var BANK_IN_LABELS = { sales:"UPI / card sales", udhaar:"Udhaar paid back (UPI / bank)", invest:"Partner money in", deposits:"Handover cash deposited", interest:"Interest", adj:"Adjustment" };
-var BANK_OUT_LABELS = { bills:"Bills paid", purchases:"Purchases paid", charges:"Bank charges", withdraw:"Partner withdrawals", loanrepay:"Partner loans repaid", repaid:"Partners repaid for bills", atm:"Cash withdrawn", adj:"Adjustment" };
+var BANK_IN_LABELS = { sales:"UPI / card sales", udhaar:"Udhaar paid back (UPI / bank)", invest:"Partner capital in", loanin:"Loan from partner", deposits:"Handover cash deposited", interest:"Interest", adj:"Adjustment" };
+var BANK_OUT_LABELS = { bills:"Bills paid", purchases:"Purchases paid", charges:"Bank charges", withdraw:"Partner withdrawals", loanrepay:"Loan repaid to partner", repaid:"Partners repaid for bills", atm:"Cash withdrawn", adj:"Adjustment" };
+// Loans show per partner: "Loan from Rishabh", "Loan repaid to Rishabh".
+function bankSumKey(r){ return (r.kind==="loanin" || r.kind==="loanrepay" || r.kind==="invest") && r.who ? r.kind+"|"+r.who : r.kind; }
+function bankSumLabel(key, inn){
+  var k = key.split("|")[0], who = key.split("|")[1];
+  if(who && k==="loanin") return "Loan from "+who;
+  if(who && k==="loanrepay") return "Loan repaid to "+who;
+  if(who && k==="invest") return "Capital from "+who;
+  return (inn ? BANK_IN_LABELS : BANK_OUT_LABELS)[k] || k;
+}
 function bankDaySummary(dateStr){
   var rec = bankCheckOn(dateStr), rows = bankRows();
   var anchors = bankAnchors().filter(function(a){ return !(a.id && rec && a.id===rec.id) && a.date < dateStr; });
@@ -7019,8 +7029,9 @@ function bankDaySummary(dateStr){
   var ins = {}, outs = {}, inn = 0, out = 0;
   rows.forEach(function(r){
     if(r.date!==dateStr) return;
-    if(r.amt >= 0){ ins[r.kind] = r2((ins[r.kind]||0) + r.amt); inn += r.amt; }
-    else { outs[r.kind] = r2((outs[r.kind]||0) - r.amt); out -= r.amt; }
+    var key = bankSumKey(r);
+    if(r.amt >= 0){ ins[key] = r2((ins[key]||0) + r.amt); inn += r.amt; }
+    else { outs[key] = r2((outs[key]||0) - r.amt); out -= r.amt; }
   });
   return { rec:rec, opening:opening, ins:ins, outs:outs, inn:r2(inn), out:r2(out), expected:r2(opening + inn - out) };
 }
@@ -7028,10 +7039,10 @@ function bankSummaryRows(sm){
   var h = '<div class="psrow"><span>Opening bank balance</span><b>'+rupeeP(sm.opening)+'</b></div>';
   var ik = Object.keys(sm.ins), ok = Object.keys(sm.outs);
   if(!ik.length) h += '<div class="psrow"><span>+ Money in (UPI / card sales…)</span><b>'+rupeeP(0)+'</b></div>';
-  ik.forEach(function(k){ h += '<div class="psrow"><span>+ '+esc(BANK_IN_LABELS[k] || k)+'</span><b>'+rupeeP(sm.ins[k])+'</b></div>'; });
+  ik.forEach(function(k){ h += '<div class="psrow"><span>+ '+esc(bankSumLabel(k, true))+'</span><b>'+rupeeP(sm.ins[k])+'</b></div>'; });
   if(!ok.length) h += '<div class="psrow"><span>− Paid from bank</span><b>'+rupeeP(0)+'</b></div>';
   else if(ok.length > 1) h += '<div class="psrow"><span>− Paid from bank</span><b>'+rupeeP(sm.out)+'</b></div>';
-  ok.forEach(function(k){ h += '<div class="psrow"'+(ok.length>1?' style="padding-left:12px;font-size:12.5px;"':'')+'><span>'+(ok.length>1?'· ':'− ')+esc(BANK_OUT_LABELS[k] || k)+(ok.length>1?'':' (paid from bank)')+'</span><b>'+rupeeP(sm.outs[k])+'</b></div>'; });
+  ok.forEach(function(k){ h += '<div class="psrow"'+(ok.length>1?' style="padding-left:12px;font-size:12.5px;"':'')+'><span>'+(ok.length>1?'· ':'− ')+esc(bankSumLabel(k, false))+(ok.length>1?'':' (paid from bank)')+'</span><b>'+rupeeP(sm.outs[k])+'</b></div>'; });
   h += '<div class="psrow"><span><b>Should be in bank</b></span><b>'+rupeeP(sm.expected)+'</b></div>';
   return h;
 }
@@ -7217,9 +7228,9 @@ function otherIncomeIn(test){
 // ---------- BANK / UPI ACCOUNT ----------
 var bkMonth = fmtDate(new Date()).slice(0,7);
 var BANK_GROUPS = [
-  ["sales","UPI / card sales",1],["udhaar","Udhaar paid back by UPI / bank",1],["invest","Partner money in (capital / loans)",1],["deposits","Handover cash deposited",1],
+  ["sales","UPI / card sales",1],["udhaar","Udhaar paid back by UPI / bank",1],["invest","Partner capital in",1],["loanin","Loans from partners",1],["deposits","Handover cash deposited",1],
   ["interest","Interest",1],["adjIn","Adjustments in",1],
-  ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],["loanrepay","Partner loans repaid",-1],
+  ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],["loanrepay","Loans repaid to partners",-1],
   ["repaid","Partners repaid",-1],["atm","Cash withdrawn",-1],["adjOut","Adjustments out",-1],
   ["checkIn","Found higher at balance checks",1],["checkOut","Found lower at balance checks",-1]
 ];
@@ -7336,7 +7347,7 @@ function renderBankView(){
       if(k==="sales"){ openCalendarOn(ref); return; }
       if(k==="bills" || k==="charges"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
       if(k==="purchases"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
-      if(k==="invest" || k==="withdraw" || k==="loanrepay"){ var v = investments.find(function(e){ return e.id===ref; }); if(v) openForm("investment", v, v.date); return; }
+      if(k==="invest" || k==="loanin" || k==="withdraw" || k==="loanrepay"){ var v = investments.find(function(e){ return e.id===ref; }); if(v) openForm("investment", v, v.date); return; }
       if(k==="udhaar"){ if(ref && typeof openCustomerDetail==="function") openCustomerDetail(ref); return; }
       if(k==="repaid"){ appAlert("This is a partner repayment. To change it, find the bill or expense it repaid."); return; }
       if(k==="check"){ if(ref==="noted") openOpeningBalanceForm(); else { var bc = cashMoves.find(function(e){ return e.id===ref; }); if(bc) openBankCheckForm(bc.date); } return; }
@@ -8044,9 +8055,9 @@ function renderCashView(){
     var bl = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+sign+' '+lbl+'</span><b>'+rupee(v)+'</b></div>' : ''; };
     html += '<div class="psrow"><span>'+(bm.base && !bm.base.noted ? 'Last bank balance check ('+fmtD(bm.base.date)+')' : 'Starting balance')+'</span><b>'+rupee(bm.base ? bm.base.amount : 0)+'</b></div>'+
       '<div class="backupnote" style="margin:8px 0 4px;">Since then:</div>'+
-      bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner money in (capital / loans)", bm.invest, "+")+
+      bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner capital in", bm.invest, "+")+bl("Loans from partners", bm.loanin, "+")+
       bl("Handover cash deposited", bm.deposits, "+")+bl("Interest received", bm.interest, "+")+bl("Bills paid by UPI / bank", bm.bills, "−")+bl("Bank charges", bm.charges, "−")+bl("Purchases paid by UPI / bank", bm.purchases, "−")+
-      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+bl("Partner loans repaid", bm.loanrepay, "−")+bl("Cash withdrawn from the bank", bm.atm, "−")+
+      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+bl("Loans repaid to partners", bm.loanrepay, "−")+bl("Cash withdrawn from the bank", bm.atm, "−")+
       bl("Adjustments in", bm.adjIn, "+")+bl("Adjustments out", bm.adjOut, "−")+
       '<div class="psrow"><span><b>Cafe bank account now</b></span><b class="'+(bankBalanceNow()<0?"bad":"")+'">'+rupee(bankBalanceNow())+'</b></div>'+
       '<div class="backupnote" style="margin:6px 0 0;">Note the real balance from the bank app each day (calendar day, or Records → Bank) and the app starts again from it.</div>'+
