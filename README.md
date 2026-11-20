@@ -88,6 +88,10 @@ When the cafe repays a partner (Expenses → Money owed to partners → Settle, 
 
 Compare the balance with the bank app now and then; if it still differs (a missed entry), note the real balance and the count starts again from that date.
 
+### Daily bank balance
+
+Like the counter count: on any calendar day, **Bank balance** shows what should be in the bank at the end of the day (from the last check plus that day's UPI / card sales, bank payments, deposits and other bank entries). Tap **Record bank balance** and type the balance from the bank app; the app shows whether it tallies or how much more / less there is. Each check becomes the starting point for the following days (like a counter count), and differences show as "found higher / lower at balance checks" in the Bank tab, the bank statement PDF and the cash review. Checked days get a blue dot on the calendar. Also from Records → Bank (**Record today's bank balance**) and the Cash tab.
+
 ### Bank tab
 
 Records → **Bank** reviews the cafe bank / UPI account month by month, like the Handover tab:
