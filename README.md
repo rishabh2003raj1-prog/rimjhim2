@@ -118,6 +118,12 @@ Each entry also says **where the money went**: *paid directly* to a seller, cont
 
 The monthly cash review shows partner money in its own section, separate from what the cafe earned and spent.
 
+## Undoing a settlement
+
+Settled something by mistake (a wrong tap, or worked out wrongly)? **Review settlements** (Expenses → Money owed to partners → Review / undo settled items, Records → Partners, or Staff → Salary → Review settlements) lists every settled partner bill and staff salary month.
+- **Partner bills:** **Undo** puts the item back to owed and reverses its effect (bank, counter or handover cash goes back up; a loan created by "count it as their loan" is removed). **Undo & settle again** opens the repay screen straight away.
+- **Staff salary:** **Undo settlement** (also on the Salary card) removes the settlement - round off, the unused-leave choice and its goodwill - with an option to also delete the payment recorded at settlement (untick if it really was paid).
+
 ## Monthly cash review
 
 Records → **Cash review** (also from the Cash tab) shows all the cafe's money for a month:

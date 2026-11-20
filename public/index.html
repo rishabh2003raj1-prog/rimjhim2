@@ -3059,10 +3059,13 @@ function openOwedSheet(){
              '<button class="btn-additem" style="width:auto;padding:8px 12px;" data-settle="'+g.id+'">Settle</button></div>';
     }).join("");
   }
+  var nSet = settledOwedItems().length;
+  if(nSet) html += '<button class="btn-additem" id="ow_review" style="margin-top:12px;">Review / undo settled items ('+nSet+')</button>';
   html += '<div class="sheetbtns" style="margin-top:14px;"><button class="btn-cancel" id="ow_close" style="flex:1;">Close</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("ow_close").addEventListener("click", closeForm);
+  var owr = document.getElementById("ow_review"); if(owr) owr.addEventListener("click", function(){ openSettlementReview("owed"); });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-settle]"), function(b){
     b.addEventListener("click", function(){ openSettleSheet(b.getAttribute("data-settle")); });
   });
@@ -3114,7 +3117,7 @@ function openSettleSheet(ids){
     items.forEach(function(g){
       if(v==="invest"){
         investments.push({ id:uid(), date:g.date, partner:g.partner, invType:"Loan", purpose:"Working capital", via:"direct",
-                           amount:g.amount, mode:"Cash", viaBill:true, notes:"Paid "+g.vendor+" from own pocket" });
+                           amount:g.amount, mode:"Cash", viaBill:true, fromOwed:g.id, notes:"Paid "+g.vendor+" from own pocket" });
         markSettled(g.id, { mode:"invest", date:d }, true);
       } else {
         markSettled(g.id, { mode: v.indexOf("held:")===0 ? "held" : v, from: v.indexOf("held:")===0 ? v.slice(5) : "", date:d }, true);
@@ -3123,6 +3126,136 @@ function openSettleSheet(ids){
     if(v==="invest") saveInvest();
     saveExpense(); saveBills();
     renderAll(); openOwedSheet();
+  });
+}
+
+// ---- reviewing / undoing settlements ----
+// A settlement tapped by mistake (or worked out wrongly) can be undone: the item goes
+// back to owed, and anything the settlement created is removed with it.
+var SETTLE_MODE_LABEL = { bank:"repaid by UPI / bank", cash:"repaid in cash from the counter", held:"repaid from handover cash", invest:"counted as their loan to the cafe" };
+function settledOwedItems(){
+  var out = [];
+  expenses.forEach(function(x){
+    if(!payerIsPersonal(x.paidBy) || !x.settled) return;
+    out.push({ id:"exp:"+x.id, partner:payerPartner(x.paidBy), amount:expAmt(x), what:expLabel(x), date:x.date,
+               mode:x.settleMode||"", on:x.settledOn||"", from:x.settleFrom||"" });
+  });
+  billGroups().forEach(function(g){
+    if(!payerIsPersonal(g.paidBy)) return;
+    var b = getBill(g.id);
+    if(!b || !b.settled) return;
+    out.push({ id:g.id, partner:payerPartner(g.paidBy), amount:r2(g.lines.reduce(function(a,p){ return a+purchTotal(p); },0)), what:"Purchase"+(g.vendor?" - "+g.vendor:""), date:g.date,
+               mode:b.settleMode||"", on:b.settledOn||"", from:b.settleFrom||"" });
+  });
+  return out.sort(function(a,b){ return (b.on||b.date).localeCompare(a.on||a.date); });
+}
+// The loan entry created when a bill was "counted as their loan".
+function owedLoanEntry(item){
+  var vendorText = item.what;
+  return investments.find(function(v){ return v.fromOwed===item.id; }) ||
+         investments.find(function(v){ return !v.fromOwed && v.viaBill && v.partner===item.partner && Math.abs((+v.amount||0) - item.amount) < 0.01 &&
+                                            / from own pocket$/.test(v.notes||"") && v.date===item.date; }) || null;
+}
+function undoOwedSettlement(id){
+  var item = settledOwedItems().find(function(x){ return x.id===id; });
+  if(!item) return null;
+  if(item.mode==="invest" || !item.mode){
+    var loan = owedLoanEntry(item);
+    if(loan) investments = investments.filter(function(v){ return v.id!==loan.id; });
+  }
+  function clear(rec){ rec.settled = false; delete rec.settleMode; delete rec.settledOn; delete rec.settleFrom; }
+  if(String(id).indexOf("exp:")===0){ var x = expenses.find(function(e){ return "exp:"+e.id===id; }); if(x) clear(x); }
+  else { var b = getBill(id); if(b) clear(b); }
+  saveExpense(); saveBills(); saveInvest();
+  return item;
+}
+// Payments recorded together with a staff settlement.
+function settlementPayments(rec){
+  if(!rec) return [];
+  var st = staffById(rec.staffId);
+  return expenses.filter(function(x){
+    if(rec.payExpenseId) return x.id===rec.payExpenseId;
+    // Older settlements didn't store the link: match the settlement payment by its description.
+    return x.payrollId===rec.id || (st && isStaffPay(x, st) && /\(final settlement\)/.test(x.description||"") && expenseMonth(x)===rec.month);
+  });
+}
+function openSettlementReview(focus){
+  var sheet = document.getElementById("sheet");
+  var items = settledOwedItems();
+  var recs = payroll.filter(function(r){ return r.settled; }).sort(function(a,b){ return (b.settledOn||b.month).localeCompare(a.settledOn||a.month); });
+  var html = '<h2 class="serif">Review settlements</h2>';
+  html += '<div class="backupnote">Settled something by mistake, or worked it out wrongly? Undo it here. The item goes back to owed / unsettled, and what the settlement created is removed with it, so the bank, counter, handover and loan balances correct themselves.</div>';
+  html += '<div class="daygroup">Partner money owed - settled</div>';
+  if(!items.length) html += '<div class="backupnote" style="margin:0 0 10px;">Nothing settled yet.</div>';
+  items.forEach(function(it){
+    html += '<div class="card" style="margin-bottom:8px;padding:10px 12px;"><div class="billtop"><div><b>'+esc(it.partner)+' · '+rupeeP(it.amount)+'</b>'+
+      '<span>'+esc(it.what)+' · paid '+fmtD(it.date)+'</span>'+
+      '<span>'+(it.mode ? esc(SETTLE_MODE_LABEL[it.mode]||it.mode)+(it.mode==="held"&&it.from?' ('+esc(it.from)+')':'')+(it.on?' on '+fmtD(it.on):'') : 'settled (method not recorded)')+'</span></div></div>'+
+      '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" data-unowed="'+esc(it.id)+'">Undo</button><button class="btn-additem" data-reowed="'+esc(it.id)+'">Undo &amp; settle again</button></div></div>';
+  });
+  html += '<div class="daygroup" style="margin-top:14px;">Staff salary - settled months</div>';
+  if(!recs.length) html += '<div class="backupnote" style="margin:0 0 10px;">No salary settlements yet.</div>';
+  recs.forEach(function(r){
+    var st = staffById(r.staffId), pays = settlementPayments(r);
+    html += '<div class="card" style="margin-bottom:8px;padding:10px 12px;"><div class="billtop"><div><b>'+esc(st?st.name:"(removed staff)")+' · '+esc(monthLabel(r.month))+'</b>'+
+      '<span>Settled'+(r.settledOn?' on '+fmtD(r.settledOn):'')+(r.roundOff?' · round off '+(r.roundOff>0?'+':'−')+rupeeP(Math.abs(r.roundOff)):'')+(r.extraLeave==="waived"&&r.waivedAmount?' · '+rupeeP(r.waivedAmount)+' waived as goodwill':'')+'</span>'+
+      (pays.length ? '<span>Payment recorded with it: '+pays.map(function(x){ return rupeeP(expAmt(x))+' on '+fmtD(x.date); }).join(", ")+'</span>' : '')+'</div></div>'+
+      '<button class="btn-additem" data-unsal="'+esc(r.id)+'" style="margin-top:8px;">Undo settlement</button></div>';
+  });
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="rv_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  sheet.scrollTop = 0;
+  document.getElementById("rv_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-unowed],[data-reowed]"), function(b){
+    b.addEventListener("click", function(){
+      var id = b.getAttribute("data-unowed") || b.getAttribute("data-reowed"), again = b.hasAttribute("data-reowed");
+      var it = items.find(function(x){ return x.id===id; });
+      if(!it) return;
+      var loan = (it.mode==="invest" || !it.mode) ? owedLoanEntry(it) : null;
+      var msg = "Undo this settlement?\n\n"+it.partner+" · "+rupeeP(it.amount)+" · "+it.what+"\n\nIt goes back to \"owed\"."+
+        (it.mode==="bank" ? " The bank balance goes back up by "+rupeeP(it.amount)+"." : it.mode==="cash" ? " The counter cash for "+fmtD(it.on)+" goes back up." : it.mode==="held" ? " "+it.from+"'s handover cash goes back up." : "")+
+        (loan ? " The loan entry it created ("+rupeeP(loan.amount)+") is removed." : "");
+      askConfirm(msg, function(){
+        undoOwedSettlement(id);
+        renderAll();
+        if(again) openSettleSheet(id); else openSettlementReview(focus);
+      });
+    });
+  });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-unsal]"), function(b){
+    b.addEventListener("click", function(){ var r = payroll.find(function(x){ return x.id===b.getAttribute("data-unsal"); }); if(r) openUndoSalarySettlement(r, function(){ openSettlementReview(focus); }); });
+  });
+}
+function openUndoSalarySettlement(rec, back){
+  var st = staffById(rec.staffId), pays = settlementPayments(rec);
+  var gw = st ? goodwillFor(st) : null;
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Undo salary settlement</h2>';
+  html += '<div class="backupnote">'+esc(st?st.name:"Staff")+' · '+esc(monthLabel(rec.month))+(rec.settledOn?' · settled on '+fmtD(rec.settledOn):'')+'</div>';
+  html += '<div class="card" style="margin-bottom:12px;">'+
+    '<div class="psrow"><span>Unused leave</span><b>'+(rec.extraLeave==="waived" ? 'waived'+(rec.waivedAmount?' · '+rupeeP(rec.waivedAmount)+' goodwill':'') : 'paid')+'</b></div>'+
+    (rec.roundOff ? '<div class="psrow"><span>Round off</span><b>'+(rec.roundOff>0?'+':'−')+rupeeP(Math.abs(rec.roundOff))+'</b></div>' : '')+
+    (rec.note ? '<div class="psrow"><span>Note</span><b style="font-weight:500;">'+esc(rec.note)+'</b></div>' : '')+'</div>';
+  html += '<div class="backupnote">Undoing removes the settlement: the month goes back to unsettled, unused leave goes back to "pay", and any round off and goodwill from it are removed. You can then settle the month again.</div>';
+  if(pays.length){
+    html += '<label class="setlopt"><input type="checkbox" id="us_pay" checked> <span>Also delete the payment recorded with the settlement: <b>'+pays.map(function(x){ return rupeeP(expAmt(x))+' on '+fmtD(x.date)+' ('+esc(x.mode||"")+')'; }).join(", ")+'</b>. Untick if the money really was paid.</span></label>';
+  }
+  if(gw && rec.extraLeave==="waived" && rec.waivedAmount && gw.bonus > gw.waived - rec.waivedAmount + 0.5){
+    html += '<div class="attmwarn">A bonus has already been paid from this goodwill. Undoing leaves that bonus as it is.</div>';
+  }
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="us_back">Back</button><button class="btn-del" id="us_go">Undo settlement</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("us_back").addEventListener("click", function(){ if(back) back(); else closeForm(); });
+  document.getElementById("us_go").addEventListener("click", function(){
+    var delPay = pays.length && document.getElementById("us_pay").checked;
+    payroll = payroll.filter(function(r){ return r.id!==rec.id; });
+    savePayroll();
+    if(delPay){ var ids = pays.map(function(x){ return x.id; }); expenses = expenses.filter(function(x){ return ids.indexOf(x.id)<0; }); saveExpense(); }
+    renderAll();
+    if(back) back(); else closeForm();
+    appAlert((st?st.name+" · ":"")+monthLabel(rec.month)+" is no longer settled."+(delPay?" The settlement payment was deleted.":""));
   });
 }
 
@@ -3236,7 +3369,9 @@ function renderExpenseList(){
       '<div class="psrow"><span>Variable (everything else)</span><b>'+rupee(varAct)+'</b></div>'+
       '<div class="psrow"><span><b>Total paid</b></span><b>'+rupee(fixedAct+varAct)+'</b></div></div>';
   }
-  head = owedSummary().replace('id="owed_view"', 'id="owed_view_x"') + head;
+  var owedCard = owedSummary().replace('id="owed_view"', 'id="owed_view_x"');
+  if(!owedCard && settledOwedItems().length) owedCard = '<button class="btn-additem" id="owed_rev_x" style="margin-bottom:12px;">Review / undo settled partner bills ('+settledOwedItems().length+')</button>';
+  head = owedCard + head;
   var sorted = expenses.slice().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
   if(sorted.length===0){ el.innerHTML = head + '<div class="empty">No expenses logged yet. Tap + to add one.</div>'; }
   else {
@@ -3248,6 +3383,7 @@ function renderExpenseList(){
     el.innerHTML = html;
     wireEntryClicks(el);
   }
+  var orv = el.querySelector("#owed_rev_x"); if(orv) orv.addEventListener("click", function(){ openSettlementReview("owed"); });
   var ov2 = el.querySelector("#owed_view_x");
   if(ov2) ov2.addEventListener("click", openOwedSheet);
   if(recSub==="expenses") updateRecordsTotal();
@@ -3271,7 +3407,8 @@ function renderPartnersView(){
       '<div class="psrow"><span>− Loans repaid + withdrawals so far</span><b>'+rupee(repaidTot + wdTot)+'</b></div>'+
       '<div class="psrow"><span><b>Profit available to repay loans</b></span><b class="'+(avail<0?"bad":"ok")+'">'+rupeeSigned(avail)+'</b></div>'+
       '<div class="backupnote" style="margin:6px 0 0;">Loans are repaid from the cafe’s profit over time. Repay only what the profit covers, so the cafe keeps enough cash to run.</div>'+
-      '<button class="btn-save" id="pm_pdf" style="width:100%;margin-top:10px;">Download partner money statement PDF</button></div>';
+      '<button class="btn-save" id="pm_pdf" style="width:100%;margin-top:10px;">Download partner money statement PDF</button>'+
+      '<button class="btn-additem" id="pm_review" style="margin-top:8px;">Review / undo settlements</button></div>';
     html += all.map(function(x){
       var m = x.m, share = capTot>0 ? Math.round(m.capital/capTot*100) : 0;
       var cats = CAPITAL_CATS.filter(function(c){ return m.byCat[c]; });
@@ -3295,6 +3432,7 @@ function renderPartnersView(){
   Array.prototype.forEach.call(el.querySelectorAll("[data-delpartner]"), function(b){
     b.addEventListener("click", function(){ deletePartner(b.getAttribute("data-delpartner")); });
   });
+  var pmr = document.getElementById("pm_review"); if(pmr) pmr.addEventListener("click", function(){ openSettlementReview(); });
   var pmp = document.getElementById("pm_pdf");
   if(pmp) pmp.addEventListener("click", function(){ exportPartnerStatement(null, pmp); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-ppdf]"), function(b){
@@ -8511,7 +8649,7 @@ function renderSalaryView(){
     '<div class="kpi"><div class="lbl">Paid</div><div class="val pos">'+rupeeP(tot.paid)+'</div></div>'+
     '<div class="kpi"><div class="lbl">Balance</div><div class="val '+(tot.bal>0?"neg":"pos")+'">'+rupeeP(tot.bal)+'</div></div></div>';
   html += '<div class="backupnote" style="margin:0 0 10px;">'+paidLeavePerMonth()+' paid leave days a month · salary due by the '+salaryDueDay()+
-          ordinal(salaryDueDay())+' of the next month · days not marked in attendance count as worked. <a href="#" id="sl_rules">Change</a></div>';
+          ordinal(salaryDueDay())+' of the next month · days not marked in attendance count as worked. <a href="#" id="sl_rules">Change</a> · <a href="#" id="sl_review">Review settlements</a></div>';
   if(!list.length) html += '<div class="empty">Nobody was employed this month.</div>';
   list.forEach(function(s){
     var st = s.st, gw = goodwillFor(st);
@@ -8543,7 +8681,8 @@ function renderSalaryView(){
     html += '<div class="salbtns">'+
       (s.balance>0 ? '<button class="sale" data-slpay="'+st.id+'">Pay '+rupeeP(s.balance)+'</button>' : '')+
       '<button data-sladv="'+st.id+'">Advance</button>'+
-      (!s.current && !s.future ? '<button class="invest" data-slsettle="'+st.id+'">'+(s.status==="settled"?"Settlement":"Final settlement")+'</button>' : '')+
+      (!s.current && !s.future && s.status!=="settled" ? '<button class="invest" data-slsettle="'+st.id+'">Final settlement</button>' : '')+
+      (s.status==="settled" && s.rec ? '<button class="purch" data-slundo="'+st.id+'">Undo settlement</button>' : '')+
       '<button class="expense" data-slslip="'+st.id+'">Salary slip</button>'+
       (gw.balance>0 ? '<button class="purch" data-slbonus="'+st.id+'">Give bonus</button>' : '')+'</div>';
     html += '</div>';
@@ -8553,9 +8692,11 @@ function renderSalaryView(){
   document.getElementById("slPrev").addEventListener("click", function(){ shift(-1); });
   document.getElementById("slNext").addEventListener("click", function(){ shift(1); });
   document.getElementById("sl_rules").addEventListener("click", function(e){ e.preventDefault(); openSalaryRules(); });
+  document.getElementById("sl_review").addEventListener("click", function(e){ e.preventDefault(); openSettlementReview("staff"); });
   function wire(attr, fn){ Array.prototype.forEach.call(el.querySelectorAll("["+attr+"]"), function(b){ b.addEventListener("click", function(){ var st = staffById(b.getAttribute(attr)); if(st) fn(st); }); }); }
   wire("data-slpay", function(st){ openSalaryPay(st, salMonth); });
   wire("data-slsettle", function(st){ openSettlement(st, salMonth); });
+  wire("data-slundo", function(st){ var r = payrollFor(st.id, salMonth); if(r) openUndoSalarySettlement(r); });
   wire("data-slslip", function(st){ openSalarySlip(st, salMonth); });
   wire("data-slbonus", openBonusForm);
   wire("data-sladv", function(st){ openAdvanceForm(st, salMonth); });
@@ -8668,14 +8809,16 @@ function openSettlement(st, mKey){
     if(Math.abs(rOff) > 100){   // a round off is small change, not a pay cut
       var er2 = document.getElementById("st_err"); er2.textContent = "That is "+rupeeP(Math.abs(rOff))+" away from the exact amount - too big for a round off. Use a deduction, advance or bonus instead."; er2.style.display = "block"; return;
     }
+    var payId = null;
     if(amt>0){
       var mode = document.getElementById("st_mode").value, by = document.getElementById("st_by").value;
-      expenses.push({ id:uid(), staffId:st.id, date:document.getElementById("st_date").value || fmtDate(new Date()), category:"Staff Salary",
+      payId = uid();
+      expenses.push({ id:payId, staffId:st.id, payrollId:"pr_"+st.id+"_"+mKey, date:document.getElementById("st_date").value || fmtDate(new Date()), category:"Staff Salary",
                       description: st.name+" - "+monthLabel(mKey)+" salary (final settlement)", amount:amt, mode:mode, paidBy:by, settled:false });
       saveExpense();
     }
     payroll = payroll.filter(function(r){ return !(r.staffId===st.id && r.month===mKey); });
-    payroll.push({ id:"pr_"+st.id+"_"+mKey, staffId:st.id, month:mKey, extraLeave:ch,
+    payroll.push({ id:"pr_"+st.id+"_"+mKey, staffId:st.id, month:mKey, extraLeave:ch, payExpenseId: payId,
                    waivedAmount: ch==="waived" ? s.extraLeave : 0, unusedLeave: s.unusedLeave,
                    roundOff: rOff, roundMode: rMode,
                    settled:true, settledOn: fmtDate(new Date()), note: document.getElementById("st_note").value.trim() });
