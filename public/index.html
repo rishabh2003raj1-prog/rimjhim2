@@ -2878,13 +2878,9 @@ function renderDayPanel(){
   html += '<button class="btn-additem" id="dp_cash" style="margin-top:10px;">'+(cRec?'Update counter cash':'Record counter cash')+'</button></div>';
 
   // Bank balance for the day, like the counter count.
-  var bRec = bankCheckOn(selectedDate), bRows = bankRows();
-  var bAnch = bankAnchors().filter(function(a){ return !(bRec && a.id===bRec.id) && a.date < selectedDate; });
-  var bExp = bankBalanceAt(addDays(selectedDate, 1), bRows, bAnch);
-  var dayBank = bRows.filter(function(r){ return r.date===selectedDate; }).reduce(function(t,r){ return t+r.amt; },0);
+  var bSum = bankDaySummary(selectedDate), bRec = bSum.rec, bExp = bSum.expected;
   html += '<div class="card cashday" style="margin:4px 0 12px;"><h3>Bank balance</h3>';
-  if(dayBank) html += '<div class="psrow"><span>Bank in / out this day</span><b class="'+(dayBank<0?"bad":"ok")+'">'+rupeeSigned(r2(dayBank))+'</b></div>';
-  html += '<div class="psrow"><span>Should be in the bank (end of day)</span><b>'+rupeeP(bExp)+'</b></div>';
+  html += bankSummaryRows(bSum);
   if(bRec){
     var bDiff = r2((+bRec.amount||0) - bExp);
     html += '<div class="psrow"><span>Bank app showed</span><b>'+rupeeP(bRec.amount)+'</b></div>';
@@ -7013,15 +7009,39 @@ function bankMovements(){
 function bankDepositsSince(){ return bankMovements().deposits; }
 function bankBalanceNow(){ return bankBalanceAt(addDays(fmtDate(new Date()), 1)); }
 
-function openBankCheckForm(dateStr){
+// The day's bank working, like the counter's: opening + money in - paid from bank.
+var BANK_IN_LABELS = { sales:"UPI / card sales", udhaar:"Udhaar paid back (UPI / bank)", invest:"Partner money in", deposits:"Handover cash deposited", interest:"Interest", adj:"Adjustment" };
+var BANK_OUT_LABELS = { bills:"Bills paid", purchases:"Purchases paid", charges:"Bank charges", withdraw:"Partner withdrawals", loanrepay:"Partner loans repaid", repaid:"Partners repaid for bills", atm:"Cash withdrawn", adj:"Adjustment" };
+function bankDaySummary(dateStr){
   var rec = bankCheckOn(dateStr), rows = bankRows();
   var anchors = bankAnchors().filter(function(a){ return !(a.id && rec && a.id===rec.id) && a.date < dateStr; });
-  var expected = bankBalanceAt(addDays(dateStr, 1), rows, anchors);
+  var opening = bankBalanceAt(dateStr, rows, anchors);
+  var ins = {}, outs = {}, inn = 0, out = 0;
+  rows.forEach(function(r){
+    if(r.date!==dateStr) return;
+    if(r.amt >= 0){ ins[r.kind] = r2((ins[r.kind]||0) + r.amt); inn += r.amt; }
+    else { outs[r.kind] = r2((outs[r.kind]||0) - r.amt); out -= r.amt; }
+  });
+  return { rec:rec, opening:opening, ins:ins, outs:outs, inn:r2(inn), out:r2(out), expected:r2(opening + inn - out) };
+}
+function bankSummaryRows(sm){
+  var h = '<div class="psrow"><span>Opening bank balance</span><b>'+rupeeP(sm.opening)+'</b></div>';
+  var ik = Object.keys(sm.ins), ok = Object.keys(sm.outs);
+  if(!ik.length) h += '<div class="psrow"><span>+ Money in (UPI / card sales…)</span><b>'+rupeeP(0)+'</b></div>';
+  ik.forEach(function(k){ h += '<div class="psrow"><span>+ '+esc(BANK_IN_LABELS[k] || k)+'</span><b>'+rupeeP(sm.ins[k])+'</b></div>'; });
+  if(!ok.length) h += '<div class="psrow"><span>− Paid from bank</span><b>'+rupeeP(0)+'</b></div>';
+  else if(ok.length > 1) h += '<div class="psrow"><span>− Paid from bank</span><b>'+rupeeP(sm.out)+'</b></div>';
+  ok.forEach(function(k){ h += '<div class="psrow"'+(ok.length>1?' style="padding-left:12px;font-size:12.5px;"':'')+'><span>'+(ok.length>1?'· ':'− ')+esc(BANK_OUT_LABELS[k] || k)+(ok.length>1?'':' (paid from bank)')+'</span><b>'+rupeeP(sm.outs[k])+'</b></div>'; });
+  h += '<div class="psrow"><span><b>Should be in bank</b></span><b>'+rupeeP(sm.expected)+'</b></div>';
+  return h;
+}
+function openBankCheckForm(dateStr){
+  var sm = bankDaySummary(dateStr), rec = sm.rec, expected = sm.expected;
   var sheet = document.getElementById("sheet");
-  var html = '<h2 class="serif">Bank balance · '+esc(parseDate(dateStr).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"}))+'</h2>';
-  html += '<div class="card" style="margin-bottom:12px;"><div class="psrow"><span>Should be in the bank (end of day)</span><b>'+rupeeP(expected)+'</b></div>'+
-          '<div class="barsub">From the last check plus this day’s UPI / card sales, bank payments, deposits and other bank entries.</div></div>';
+  var html = '<h2 class="serif">Bank balance</h2><div class="backupnote" style="margin-top:-6px;">'+esc(parseDate(dateStr).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"}))+'</div>';
+  html += '<div class="card" style="margin-bottom:12px;">'+bankSummaryRows(sm)+'</div>';
   html += '<div class="field"><label>Balance shown in the bank app (₹)</label><input type="number" inputmode="decimal" id="bc_amt" value="'+(rec?rec.amount:"")+'"></div>';
+  html += '<div class="card" id="bc_result" style="margin:-4px 0 12px;display:none;"></div>';
   html += '<div class="backupnote" id="bc_diff"></div>';
   html += '<div class="field"><label>Note (optional)</label><input type="text" id="bc_note" value="'+esc(rec&&rec.note||"")+'" placeholder="e.g. checked at 10 pm, UPI settlement pending"></div>';
   html += '<div class="err" id="bc_err"></div><div class="sheetbtns"><button class="btn-cancel" id="bc_cancel">Cancel</button>'+(rec?'<button class="btn-del" id="bc_del">Delete</button>':'')+'<button class="btn-save" id="bc_save">Save</button></div>';
@@ -7029,8 +7049,13 @@ function openBankCheckForm(dateStr){
   document.getElementById("sheetBg").classList.add("on");
   function showDiff(){
     var v = parseFloat(document.getElementById("bc_amt").value), el = document.getElementById("bc_diff");
-    if(isNaN(v)){ el.textContent = ""; return; }
+    var box = document.getElementById("bc_result");
+    if(isNaN(v)){ el.textContent = ""; box.style.display = "none"; return; }
     var d = r2(v - expected);
+    box.style.display = "";
+    box.innerHTML = '<div class="psrow"><span>Should be in bank</span><b>'+rupeeP(expected)+'</b></div>'+
+      '<div class="psrow"><span>Bank app shows</span><b>'+rupeeP(v)+'</b></div>'+
+      '<div class="psrow"><span><b>Difference</b></span><b class="'+(Math.abs(d)<1?"ok":d<0?"bad":"warnamt")+'">'+(Math.abs(d)<1?"Tallies":rupeeSigned(d)+(d<0?" less":" more"))+'</b></div>';
     el.innerHTML = Math.abs(d) < 1 ? '<b class="ok">Tallies with the app.</b>' :
       '<b class="'+(d<0?"bad":"warnamt")+'">'+rupeeP(Math.abs(d))+(d<0?' less':' more')+'</b> than expected. Saving keeps the real balance; look for a missing UPI sale, bank payment or charge, or add an adjustment with a note.';
   }
