@@ -793,22 +793,23 @@ function invDestLabel(v){
   return (inn ? "kept by " : "from cash held by ")+d.slice(5);
 }
 function investAmt(v){ return invIsIn(v) ? (v.amount||0) : -(v.amount||0); }
-// Per-partner totals for all time.
-function partnerMoney(name){
+// Per-partner totals for all time, or up to and including a date.
+function partnerMoney(name, upto){
   var r = { capital:0, byCat:{}, loan:0, repaid:0, withdrawn:0 };
   investments.forEach(function(v){
-    if(v.partner!==name) return;
+    if(v.partner!==name || (upto && v.date > upto)) return;
     var a = +v.amount||0, k = invKind(v);
     if(k==="capital"){ r.capital += a; var c = invCategory(v); r.byCat[c] = (r.byCat[c]||0) + a; }
     else if(k==="loan") r.loan += a; else if(k==="repay") r.repaid += a; else r.withdrawn += a;
   });
-  cashMoves.forEach(function(m){ if(m.type==="withdraw" && m.holder===name) r.withdrawn += +m.amount||0; });
+  cashMoves.forEach(function(m){ if(m.type==="withdraw" && m.holder===name && (!upto || m.date <= upto)) r.withdrawn += +m.amount||0; });
   r.outstanding = r2(r.loan - r.repaid);
   return r;
 }
-function allTimeProfit(){
-  var s1 = sales.reduce(function(a,x){ return a+saleTotal(x); },0), p1 = purchases.reduce(function(a,x){ return a+purchTotal(x); },0);
-  var e1 = expenses.reduce(function(a,x){ return a+expAmt(x); },0), o1 = otherIncomeIn(function(){ return true; });
+function allTimeProfit(upto, from){
+  function ok(d){ return (!upto || (d||"") <= upto) && (!from || (d||"") >= from); }
+  var s1 = sales.reduce(function(a,x){ return a+(ok(x.date)?saleTotal(x):0); },0), p1 = purchases.reduce(function(a,x){ return a+(ok(x.date)?purchTotal(x):0); },0);
+  var e1 = expenses.reduce(function(a,x){ return a+(ok(expBookDate(x))?expAmt(x):0); },0), o1 = otherIncomeIn(ok);
   return r2(s1 - p1 - e1 + o1);
 }
 function expAmt(x){ return x.amount||0; }
@@ -2548,7 +2549,7 @@ function setAppMonth(mKey){
 }
 function setAppDate(d){ selectedDate = d; setAppMonth(d.slice(0,7)); selectedDate = d; }
 function shiftAppMonth(n){ setAppMonth(fmtDate(new Date(calCursor.getFullYear(), calCursor.getMonth()+n, 1)).slice(0,7)); }
-function renderRecordLists(){ renderSalesList(); renderPurchList(); renderInvestList(); renderExpenseList(); renderCashView(); updateRecordsTotal(); }
+function renderRecordLists(){ renderSalesList(); renderPurchList(); renderInvestList(); renderExpenseList(); renderCashView(); renderPartnersView(); updateRecordsTotal(); }
 function setBillsMonth(mKey){ setAppMonth(mKey); }
 function billDefaultDate(mKey){
   var today = fmtDate(new Date());
@@ -3098,7 +3099,7 @@ function updateRecordsTotal(){
   else if(recSub==="menu"){ lbl.textContent = menuItems.length+" item"+(menuItems.length!==1?"s":""); }
   else if(recSub==="stock"){ var low=ingredients.filter(function(i){return stockLevel(i.id) <= (i.minStock||0);}).length;
     lbl.textContent = ingredients.length+" ingredients"+(low?" · "+low+" low":""); }
-  else { lbl.textContent = PARTNERS.length+" partner"+(PARTNERS.length!==1?"s":""); }
+  else { lbl.textContent = rl+" · "+PARTNERS.length+" partner"+(PARTNERS.length!==1?"s":""); }
 }
 
 // ---- Records by day / month / year (same date as the calendar) ----
@@ -3630,43 +3631,86 @@ function renderExpenseList(){
 // ---------- PARTNERS ----------
 function renderPartnersView(){
   var el = document.getElementById("partnersView");
-  var html = '<button class="btn-save" id="partnerAddBtn" style="width:100%;margin-bottom:14px;">+ Add partner</button>';
+  var R = recRange(), today = fmtDate(new Date());
+  var upto = R.to < today ? R.to : today;          // balances "as at" the end of the period (or today)
+  function inR(d){ return !!d && d>=R.from && d<=R.to; }
+  var html = recPeriodBar("investment", "partner money");
   if(PARTNERS.length===0){
-    html += '<div class="empty">No partners yet.</div>';
+    html += '<button class="btn-save" id="partnerAddBtn" style="width:100%;margin-bottom:14px;">+ Add partner</button><div class="empty">No partners yet.</div>';
   } else {
-    var all = PARTNERS.map(function(n){ return { name:n, m:partnerMoney(n) }; });
+    // What each partner did in the period.
+    var reps = partnerRepayments();
+    function act(n){
+      var a = { capital:0, loan:0, repay:0, withdraw:0, pocket:0, back:0 };
+      investments.forEach(function(v){ if(v.partner===n && inR(v.date)) a[invKind(v)] += +v.amount||0; });
+      cashMoves.forEach(function(m){ if(m.type==="withdraw" && m.holder===n && inR(m.date)) a.withdraw += +m.amount||0; });
+      purchases.forEach(function(p){ if(inR(p.date) && (p.mode||"Cash")!=="Credit" && payerIsPersonal(p.paidBy) && payerPartner(p.paidBy)===n) a.pocket += purchTotal(p); });
+      expenses.forEach(function(x){ if(inR(x.date) && payerIsPersonal(x.paidBy) && payerPartner(x.paidBy)===n) a.pocket += expAmt(x); });
+      reps.forEach(function(r){ if(r.partner===n && inR(r.date)) a.back += r.amount; });
+      Object.keys(a).forEach(function(k){ a[k] = r2(a[k]); });
+      a.net = r2(a.capital + a.loan - a.repay - a.withdraw);
+      return a;
+    }
+    var all = PARTNERS.map(function(n){ return { name:n, m:partnerMoney(n, upto), a:act(n) }; });
+    var owedBy = {}; pendingReimbursements().forEach(function(g){ owedBy[g.partner] = (owedBy[g.partner]||0) + g.amount; });
     var capTot = all.reduce(function(a,x){ return a+x.m.capital; },0), loanOut = all.reduce(function(a,x){ return a+x.m.outstanding; },0);
     var repaidTot = all.reduce(function(a,x){ return a+x.m.repaid; },0), wdTot = all.reduce(function(a,x){ return a+x.m.withdrawn; },0);
-    var profit = allTimeProfit(), avail = r2(profit - repaidTot - wdTot);
-    html += '<div class="card" style="margin-bottom:12px;"><h3>Partner money <span class="muted">· kept apart from cafe sales</span></h3>'+
+    var pIn = all.reduce(function(a,x){ return a+x.a.capital+x.a.loan; },0), pOut = all.reduce(function(a,x){ return a+x.a.repay+x.a.withdraw; },0);
+    var periodProfit = allTimeProfit(R.to, R.from);
+    var profit = allTimeProfit(upto), avail = r2(profit - repaidTot - wdTot);
+    var asAt = upto===today ? "today" : fmtD(upto);
+    html += recKpis([["Partners put in", rupee(pIn), "pos", esc(R.label)], ["Paid out to them", rupee(pOut), pOut>0?"neg":"", "repaid + withdrawn"], ["Cafe profit", rupeeSigned(periodProfit), periodProfit<0?"neg":"pos", esc(R.label)]]);
+
+    if(recPeriod==="year"){
+      var mrows = {};
+      investments.forEach(function(v){ if(!inR(v.date)) return; var mk = v.date.slice(0,7), r = mrows[mk] || (mrows[mk] = { inn:0, out:0 }); if(invIsIn(v)) r.inn += +v.amount||0; else r.out += +v.amount||0; });
+      cashMoves.forEach(function(m){ if(m.type==="withdraw" && inR(m.date)){ var mk = m.date.slice(0,7), r = mrows[mk] || (mrows[mk] = { inn:0, out:0 }); r.out += +m.amount||0; } });
+      var mks = Object.keys(mrows).sort().reverse();
+      if(mks.length){
+        html += '<div class="daygroup">Month by month</div>' + mks.map(function(mk){ var r = mrows[mk];
+          return '<div class="entry rpmonthrow" data-rpmonth="'+mk+'"><div><div class="who">'+esc(monthLabel(mk))+'</div><div class="meta">'+rupee(r.inn)+' in · '+rupee(r.out)+' out · tap to open the month</div></div>'+
+                 '<div class="amt '+(r.inn-r.out<0?"purch":"sale")+'">'+rupeeSigned(r.inn-r.out)+'</div></div>'; }).join("");
+      }
+    }
+
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Partner money <span class="muted">· as at '+esc(asAt)+'</span></h3>'+
       '<div class="psrow"><span>Capital in the business</span><b>'+rupee(capTot)+'</b></div>'+
       '<div class="psrow"><span>Working capital loans outstanding</span><b class="'+(loanOut>0?"warnamt":"")+'">'+rupee(loanOut)+'</b></div>'+
-      '<div class="psrow"><span>Cafe profit so far (all time)</span><b class="'+(profit<0?"bad":"ok")+'">'+rupeeSigned(profit)+'</b></div>'+
-      '<div class="psrow"><span>− Loans repaid + withdrawals so far</span><b>'+rupee(repaidTot + wdTot)+'</b></div>'+
+      '<div class="psrow"><span>Cafe profit up to '+esc(asAt)+'</span><b class="'+(profit<0?"bad":"ok")+'">'+rupeeSigned(profit)+'</b></div>'+
+      '<div class="psrow"><span>− Loans repaid + withdrawals up to '+esc(asAt)+'</span><b>'+rupee(repaidTot + wdTot)+'</b></div>'+
       '<div class="psrow"><span><b>Profit available to repay loans</b></span><b class="'+(avail<0?"bad":"ok")+'">'+rupeeSigned(avail)+'</b></div>'+
-      '<div class="backupnote" style="margin:6px 0 0;">Loans are repaid from the cafe’s profit over time. Repay only what the profit covers, so the cafe keeps enough cash to run.</div>'+
+      '<div class="backupnote" style="margin:6px 0 0;">Loans are repaid from the cafe’s profit over time. Repay only what the profit covers, so the cafe keeps enough cash to run. Kept apart from cafe sales.</div>'+
       '<button class="btn-save" id="pm_pdf" style="width:100%;margin-top:10px;">Download partner money statement PDF</button>'+
       '<button class="btn-additem" id="pm_review" style="margin-top:8px;">Review / undo settlements</button></div>';
     html += all.map(function(x){
-      var m = x.m, share = capTot>0 ? Math.round(m.capital/capTot*100) : 0;
+      var m = x.m, a = x.a, share = capTot>0 ? Math.round(m.capital/capTot*100) : 0;
       var cats = CAPITAL_CATS.filter(function(c){ return m.byCat[c]; });
+      function line(lbl, v, sign, cls){ return v ? '<div class="psrow"><span>'+sign+' '+lbl+'</span><b class="'+(cls||"")+'">'+rupee(v)+'</b></div>' : ''; }
+      var period = line("Capital put in", a.capital, "+", "ok")+line("Loan to the cafe", a.loan, "+", "ok")+line("Loan repaid by the cafe", a.repay, "−")+line("Withdrawn", a.withdraw, "−")+
+                   line("Bills paid from own pocket", a.pocket, "·")+line("Paid back for bills", a.back, "·");
       return '<div class="card" style="margin-bottom:12px;"><div class="billtop"><div><b style="font-size:16px;">'+esc(x.name)+'</b><span>'+share+'% of capital</span></div>'+
         '<button class="ndel" data-delpartner="'+esc(x.name)+'" aria-label="Remove partner">×</button></div>'+
-        '<div class="daygroup" style="margin:8px 0 2px;">Capital invested</div>'+
+        '<div class="daygroup" style="margin:8px 0 2px;">In '+esc(R.label)+'</div>'+
+        (period ? period + ((a.capital||a.loan||a.repay||a.withdraw) ? '<div class="psrow"><span><b>Net put in</b></span><b class="'+(a.net<0?"bad":"ok")+'">'+rupeeSigned(a.net)+'</b></div>' : '')
+                : '<div class="backupnote" style="margin:0;">Nothing in this period.</div>')+
+        '<div class="daygroup" style="margin:10px 0 2px;">Capital invested · as at '+esc(asAt)+'</div>'+
         (cats.length ? cats.map(function(c){ return '<div class="psrow"><span>'+esc(c)+'</span><b>'+rupee(m.byCat[c])+'</b></div>'; }).join("") : '<div class="backupnote" style="margin:0;">None yet.</div>')+
         '<div class="psrow"><span><b>Total capital</b></span><b>'+rupee(m.capital)+'</b></div>'+
-        '<div class="daygroup" style="margin:10px 0 2px;">Working capital loan to the cafe</div>'+
+        '<div class="daygroup" style="margin:10px 0 2px;">Working capital loan · as at '+esc(asAt)+'</div>'+
         '<div class="psrow"><span>Lent</span><b>'+rupee(m.loan)+'</b></div>'+
         '<div class="psrow"><span>Repaid by the cafe</span><b>'+rupee(m.repaid)+'</b></div>'+
         '<div class="psrow"><span><b>Outstanding</b></span><b class="'+(m.outstanding>0?"warnamt":"ok")+'">'+rupee(m.outstanding)+'</b></div>'+
         (m.withdrawn ? '<div class="psrow" style="margin-top:6px;"><span>Withdrawn (profit share / personal)</span><b>'+rupee(m.withdrawn)+'</b></div>' : '')+
+        (owedBy[x.name] ? '<div class="psrow" style="margin-top:6px;"><span>Cafe owes for bills (now)</span><b class="bad">'+rupee(owedBy[x.name])+'</b></div>' : '')+
         '<div class="billbtns" style="margin-top:10px;"><button class="btn-additem" data-pinv="'+esc(x.name)+'">+ Add money</button>'+
-        (m.outstanding>0 ? '<button class="btn-additem" data-prepay="'+esc(x.name)+'">Repay loan</button>' : '')+'</div>'+
+        (partnerMoney(x.name).outstanding>0 ? '<button class="btn-additem" data-prepay="'+esc(x.name)+'">Repay loan</button>' : '')+'</div>'+
         '<button class="btn-additem" data-ppdf="'+esc(x.name)+'" style="margin-top:8px;">Statement PDF · '+esc(x.name)+'</button></div>';
     }).join("");
+    html += '<button class="btn-additem" id="partnerAddBtn" style="margin-bottom:72px;">+ Add partner</button>';
   }
   el.innerHTML = html;
   document.getElementById("partnerAddBtn").addEventListener("click", openPartnerForm);
+  wireRecPeriodBar(el);
   Array.prototype.forEach.call(el.querySelectorAll("[data-delpartner]"), function(b){
     b.addEventListener("click", function(){ deletePartner(b.getAttribute("data-delpartner")); });
   });
@@ -3677,7 +3721,7 @@ function renderPartnersView(){
     b.addEventListener("click", function(){ exportPartnerStatement(b.getAttribute("data-ppdf"), b); });
   });
   Array.prototype.forEach.call(el.querySelectorAll("[data-pinv]"), function(b){
-    b.addEventListener("click", function(){ openForm("investment", null, fmtDate(new Date()), { partner: b.getAttribute("data-pinv") }); });
+    b.addEventListener("click", function(){ openForm("investment", null, recPeriod==="day" ? selectedDate : fmtDate(new Date()), { partner: b.getAttribute("data-pinv") }); });
   });
   Array.prototype.forEach.call(el.querySelectorAll("[data-prepay]"), function(b){
     b.addEventListener("click", function(){
@@ -8888,11 +8932,19 @@ function renderCashView(){
   html += '<button class="btn-additem" id="cash_cr" style="margin-top:10px;">Monthly cash review (counter + people + bank)</button>';
   html += '<button class="btn-additem" id="cash_setup" style="margin-top:10px;">'+((settings.openingCash===null||settings.openingCash===undefined)?'Set opening balances':'Update opening balances')+'</button></div>';
 
-  var exp = expectedCash(today);
-  var todayRec = cashDayFor(today);
-  html += '<div class="card" style="margin-bottom:14px;"><h3>Counter today <span class="muted">· '+parseDate(today).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</span></h3>';
-  var m = cashMovement(today);
-  html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(today))+'</b></div>';
+  // Opening balances and the bank card go last; the period view comes first.
+  var obHtml = html;
+  var R = recRange();
+  html = recPeriodBar(null);
+  // The day's counter: the selected day in Day view, today in the current month / year.
+  var cd = recPeriod==="day" ? selectedDate : (today>=R.from && today<=R.to ? today : null);
+  if(cd && cd > today){ html += '<div class="empty">'+esc(fmtD(cd))+' hasn’t come yet.</div>'; cd = null; }
+  if(cd){
+  var exp = expectedCash(cd);
+  var todayRec = cashDayFor(cd);
+  html += '<div class="card" style="margin-bottom:14px;"><h3>'+(cd===today?'Counter today':'Counter')+' <span class="muted">· '+parseDate(cd).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</span></h3>';
+  var m = cashMovement(cd);
+  html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(cd))+'</b></div>';
   html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn)+'</b></div>';
   if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
   if(m.invOut) html += '<div class="psrow"><span>− Partner withdrawal in cash</span><b>'+rupee(m.invOut)+'</b></div>';
@@ -8914,28 +8966,61 @@ function renderCashView(){
       html += '<div class="psrow"><span>Handed to '+esc(todayRec.receivedBy||"—")+'</span><b class="ok">'+rupee(handoverAmount(todayRec))+'</b></div>';
     }
   }
-  html += '<button class="btn-save" id="cash_close" style="width:100%;margin-top:10px;">'+(todayRec?'Update today\u2019s count':'Record today\u2019s closing cash')+'</button></div>';
+  html += '<button class="btn-save" id="cash_close" data-cashday="'+cd+'" style="width:100%;margin-top:10px;">'+(cd===today ? (todayRec?'Update today\u2019s count':'Record today\u2019s closing cash') : (todayRec?'Update count for ':'Record closing cash for ')+esc(fmtD(cd)))+'</button></div>';
+  }
+  // A shortcut to today's count whenever today's card isn't the one shown.
+  if(cd!==today) html += '<button class="btn-additem" id="cash_today" style="margin-bottom:12px;">Record / update today’s closing cash</button>';
+
+  // Period totals: cash sales, paid from the till, counts short or extra.
+  var lastDay = R.to < today ? R.to : today, st = { sales:0, till:0, short:0, extra:0, counted:0, days:0 };
+  var monthRows = {};
+  if(recPeriod!=="day" && R.from <= today){
+    datesBetween(R.from, lastDay).forEach(function(d){
+      var mv = cashMovement(d), cs = mv.inflow - mv.inCredit - mv.backIn - mv.invIn - mv.loanIn;
+      st.sales += cs; st.till += mv.outflow; st.days++;
+      var mr = monthRows[d.slice(0,7)] || (monthRows[d.slice(0,7)] = { sales:0, till:0, diff:0, counted:0, handed:0 });
+      mr.sales += cs; mr.till += mv.outflow;
+      var c = cashDayFor(d);
+      if(c && c.counted !== null && c.counted !== undefined && c.counted !== ""){
+        var df = (+c.counted) - expectedCash(d);
+        st.counted++; mr.counted++; mr.diff += Math.abs(df) < 1 ? 0 : df; mr.handed += handoverAmount(c);
+        if(df <= -1) st.short += -df; else if(df >= 1) st.extra += df;
+      }
+    });
+    html += recKpis([["Cash sales", rupee(st.sales), "pos", st.days+" day"+(st.days!==1?"s":"")],
+                     ["Paid from till", rupee(st.till), "", "cash spent"],
+                     ["Short / extra", (st.short||st.extra) ? rupeeSigned(r2(st.extra-st.short)) : 'Tallied', st.extra-st.short<0?"neg":"pos",
+                      (st.short||st.extra) ? rupee(st.short)+' short · '+rupee(st.extra)+' extra' : st.counted+" day"+(st.counted!==1?"s":"")+" counted"]]);
+  }
 
   var mKeyNow = appMonth();
   var handTot = {};
   cashDays.forEach(function(c){
-    if(c.date.slice(0,7)!==mKeyNow) return;
+    if(c.date < R.from || c.date > R.to) return;
     var amt = handoverAmount(c);
     if(amt>0 && c.receivedBy){ handTot[c.receivedBy] = (handTot[c.receivedBy]||0) + amt; }
   });
   var hKeys = Object.keys(handTot).sort(function(a,b){ return handTot[b]-handTot[a]; });
   if(hKeys.length){
-    html += '<div class="card" style="margin-bottom:14px;"><h3>Cash handed over <span class="muted">· '+esc(monthLabel(mKeyNow))+'</span></h3>'+
+    html += '<div class="card" style="margin-bottom:14px;"><h3>Cash handed over <span class="muted">· '+esc(R.label)+'</span></h3>'+
       hKeys.map(function(k){ return '<div class="psrow"><span>'+esc(k)+'</span><b>'+rupee(handTot[k])+'</b></div>'; }).join("")+
       '<div class="backupnote" style="margin-top:8px;">Counter cash collected by each person. Record where it went (bank, expenses, back to the counter) in the Handover tab.</div>'+
       '<button class="btn-additem" id="cash_ho" style="margin-top:8px;">See where the handover cash went</button></div>';
   }
 
-  var recent = cashDays.filter(function(c){ return c.date.slice(0,7)===mKeyNow; }).sort(function(a,b){ return b.date.localeCompare(a.date); });
-  var cntd = recent.filter(function(c){ return c.counted !== null && c.counted !== undefined && c.counted !== ""; }).length;
-  html += '<div class="calhead" style="margin:4px 0 6px;"><button id="cashLogPrev" aria-label="Previous month">‹</button><h2 class="serif" style="font-size:17px;">Counter log · '+esc(monthLabel(mKeyNow))+'</h2><button id="cashLogNext" aria-label="Next month">›</button></div>';
-  html += '<div class="barsub" style="margin:0 0 6px;">'+cntd+' day'+(cntd!==1?'s':'')+' counted · same month as the calendar</div>';
-  if(!recent.length) html += '<div class="empty">No counter counts in '+esc(monthLabel(mKeyNow))+'.</div>';
+  var recent = recPeriod==="month" ? cashDays.filter(function(c){ return c.date >= R.from && c.date <= R.to; }).sort(function(a,b){ return b.date.localeCompare(a.date); }) : [];
+  if(recPeriod==="year"){
+    var mks = Object.keys(monthRows).sort().reverse();
+    html += '<div class="daygroup">Month by month</div>';
+    if(!mks.length) html += '<div class="empty">Nothing in '+esc(R.label)+' yet.</div>';
+    html += mks.map(function(mk){ var r = monthRows[mk];
+      return '<div class="entry rpmonthrow" data-rpmonth="'+mk+'"><div><div class="who">'+esc(monthLabel(mk))+'</div><div class="meta">'+r.counted+' day'+(r.counted!==1?'s':'')+' counted · '+rupee(r.till)+' paid from till · '+rupee(r.handed)+' handed over'+
+        (Math.abs(r.diff)>=1 ? ' · <span class="'+(r.diff<0?"bad":"warnamt")+'">'+rupeeSigned(r.diff)+(r.diff<0?' short':' extra')+'</span>' : ' · tallied')+'</div></div><div class="amt sale">'+rupee(r.sales)+'</div></div>'; }).join("");
+  }
+  if(recPeriod==="month"){
+    html += '<div class="daygroup">Counter log · '+esc(R.label)+'</div>';
+    if(!recent.length) html += '<div class="empty">No counter counts in '+esc(R.label)+'.</div>';
+  }
   if(recent.length){
     html += recent.map(function(c){
       var e = expectedCash(c.date);
@@ -8952,7 +9037,11 @@ function renderCashView(){
     }).join("");
   }
 
+  html += obHtml;
   el.innerHTML = html;
+  wireRecPeriodBar(el);
+  var ctd = document.getElementById("cash_today");
+  if(ctd) ctd.addEventListener("click", function(){ openCashDayForm(today); });
   document.getElementById("cash_setup").addEventListener("click", openOpeningBalanceForm);
   var cbc = document.getElementById("cash_bankcheck");
   if(cbc) cbc.addEventListener("click", function(){ openBankCheckForm(today); });
@@ -8967,9 +9056,8 @@ function renderCashView(){
       else { var x = expenses.find(function(e){ return e.id===id; }); if(x) openForm("expense", x, x.date); }
     });
   });
-  document.getElementById("cash_close").addEventListener("click", function(){ openCashDayForm(today); });
-  document.getElementById("cashLogPrev").addEventListener("click", function(){ shiftAppMonth(-1); renderAll(); });
-  document.getElementById("cashLogNext").addEventListener("click", function(){ shiftAppMonth(1); renderAll(); });
+  var ccl = document.getElementById("cash_close");
+  if(ccl) ccl.addEventListener("click", function(){ openCashDayForm(ccl.getAttribute("data-cashday")); });
   var crb = document.getElementById("cash_cr");
   if(crb) crb.addEventListener("click", function(){ setAppMonth(appMonth()); switchRecordsSub("review"); renderAll(); window.scrollTo(0,0); });
   var cho = document.getElementById("cash_ho");

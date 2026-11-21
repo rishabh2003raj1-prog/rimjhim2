@@ -190,3 +190,8 @@ totals for the period (payment modes, paid-how, by partner, by category). Bills,
 Loans and the Cash tab's counter log all show the same month — moving any of them (or the calendar) moves all of
 them. Under the calendar, **Month at a glance** shows sales, purchases, expenses, profit and partner money, and
 opens the matching Records view.
+The **Cash** tab follows the same Day / Month / Year switch: Day shows that day's counter working (opening, cash
+sales, paid from till, should-be, counted, difference, handover) with a button to record or update that day's count;
+Month shows cash sales, paid from the till, short / extra, handovers by person and the counter log; Year shows one
+row per month. The **Partners** tab shows what each partner put in or took out in the period (capital, loans,
+repayments, withdrawals, own-pocket bills and paybacks) and every balance "as at" the end of the period.
