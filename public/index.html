@@ -509,6 +509,7 @@
         <button data-r="handover">Handover</button>
         <button data-r="bank">Bank</button>
         <button data-r="review">Cash review</button>
+        <button data-r="loans">Loans</button>
         <button data-r="partners">Partners</button>
       </div>
       <div id="salesList" class="reclist"></div>
@@ -526,6 +527,7 @@
       <div id="handoverView" class="reclist" style="display:none;"></div>
       <div id="bankView" class="reclist" style="display:none;"></div>
       <div id="reviewView" class="reclist" style="display:none;"></div>
+      <div id="loansView" class="reclist" style="display:none;"></div>
     </div>
 
     <div class="view" id="view-notes">
@@ -681,13 +683,14 @@ function appAlert(msg){
 
 function storeKey(k){ return OUTLET.id==="rimjhim" ? k : (OUTLET.id + "__" + k); }
 
-var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1";
+var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1", LOANS_KEY = "loans_v1";
 var sales = [], purchases = [], notes = [], investments = [], expenses = [], bills = [];
 var staff = [], roster = [], attendance = [], tasks = [], conduct = [], cashDays = [];
 var menuItems = [], ingredients = [], dishLog = [], vendors = [], assets = [], customers = [], creditPayments = [];
 var wastage = [], prepBatches = [], stockAudits = [];
 var payroll = []; // one record per person per month: settlement + unused-leave choice
 var cashMoves = []; // what was done with handed-over cash: banked, put back, passed on, withdrawn, taken
+var loans = []; // loans the cafe took from / gave to anyone other than a partner (partner loans live in investments)
 var retailItems = [], retailSales = [];
 var cafeUse = [];
 var stockSub = "all";
@@ -847,7 +850,7 @@ function seedData(){
 // entries without internet; changes upload as soon as the connection is back.
 var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
-  PAYROLL_KEY, CASHMOVE_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
+  PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
   VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo";
 
@@ -1070,6 +1073,7 @@ function setKeyValue(key, v){
     case CONDUCT_KEY: conduct = arr; break;
     case PAYROLL_KEY: payroll = arr; break;
     case CASHMOVE_KEY: cashMoves = arr; break;
+    case LOANS_KEY: loans = arr; break;
     case PARTNERS_KEY: if(Array.isArray(v) && v.length) PARTNERS = v; break;
     case SETTINGS_KEY: settings = (v && typeof v==="object") ? v : {}; break;
   }
@@ -1679,6 +1683,7 @@ function readLists(){
   conduct = Array.isArray(cd) ? cd : [];
   var pr = lsGet(PAYROLL_KEY); payroll = Array.isArray(pr) ? pr : [];
   var cmv = lsGet(CASHMOVE_KEY); cashMoves = Array.isArray(cmv) ? cmv : [];
+  var lnv = lsGet(LOANS_KEY); loans = Array.isArray(lnv) ? lnv : [];
   var cdays = lsGet(CASH_KEY), sett = lsGet(SETTINGS_KEY);
   cashDays = Array.isArray(cdays) ? cdays : [];
   settings = (sett && typeof sett==="object") ? sett : { openingCash:null, openingCashDate:null, bankBalance:null, bankDate:null };
@@ -1727,6 +1732,7 @@ function saveTasks(){ return lsSet(TASKS_KEY, tasks); }
 function saveConduct(){ return lsSet(CONDUCT_KEY, conduct); }
 function savePayroll(){ return lsSet(PAYROLL_KEY, payroll); }
 function saveCashMoves(){ return lsSet(CASHMOVE_KEY, cashMoves); }
+function saveLoans(){ return lsSet(LOANS_KEY, loans); }
 function saveCashDays(){ return lsSet(CASH_KEY, cashDays); }
 function saveSettings(){ return lsSet(SETTINGS_KEY, settings); }
 function saveMenu(){ return lsSet(MENU_KEY, menuItems); }
@@ -1863,6 +1869,7 @@ function renderAll(){
   renderHandoverView();
   renderBankView();
   renderCashReviewView();
+  renderLoansView();
   renderPartnersView();
   renderStaffSection();
   renderNotes();
@@ -2096,7 +2103,9 @@ function renderDashboard(){
     '<div class="psrow"><span>Bank'+(function(){ var b = bankMovements().base; return b ? ' <span class="muted">('+(b.noted?'from balance noted':'checked '+fmtD(b.date))+', updated since)</span>' : ''; })()+'</span><b>'+rupee(bankBalanceNow())+'</b></div>'+
     '<div class="psrow"><span>Customer udhaar to collect</span><b class="'+(creditOut>0?"bad":"")+'">'+rupee(creditOut)+'</b></div>'+
     '<div class="psrow"><span>Vendor bills unpaid</span><b class="'+(vendorDue>0?"bad":"")+'">'+rupee(vendorDue)+'</b></div>'+
-    '<div class="psrow"><span>Owed to partners</span><b class="'+(owed>0?"bad":"")+'">'+rupee(owed)+'</b></div>';
+    '<div class="psrow"><span>Owed to partners</span><b class="'+(owed>0?"bad":"")+'">'+rupee(owed)+'</b></div>'+
+    (function(){ var lt = loanTotals(fmtDate(new Date())); return (lt.cafeOwes ? '<div class="psrow"><span>Loans the cafe owes</span><b class="bad">'+rupee(lt.cafeOwes)+'</b></div>' : '')+
+      (lt.owedToCafe ? '<div class="psrow"><span>Loans to collect</span><b>'+rupee(lt.owedToCafe)+'</b></div>' : ''); })();
 
   // --- investments ---
   var pms = PARTNERS.map(function(n){ return { n:n, m:partnerMoney(n) }; });
@@ -2760,7 +2769,8 @@ function renderCalendar(){
   expenses.forEach(function(x){
     if(FIXED_CATS.indexOf(x.category)>=0 || STAFF_CATS.indexOf(x.category)>=0) billByDate[x.date]=true; else otherByDate[x.date]=true;
   });
-  var serviceByDate = {}, bankCheckByDate = {};
+  var serviceByDate = {}, bankCheckByDate = {}, loanByDate = {};
+  allLoanEntries().forEach(function(e){ loanByDate[e.date] = true; });
   bankChecks().forEach(function(c){ bankCheckByDate[c.date] = true; });
   assets.forEach(function(a){ if(a.nextService) serviceByDate[a.nextService] = true; });
   var cashByDate = {};
@@ -2780,6 +2790,7 @@ function renderCalendar(){
     if(billByDate[ds]) dots += '<i style="background:#6A4C93"></i>';
     if(cashByDate[ds]) dots += '<i style="background:#546E7A"></i>';
     if(bankCheckByDate[ds]) dots += '<i style="background:#2B6CB0"></i>';
+    if(loanByDate[ds]) dots += '<i style="background:#8D6E63"></i>';
     if(serviceByDate[ds]) dots += '<i style="background:#EF6C00"></i>';
     html += '<div class="'+cls+'" data-date="'+ds+'">'+day+'<span class="dots">'+dots+'</span></div>';
   }
@@ -2891,6 +2902,15 @@ function renderDayPanel(){
   }
   html += '<button class="btn-additem" id="dp_bank" style="margin-top:10px;">'+(bRec?'Update bank balance':'Record bank balance')+'</button></div>';
 
+  // Loans on this day (partner loans, other loans, staff salary advances).
+  var dLoans = allLoanEntries().filter(function(e){ return e.date===selectedDate; });
+  var dAdv = staffAdvances().filter(function(x){ return x.date===selectedDate; });
+  html += '<div class="card cashday" style="margin:4px 0 12px;"><h3>Loans</h3>';
+  if(!dLoans.length && !dAdv.length) html += '<div class="backupnote" style="margin:0;">No loan entries this day.</div>';
+  dLoans.forEach(function(e){ html += loanEntryRow(e); });
+  dAdv.forEach(function(x){ html += '<div class="psrow"><span>Salary advance · '+esc((x.description||"").split(" - ")[0])+' <i class="muted">(adjusted against salary)</i></span><b>'+rupeeP(expAmt(x))+'</b></div>'; });
+  html += '<div class="billbtns" style="margin-top:10px;"><button class="btn-additem" id="dp_loan">+ Loan entry</button><button class="btn-additem" id="dp_loans">All loans · '+esc(monthLabel(selectedDate.slice(0,7)))+'</button></div></div>';
+
   if(daySales.length===0 && dayPurch.length===0 && dayInvest.length===0 && dayExpense.length===0){
     html += '<div class="empty">No entries for this day yet.</div>';
   } else {
@@ -2916,6 +2936,11 @@ function renderDayPanel(){
   Array.prototype.forEach.call(panel.querySelectorAll("[data-add]"), function(b){
     b.addEventListener("click", function(){ openForm(b.getAttribute("data-add"), null, selectedDate); });
   });
+  var dpl = document.getElementById("dp_loan");
+  if(dpl) dpl.addEventListener("click", function(){ openLoanForm(null, { date:selectedDate }); });
+  var dpls = document.getElementById("dp_loans");
+  if(dpls) dpls.addEventListener("click", function(){ openLoansTab(selectedDate.slice(0,7)); });
+  wireLoanRows(panel);
   var dpb = document.getElementById("dp_bank");
   if(dpb) dpb.addEventListener("click", function(){ openBankCheckForm(selectedDate); });
   var dpc = document.getElementById("dp_cash");
@@ -2964,9 +2989,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -2980,6 +3005,7 @@ function updateRecordsTotal(){
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
   else if(recSub==="bank"){ lbl.textContent = rupee(bankBalanceNow())+" now"; }
+  else if(recSub==="loans"){ var lt = loanTotals(loanMonthEnd(lnMonth)); lbl.textContent = rupee(lt.cafeOwes)+" owed by cafe"+(lt.owedToCafe?" · "+rupee(lt.owedToCafe)+" to collect":""); }
   else if(recSub==="review"){ var cr = cashReview(crMonth); lbl.textContent = cr.future ? "" : rupee(cr.end)+" total"; }
   else if(recSub==="cash"){ lbl.textContent = rupee(cashInHand())+" in hand · "+rupee(bankBalanceNow())+" bank"; }
   else if(recSub==="customers"){ var due=customers.reduce(function(a,c){return a+customerDue(c);},0);
@@ -3554,7 +3580,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans };
 }
 
 function exportBackup(){
@@ -3733,6 +3759,7 @@ function applyBackupData(data, errEl, partial){
     cafeUse = take("cafeUse", cafeUse); custPayments = take("custPayments", custPayments);
     payroll = take("payroll", payroll);
     cashMoves = take("cashMoves", cashMoves);
+    loans = take("loans", loans);
     offers = take("offers", offers);
     if(Array.isArray(data.partners) && data.partners.length){
       PARTNERS = partial ? PARTNERS.concat(data.partners.filter(function(p){ return PARTNERS.indexOf(p)<0; })) : data.partners;
@@ -3750,7 +3777,7 @@ function saveEverything(){
   saveSales(); savePurch(); saveInvest(); saveExpense(); saveNotes(); savePartners(); saveBills();
   saveStaff(); saveRoster(); saveAttend(); saveTasks(); saveConduct(); saveCashDays(); saveSettings();
   saveMenu(); saveIngredients(); saveDishLog(); saveVendors(); saveAssets(); saveCustomers(); saveCreditPayments();
-  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); savePayroll(); saveCashMoves();
+  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); savePayroll(); saveCashMoves(); saveLoans();
 }
 
 function importBackup(file){
@@ -7065,6 +7092,11 @@ function bankRows(){
     else if(k==="loan") rows.push({ date:v.date, kind:"loanin", amt:a, text:"Loan from "+v.partner+" (working capital)", ref:v.id, who:v.partner });
     else rows.push({ date:v.date, kind:"invest", amt:a, text:"Capital ("+invCategory(v)+") · "+v.partner, ref:v.id, who:v.partner });
   });
+  loans.forEach(function(l){
+    if(!l.date || l.via!=="bank") return;
+    var a = +l.amount||0;
+    rows.push({ date:l.date, kind: loanIsIn(l) ? "oloanin" : "oloanout", amt: loanIsIn(l) ? a : -a, text:loanTypeLabel(l)+" · "+l.party+(l.note?" · "+l.note:""), ref:l.id, who:l.party, ltype:l.type });
+  });
   cashMoves.forEach(function(x){
     var a = +x.amount||0;
     if(x.type==="bank") rows.push({ date:x.date, kind:"deposits", amt:a, text:"Handover cash deposited · "+x.holder+(x.note?" · "+x.note:""), ref:x.id });
@@ -7133,15 +7165,15 @@ function bankCheckResults(rows){
 function bankMovements(){
   var today = fmtDate(new Date()), anchors = bankAnchors().filter(function(a){ return a.date < today || a.date===today; });
   var base = anchors.length ? anchors[anchors.length-1] : null;
-  var m = { sales:0, udhaar:0, invest:0, loanin:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, loanrepay:0, repaid:0, atm:0, adjIn:0, adjOut:0 };
+  var m = { sales:0, udhaar:0, invest:0, loanin:0, oloanin:0, deposits:0, interest:0, bills:0, charges:0, purchases:0, withdraw:0, loanrepay:0, oloanout:0, repaid:0, atm:0, adjIn:0, adjOut:0 };
   bankRows().forEach(function(r){
     if(!(r.date && (!base || r.date > base.date) && r.date <= today)) return;
     if(r.kind==="adj"){ if(r.amt>=0) m.adjIn += r.amt; else m.adjOut -= r.amt; return; }
     m[r.kind] += Math.abs(r.amt);
   });
   Object.keys(m).forEach(function(k){ m[k] = r2(m[k]); });
-  m.in = r2(m.sales + m.udhaar + m.invest + m.loanin + m.deposits + m.interest + m.adjIn);
-  m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.loanrepay + m.repaid + m.atm + m.adjOut);
+  m.in = r2(m.sales + m.udhaar + m.invest + m.loanin + m.oloanin + m.deposits + m.interest + m.adjIn);
+  m.out = r2(m.bills + m.charges + m.purchases + m.withdraw + m.loanrepay + m.oloanout + m.repaid + m.atm + m.adjOut);
   m.base = base;
   return m;
 }
@@ -7152,12 +7184,19 @@ function bankBalanceNow(){ return bankBalanceAt(addDays(fmtDate(new Date()), 1))
 var BANK_IN_LABELS = { sales:"UPI / card sales", udhaar:"Udhaar paid back (UPI / bank)", invest:"Partner capital in", loanin:"Loan from partner", deposits:"Handover cash deposited", interest:"Interest", adj:"Adjustment" };
 var BANK_OUT_LABELS = { bills:"Bills paid", purchases:"Purchases paid", charges:"Bank charges", withdraw:"Partner withdrawals", loanrepay:"Loan repaid to partner", repaid:"Partners repaid for bills", atm:"Cash withdrawn", adj:"Adjustment" };
 // Loans show per partner: "Loan from Rishabh", "Loan repaid to Rishabh".
-function bankSumKey(r){ return (r.kind==="loanin" || r.kind==="loanrepay" || r.kind==="invest") && r.who ? r.kind+"|"+r.who : r.kind; }
+function bankSumKey(r){
+  if((r.kind==="oloanin" || r.kind==="oloanout") && r.who) return "o"+r.ltype+"|"+r.who;
+  return (r.kind==="loanin" || r.kind==="loanrepay" || r.kind==="invest") && r.who ? r.kind+"|"+r.who : r.kind;
+}
 function bankSumLabel(key, inn){
   var k = key.split("|")[0], who = key.split("|")[1];
   if(who && k==="loanin") return "Loan from "+who;
   if(who && k==="loanrepay") return "Loan repaid to "+who;
   if(who && k==="invest") return "Capital from "+who;
+  if(who && k==="otake") return "Loan from "+who;
+  if(who && k==="orepay") return "Loan repaid to "+who;
+  if(who && k==="ogive") return "Loan given to "+who;
+  if(who && k==="ocollect") return "Loan repayment from "+who;
   return (inn ? BANK_IN_LABELS : BANK_OUT_LABELS)[k] || k;
 }
 function bankDaySummary(dateStr){
@@ -7252,6 +7291,10 @@ function handoverRows(holder){
     if(!invIsIn(v)) rows.push({ date:v.date, kind:"invout", amt:-(+v.amount||0), text:(invKind(v)==="repay"?"Loan repaid to ":"Withdrawal · ")+v.partner, ref:"inv:"+v.id });
     else rows.push({ date:v.date, kind:"investin", amt:+v.amount||0, text:(invKind(v)==="loan"?"Loan to the cafe · ":"Capital · ")+v.partner, ref:"inv:"+v.id });
   });
+  loans.forEach(function(l){
+    if(!l.date || l.via!=="held:"+holder) return;
+    rows.push({ date:l.date, kind: loanIsIn(l) ? "investin" : "invout", amt: loanIsIn(l) ? +l.amount||0 : -(+l.amount||0), text:loanTypeLabel(l)+" · "+l.party, ref:"loan:"+l.id });
+  });
   partnerRepayments().forEach(function(r){
     if(r.mode==="held" && r.from===holder) rows.push({ date:r.date, kind:"repay", amt:-r.amount, text:"Repaid "+r.partner+" · "+r.what, ref:"" });
   });
@@ -7313,9 +7356,9 @@ function renderHandoverView(){
     var line = function(lbl, v, sign){ return v ? '<div class="psrow"><span>'+lbl+'</span><b>'+(sign||"")+rupeeP(v)+'</b></div>' : ''; };
     html += '<div class="card" style="margin-bottom:12px;"><h3>'+esc(r.holder)+'</h3>'+
       '<div class="psrow"><span>With them at the start of the month</span><b>'+rupeeP(r.opening)+'</b></div>'+
-      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Partner money in (cash)", r.investIn)+line("+ Received from others", r.fromOthers)+
+      line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Partner / loan money in (cash)", r.investIn)+line("+ Received from others", r.fromOthers)+
       line("− Spent on expenses", r.expenses)+line("− Spent on purchases", r.purchases)+line("− Deposited in bank", r.bank)+
-      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+line("− Partner withdrawal / loan repaid", r.invOut)+
+      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+line("− Partner withdrawal / loan money out", r.invOut)+
       '<div class="psrow"><span><b>Still with '+esc(r.holder)+'</b></span><b class="'+(r.closing<0?"bad":r.closing>0?"warnamt":"ok")+'">'+rupeeP(r.closing)+'</b></div>';
     if(r.closing < -0.5) html += '<div class="attmwarn" style="margin-top:8px;">More was spent than was handed over. Either a handover is missing, or '+esc(r.holder)+' added their own money (then change those entries to “own money” so the cafe owes it back).</div>';
     if(r.rows.length){
@@ -7349,6 +7392,7 @@ function renderHandoverView(){
       if(k==="handover"){ openCashDayForm(ref); return; }
       if(k==="expense"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
       if(k==="purchase"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
+      if(ref && ref.indexOf("loan:")===0){ var ln = loans.find(function(e){ return e.id===ref.slice(5); }); if(ln) openLoanForm(ln); return; }
       if(ref && ref.indexOf("inv:")===0){ var iv = investments.find(function(e){ return e.id===ref.slice(4); }); if(iv) openForm("investment", iv, iv.date); return; }
       var mm = cashMoves.find(function(e){ return e.id===ref; });
       if(mm && mm.type==="atmheld"){ openBankAdjForm(mm); return; }
@@ -7363,12 +7407,256 @@ function renderHandoverView(){
 function otherIncomeIn(test){
   return r2(cashMoves.filter(function(m){ return m.type==="interest" && test(m.date); }).reduce(function(a,m){ return a+(+m.amount||0); },0));
 }
+// ---------- LOANS ----------
+// Every loan in one place: working capital loans from partners (kept with partner
+// money), loans from anyone else (bank / NBFC, relative or friend, supplier...), and
+// loans the cafe gives (staff, others). Each entry says where the money went or came
+// from - counter cash, bank, cash a person holds, or paid directly - so cash, bank and
+// handover balances follow it. Staff salary advances are listed for reference; they
+// are settled against salary.
+var lnMonth = fmtDate(new Date()).slice(0,7);
+var LOAN_TYPES = [["take","Loan taken by the cafe"],["repay","Loan repaid by the cafe"],["give","Loan given by the cafe"],["collect","Repayment received (loan given)"]];
+var LOAN_PARTY_TYPES = ["Bank / NBFC","Relative / friend","Supplier","Staff","Other"];
+function loanIsIn(l){ return l.type==="take" || l.type==="collect"; }
+function loanTypeLabel(l){ return { take:"Loan taken", repay:"Loan repaid", give:"Loan given", collect:"Repayment received" }[l.type] || "Loan"; }
+function loanViaLabel(via, inn){
+  if(via==="direct") return "paid directly (not through the cafe)";
+  if(via==="bank") return inn ? "into cafe bank" : "from cafe bank";
+  if(via==="counter") return inn ? "into the counter" : "from the counter";
+  if(via && via.indexOf("held:")===0) return (inn ? "cash kept by " : "from cash held by ")+via.slice(5);
+  return "";
+}
+// One list for showing: partner loans (from investments) and other loans.
+function allLoanEntries(){
+  var out = [];
+  investments.forEach(function(v){
+    var k = invKind(v);
+    if(k!=="loan" && k!=="repay" || !v.date) return;
+    out.push({ src:"inv", id:v.id, date:v.date, type: k==="loan" ? "take" : "repay", party:v.partner, partyType:"Partner", amount:+v.amount||0,
+               via: invDest(v), note:v.notes||"" });
+  });
+  loans.forEach(function(l){ if(l.date) out.push({ src:"loan", id:l.id, date:l.date, type:l.type, party:l.party, partyType:l.partyType||"Other", amount:+l.amount||0, via:l.via||"direct", note:l.note||"", interest:l.interest, due:l.due }); });
+  return out.sort(function(a,b){ return a.date.localeCompare(b.date); });
+}
+function staffAdvances(){ return expenses.filter(function(x){ return x.advance || /advance/i.test(x.description||"") && STAFF_CATS.indexOf(x.category)>=0; }); }
+function loanMonthEnd(mKey){ return mKey+"-"+String(daysInMonthOf(mKey)).padStart(2,"0"); }
+// Balances per lender / borrower up to and including a date.
+function loanParties(upto){
+  var map = {};
+  allLoanEntries().forEach(function(e){
+    if(e.date > upto) return;
+    var key = e.party+"|"+(e.type==="take"||e.type==="repay" ? "owe" : "lent");
+    var p = map[key] || (map[key] = { party:e.party, partyType:e.partyType, dir:(e.type==="take"||e.type==="repay") ? "owe" : "lent", out:0, back:0, last:e.date, interest:null, due:null });
+    if(e.type==="take" || e.type==="give") p.out += e.amount; else p.back += e.amount;
+    if(e.interest) p.interest = e.interest; if(e.due) p.due = e.due;
+    p.last = e.date;
+  });
+  return Object.keys(map).map(function(k){ var p = map[k]; p.out = r2(p.out); p.back = r2(p.back); p.balance = r2(p.out - p.back); return p; })
+    .sort(function(a,b){ return (a.dir===b.dir ? 0 : a.dir==="owe" ? -1 : 1) || b.balance - a.balance; });
+}
+function loanTotals(upto){
+  var t = { cafeOwes:0, owedToCafe:0 };
+  loanParties(upto).forEach(function(p){ if(p.dir==="owe") t.cafeOwes += Math.max(0, p.balance); else t.owedToCafe += Math.max(0, p.balance); });
+  t.cafeOwes = r2(t.cafeOwes); t.owedToCafe = r2(t.owedToCafe);
+  return t;
+}
+function loanOutstanding(party, dir, excludeId){
+  var bal = 0;
+  allLoanEntries().forEach(function(e){
+    if(e.party!==party || e.id===excludeId) return;
+    var d = (e.type==="take"||e.type==="repay") ? "owe" : "lent";
+    if(d!==dir) return;
+    bal += (e.type==="take"||e.type==="give") ? e.amount : -e.amount;
+  });
+  return r2(bal);
+}
+function loanEntryRow(e){
+  var inn = e.type==="take" || e.type==="collect";
+  return '<button class="bpedit" style="margin:4px 0;width:100%;" data-lnsrc="'+e.src+'" data-lnid="'+esc(e.id)+'"><b class="'+(inn?"ok":"bad")+'">'+(inn?"+":"−")+rupeeP(e.amount)+'</b> · '+
+    esc(loanTypeLabel(e))+' · '+esc(e.party)+(e.partyType?' <i class="muted">('+esc(e.partyType)+')</i>':'')+' · '+esc(loanViaLabel(e.via, inn))+(e.note?' · '+esc(e.note):'')+'<span class="bphint">Edit</span></button>';
+}
+function wireLoanRows(root){
+  Array.prototype.forEach.call(root.querySelectorAll("[data-lnid]"), function(b){
+    b.addEventListener("click", function(){
+      var id = b.getAttribute("data-lnid");
+      if(b.getAttribute("data-lnsrc")==="inv"){ var v = investments.find(function(x){ return x.id===id; }); if(v) openForm("investment", v, v.date); }
+      else { var l = loans.find(function(x){ return x.id===id; }); if(l) openLoanForm(l); }
+    });
+  });
+}
+function openLoansTab(mKey){
+  lnMonth = mKey || fmtDate(new Date()).slice(0,7);
+  showView("records"); switchRecordsSub("loans"); renderLoansView(); window.scrollTo(0,0);
+}
+
+function renderLoansView(){
+  var el = document.getElementById("loansView");
+  if(!el) return;
+  var first = parseDate(lnMonth+"-01"), end = loanMonthEnd(lnMonth);
+  var entries = allLoanEntries().filter(function(e){ return e.date.slice(0,7)===lnMonth; });
+  var adv = staffAdvances().filter(function(x){ return (x.date||"").slice(0,7)===lnMonth; });
+  var parties = loanParties(end), tot = loanTotals(end);
+  var mIn = entries.filter(function(e){ return e.type==="take" || e.type==="collect"; }).reduce(function(a,e){ return a+e.amount; },0);
+  var mOut = entries.filter(function(e){ return e.type==="repay" || e.type==="give"; }).reduce(function(a,e){ return a+e.amount; },0);
+  var html = '<div class="calhead" style="margin-bottom:10px;"><button id="lnPrev">‹</button><h2 class="serif" style="font-size:18px;">'+
+             first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="lnNext">›</button></div>';
+  html += '<div class="kpis fckpis" style="margin-bottom:12px;">'+
+    '<div class="kpi"><div class="lbl">Cafe owes</div><div class="val '+(tot.cafeOwes>0?"neg":"")+'">'+rupee(tot.cafeOwes)+'</div><div class="sub2">at month end</div></div>'+
+    '<div class="kpi"><div class="lbl">To collect</div><div class="val">'+rupee(tot.owedToCafe)+'</div><div class="sub2">loans given</div></div>'+
+    '<div class="kpi"><div class="lbl">This month</div><div class="val" style="font-size:15px;">+'+rupee(mIn)+'<br>−'+rupee(mOut)+'</div><div class="sub2">in / out</div></div></div>';
+  html += '<div class="billbtns" style="margin-bottom:8px;"><button class="btn-additem" data-lnadd="take">+ Loan taken</button><button class="btn-additem" data-lnadd="repay">+ Repay a loan</button></div>';
+  html += '<div class="billbtns" style="margin-bottom:12px;"><button class="btn-additem" data-lnadd="give">+ Loan given</button><button class="btn-additem" data-lnadd="collect">+ Repayment received</button></div>';
+  // Who the cafe owes / who owes the cafe
+  var owe = parties.filter(function(p){ return p.dir==="owe" && (p.balance || p.last.slice(0,7)===lnMonth); });
+  var lent = parties.filter(function(p){ return p.dir==="lent" && (p.balance || p.last.slice(0,7)===lnMonth); });
+  function partyRows(list, owing){
+    if(!list.length) return '<div class="backupnote" style="margin:0;">None.</div>';
+    return list.map(function(p){
+      return '<div class="billitem"><div class="billtop"><div><b>'+esc(p.party)+'</b> <span class="pill">'+esc(p.partyType)+'</span>'+
+        '<span>'+(owing?'Borrowed ':'Lent ')+rupeeP(p.out)+' · '+(owing?'repaid ':'received back ')+rupeeP(p.back)+(p.interest?' · '+esc(String(p.interest))+'% a year':'')+(p.due?' · due '+parseDate(p.due).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}):'')+'</span></div>'+
+        '<b class="'+(p.balance>0?(owing?"bad":"warnamt"):"ok")+'" style="white-space:nowrap;">'+(p.balance>0?rupeeP(p.balance):'cleared')+'</b></div>'+
+        (p.balance>0 ? '<button class="btn-additem" data-lnquick="'+(owing?"repay":"collect")+'" data-lnparty="'+esc(p.party)+'" data-lnptype="'+esc(p.partyType)+'" style="margin-top:6px;">'+(owing?'Repay '+esc(p.party):'Record repayment from '+esc(p.party))+'</button>' : '')+'</div>';
+    }).join("");
+  }
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Loans the cafe owes <span class="muted">· at '+fmtD(end)+'</span></h3>'+partyRows(owe, true)+'</div>';
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Loans given by the cafe <span class="muted">· to collect</span></h3>'+partyRows(lent, false)+'</div>';
+  // Day by day
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Loan entries · '+esc(monthLabel(lnMonth))+'</h3>';
+  if(!entries.length) html += '<div class="backupnote" style="margin:0;">No loan entries this month.</div>';
+  var lastD = null;
+  entries.slice().reverse().forEach(function(e){
+    if(e.date!==lastD){ html += '<div class="daygroup" style="margin:8px 0 2px;cursor:pointer;" data-lnday="'+e.date+'">'+parseDate(e.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+' <span class="muted">📅</span></div>'; lastD = e.date; }
+    html += loanEntryRow(e);
+  });
+  html += '</div>';
+  if(adv.length){
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Salary advances to staff <span class="muted">· adjusted against salary</span></h3>'+
+      adv.sort(function(a,b){ return b.date.localeCompare(a.date); }).map(function(x){ return '<div class="psrow"><span>'+fmtD(x.date)+' · '+esc((x.description||"").split(" - ")[0])+'</span><b>'+rupeeP(expAmt(x))+'</b></div>'; }).join("")+
+      '<div class="barsub" style="margin-top:6px;">These come off the staff member’s salary (Staff → Salary), so they aren’t counted as loans to collect.</div></div>';
+  }
+  html += '<button class="btn-save" id="ln_pdf" style="width:100%;margin-bottom:72px;">Download loan statement PDF · '+esc(monthLabel(lnMonth))+'</button>';
+  el.innerHTML = html;
+  function shift(n){ lnMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7);
+    calCursor = parseDate(lnMonth+"-01"); fcMonth = lnMonth; renderLoansView(); renderCalendar(); updateRecordsTotal(); }
+  document.getElementById("lnPrev").addEventListener("click", function(){ shift(-1); });
+  document.getElementById("lnNext").addEventListener("click", function(){ shift(1); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-lnadd]"), function(b){ b.addEventListener("click", function(){ openLoanForm(null, { type:b.getAttribute("data-lnadd"), date:billDefaultDate(lnMonth) }); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-lnquick]"), function(b){
+    b.addEventListener("click", function(){
+      var party = b.getAttribute("data-lnparty"), type = b.getAttribute("data-lnquick"), ptype = b.getAttribute("data-lnptype");
+      if(ptype==="Partner"){ openForm("investment", null, billDefaultDate(lnMonth), { partner:party, invType:"Loan repayment", amount: partnerMoney(party).outstanding, via:"bank" }); return; }
+      openLoanForm(null, { type:type, party:party, partyType:ptype, amount: loanOutstanding(party, type==="repay"?"owe":"lent"), date:billDefaultDate(lnMonth) });
+    });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-lnday]"), function(d){ d.addEventListener("click", function(){ openCalendarOn(d.getAttribute("data-lnday")); }); });
+  wireLoanRows(el);
+  document.getElementById("ln_pdf").addEventListener("click", function(){ exportLoanStatement(lnMonth, this); });
+  if(recSub==="loans") updateRecordsTotal();
+}
+
+function openLoanForm(rec, preset){
+  preset = preset || {};
+  var type = rec ? rec.type : (preset.type || "take");
+  var sheet = document.getElementById("sheet");
+  var known = {};
+  loans.forEach(function(l){ known[l.party] = l.partyType || "Other"; });
+  var html = '<h2 class="serif">'+(rec ? "Edit loan entry" : "Loan entry")+'</h2>';
+  html += '<div class="field"><label>What happened</label><select id="ln_type">'+LOAN_TYPES.map(function(t){ return '<option value="'+t[0]+'"'+(t[0]===type?" selected":"")+'>'+t[1]+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="field"><label id="ln_partylbl">Lender</label><input type="text" id="ln_party" list="ln_parties" value="'+esc(rec?rec.party:(preset.party||""))+'" placeholder="e.g. SBI, Mama ji, Roobi Devi Kirana">'+
+          '<datalist id="ln_parties">'+Object.keys(known).map(function(n){ return '<option value="'+esc(n)+'">'; }).join("")+activeStaff().map(function(st){ return '<option value="'+esc(st.name)+'">'; }).join("")+'</datalist></div>';
+  html += '<div class="field"><label>Who they are</label><select id="ln_ptype">'+LOAN_PARTY_TYPES.map(function(t){ return '<option'+((rec?rec.partyType:(preset.partyType||"Bank / NBFC"))===t?" selected":"")+'>'+t+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="backupnote" style="margin-top:-4px;">Loans from partners are recorded with partner money: Records → Partners → + Add money (or Repay loan).</div>';
+  html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="ln_amt" value="'+(rec?rec.amount:(preset.amount||""))+'"></div>'+
+          '<div><label>Date</label><input type="date" id="ln_date" value="'+esc(rec?rec.date:(preset.date||fmtDate(new Date())))+'"></div></div>';
+  html += '<div class="field"><label id="ln_vialbl">Where the money went</label><select id="ln_via"></select></div>';
+  html += '<div class="field two" id="ln_terms"><div><label>Interest % a year (optional)</label><input type="number" inputmode="decimal" id="ln_int" value="'+esc(rec&&rec.interest||"")+'"></div>'+
+          '<div><label>Repay by (optional)</label><input type="date" id="ln_due" value="'+esc(rec&&rec.due||"")+'"></div></div>';
+  html += '<div class="field"><label>Note (optional)</label><input type="text" id="ln_note" value="'+esc(rec&&rec.note||"")+'" placeholder="e.g. for Diwali stock, 3 instalments"></div>';
+  html += '<div class="backupnote" id="ln_hint"></div>';
+  html += '<div class="err" id="ln_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ln_cancel">Cancel</button>'+(rec?'<button class="btn-del" id="ln_del">Delete</button>':'')+'<button class="btn-save" id="ln_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  var fT = document.getElementById("ln_type"), fV = document.getElementById("ln_via"), fP = document.getElementById("ln_party");
+  function sync(first){
+    var t = fT.value, inn = (t==="take" || t==="collect");
+    document.getElementById("ln_partylbl").textContent = (t==="take" || t==="repay") ? "Lender (who lent to the cafe)" : "Borrower (who the cafe lent to)";
+    document.getElementById("ln_vialbl").textContent = inn ? "Where the money went" : "Paid from";
+    document.getElementById("ln_terms").style.display = (t==="take" || t==="give") ? "" : "none";
+    var opts = (t==="take" ? [["direct","Paid directly by the lender (e.g. to a supplier) - not through cafe cash or bank"]] : [])
+      .concat([["bank", inn ? "Into the cafe bank account" : "From the cafe bank account"], ["counter", inn ? "Into the cafe cash counter" : "From the cafe cash counter"]])
+      .concat(cashHolders().map(function(h){ return ["held:"+h, (inn ? "Cash kept by " : "From cafe cash held by ")+h]; }));
+    var want = first && rec ? rec.via : (opts.some(function(o){ return o[0]===fV.value; }) && !first ? fV.value : "bank");
+    if(!opts.some(function(o){ return o[0]===want; })) want = opts[0][0] === "direct" ? "bank" : opts[0][0];
+    fV.innerHTML = opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===want?" selected":"")+'>'+esc(o[1])+'</option>'; }).join("");
+    var party = fP.value.trim(), dir = (t==="take"||t==="repay") ? "owe" : "lent";
+    var bal = party ? loanOutstanding(party, dir, rec && rec.id) : 0;
+    document.getElementById("ln_hint").innerHTML = (t==="repay" || t==="collect") && party ? (dir==="owe" ? "Cafe still owes "+esc(party)+": <b>" : esc(party)+" still owes the cafe: <b>")+rupeeP(bal)+"</b>." :
+      t==="take" ? "Money borrowed by the cafe. It isn’t cafe income and is kept apart from sales." : t==="give" ? "Money the cafe lends out, to be collected back. It isn’t an expense." : "";
+    if(known[party] && !first) document.getElementById("ln_ptype").value = known[party];
+  }
+  fT.addEventListener("change", function(){ sync(false); }); fP.addEventListener("input", function(){ sync(false); }); sync(true);
+  document.getElementById("ln_cancel").addEventListener("click", closeForm);
+  if(rec) document.getElementById("ln_del").addEventListener("click", function(){
+    askConfirm("Delete this loan entry?", function(){ loans = loans.filter(function(l){ return l.id!==rec.id; }); saveLoans(); closeForm(); renderAll(); });
+  });
+  document.getElementById("ln_save").addEventListener("click", function(){
+    var err = document.getElementById("ln_err"); err.style.display = "none";
+    var t = fT.value, party = fP.value.trim(), amt = parseFloat(document.getElementById("ln_amt").value);
+    if(!party){ err.textContent = "Enter who the loan is with."; err.style.display = "block"; return; }
+    if(PARTNERS.some(function(p){ return p.toLowerCase()===party.toLowerCase(); })){ err.textContent = party+" is a partner - record partner loans from Records → Partners (+ Add money / Repay loan)."; err.style.display = "block"; return; }
+    if(isNaN(amt) || amt<=0){ err.textContent = "Enter an amount greater than 0."; err.style.display = "block"; return; }
+    if(t==="repay" || t==="collect"){
+      var left = loanOutstanding(party, t==="repay" ? "owe" : "lent", rec && rec.id);
+      if(amt > left + 0.5){ err.textContent = (t==="repay" ? "The cafe only owes "+party+" " : party+" only owes the cafe ")+rupeeP(Math.max(0,left))+"."; err.style.display = "block"; return; }
+    }
+    var r = { id: rec ? rec.id : uid(), date: document.getElementById("ln_date").value || fmtDate(new Date()), type:t, party:party,
+              partyType: document.getElementById("ln_ptype").value, amount:r2(amt), via: fV.value, note: document.getElementById("ln_note").value.trim() };
+    if(t==="take" || t==="give"){ var iv = parseFloat(document.getElementById("ln_int").value); if(!isNaN(iv) && iv>0) r.interest = iv; var du = document.getElementById("ln_due").value; if(du) r.due = du; }
+    if(rec) loans[loans.findIndex(function(l){ return l.id===rec.id; })] = r; else loans.push(r);
+    saveLoans(); closeForm(); renderAll();
+  });
+}
+
+function exportLoanStatement(mKey, btn){
+  var label = btn ? btn.textContent : "";
+  if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var end = loanMonthEnd(mKey), parties = loanParties(end), tot = loanTotals(end);
+    var entries = allLoanEntries().filter(function(e){ return e.date.slice(0,7)===mKey; });
+    var doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4" });
+    var M = 40, y = 46, teal = [31,92,82], head = { fillColor:teal, textColor:255, fontStyle:"bold" };
+    doc.setFont("helvetica","bold"); doc.setFontSize(17); doc.setTextColor(36,26,18); doc.text(pdfClean(OUTLET.name), M, y); y += 18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(91,80,68); doc.text("Loan statement - "+monthLabel(mKey), M, y); y += 14;
+    doc.setFontSize(9); doc.text("Balances at "+pdfDate(end)+"   |   Generated "+new Date().toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}), M, y); y += 12;
+    doc.text("Cafe owes: "+pdfMoneyP(tot.cafeOwes)+"   |   To collect (loans given): "+pdfMoneyP(tot.owedToCafe), M, y); y += 16;
+    function partyTable(list, owing){
+      doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[[owing?"Loans the cafe owes":"Loans given by the cafe","Type",owing?"Borrowed":"Lent",owing?"Repaid":"Received back","Balance"]], headStyles:head,
+        styles:{ fontSize:9, cellPadding:3.5 }, columnStyles:{ 2:{halign:"right"},3:{halign:"right"},4:{halign:"right"} },
+        didParseCell: function(d){ if(d.section==="head" && d.column.index>=2) d.cell.styles.halign = "right"; },
+        body: list.length ? list.map(function(p){ return [pdfClean(p.party)+(p.interest?" ("+p.interest+"%/yr)":"")+(p.due?" due "+pdfDate(p.due):""), pdfClean(p.partyType), pdfMoneyP(p.out), pdfMoneyP(p.back), p.balance>0?pdfMoneyP(p.balance):"cleared"]; }) : [["None","","","",""]] });
+      y = doc.lastAutoTable.finalY + 14;
+    }
+    partyTable(parties.filter(function(p){ return p.dir==="owe" && (p.balance || p.last.slice(0,7)===mKey); }), true);
+    partyTable(parties.filter(function(p){ return p.dir==="lent" && (p.balance || p.last.slice(0,7)===mKey); }), false);
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Date","Entry","With","Where","In","Out"]], headStyles:head,
+      styles:{ fontSize:8.5, cellPadding:3.3, overflow:"linebreak" }, alternateRowStyles:{ fillColor:[246,244,236] },
+      columnStyles:{ 0:{cellWidth:66}, 4:{halign:"right",cellWidth:70}, 5:{halign:"right",cellWidth:70} },
+      didParseCell: function(d){ if(d.section==="head" && d.column.index>=4) d.cell.styles.halign = "right"; },
+      body: entries.length ? entries.map(function(e){ var inn = e.type==="take"||e.type==="collect";
+        return [pdfDate(e.date), loanTypeLabel(e)+(e.note?" - "+pdfClean(e.note):""), pdfClean(e.party)+" ("+pdfClean(e.partyType)+")", pdfClean(loanViaLabel(e.via, inn)), inn?pdfMoneyP(e.amount):"", inn?"":pdfMoneyP(e.amount)]; }) : [["","No loan entries this month","","","",""]] });
+    pdfFooter(doc, OUTLET.name+" - loan statement "+monthLabel(mKey));
+    done();
+    sharePdf(doc, (OUTLET.name+"_Loans_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
+  }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
+}
+
 // ---------- BANK / UPI ACCOUNT ----------
 var bkMonth = fmtDate(new Date()).slice(0,7);
 var BANK_GROUPS = [
-  ["sales","UPI / card sales",1],["udhaar","Udhaar paid back by UPI / bank",1],["invest","Partner capital in",1],["loanin","Loans from partners",1],["deposits","Handover cash deposited",1],
+  ["sales","UPI / card sales",1],["udhaar","Udhaar paid back by UPI / bank",1],["invest","Partner capital in",1],["loanin","Loans from partners",1],["oloanin","Other loans in (taken / repaid to the cafe)",1],["deposits","Handover cash deposited",1],
   ["interest","Interest",1],["adjIn","Adjustments in",1],
-  ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],["loanrepay","Loans repaid to partners",-1],
+  ["bills","Bills paid",-1],["purchases","Purchases paid",-1],["charges","Bank charges",-1],["withdraw","Partner withdrawals",-1],["loanrepay","Loans repaid to partners",-1],["oloanout","Other loans out (repaid / given)",-1],
   ["repaid","Partners repaid",-1],["atm","Cash withdrawn",-1],["adjOut","Adjustments out",-1],
   ["checkIn","Found higher at balance checks",1],["checkOut","Found lower at balance checks",-1]
 ];
@@ -7485,6 +7773,7 @@ function renderBankView(){
       if(k==="sales"){ openCalendarOn(ref); return; }
       if(k==="bills" || k==="charges"){ var x = expenses.find(function(e){ return e.id===ref; }); if(x) openForm("expense", x, x.date); return; }
       if(k==="purchases"){ var p = purchases.find(function(e){ return e.id===ref; }); if(p) openForm("purchase", p, p.date); return; }
+      if(k==="oloanin" || k==="oloanout"){ var lnb = loans.find(function(e){ return e.id===ref; }); if(lnb) openLoanForm(lnb); return; }
       if(k==="invest" || k==="loanin" || k==="withdraw" || k==="loanrepay"){ var v = investments.find(function(e){ return e.id===ref; }); if(v) openForm("investment", v, v.date); return; }
       if(k==="udhaar"){ if(ref && typeof openCustomerDetail==="function") openCustomerDetail(ref); return; }
       if(k==="repaid"){ appAlert("This is a partner repayment. To change it, find the bill or expense it repaid."); return; }
@@ -7540,7 +7829,7 @@ function cashReview(mKey){
   var flows = 0, handed = 0;
   datesBetween(first, upto).forEach(function(d){
     var m = cashMovement(d);
-    var cashSales = r2(m.inflow - m.inCredit - m.backIn - m.invIn);
+    var cashSales = r2(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn);
     add("cashSales", cashSales); add("udhaar", m.inCredit);
     add("purchases", -m.outPurch); add("expenses", -m.outExp); add("repaid", -m.repaid);
     flows += m.inflow - m.outflow;
@@ -7580,6 +7869,13 @@ function cashReview(mKey){
     var k = invKind(v), a = +v.amount||0;
     add(k==="capital" ? "pCapital" : k==="loan" ? "pLoan" : k==="repay" ? "pRepay" : "pWithdraw", k==="capital"||k==="loan" ? a : -a);
   });
+  // Other loans that went through the counter, bank or a person's cash.
+  loans.forEach(function(l){
+    if(!l.date || l.date.slice(0,7)!==mKey || l.via==="direct" || !l.via) return;
+    if(l.via==="counter" && l.date > upto) return;
+    var a = +l.amount||0;
+    add({ take:"lTaken", repay:"lRepaid", give:"lGiven", collect:"lBack" }[l.type], loanIsIn(l) ? a : -a);
+  });
   // Partner money paid straight to sellers / contractors: shown, but not cafe money.
   R.directIn = r2(investments.filter(function(v){ return v.date && v.date.slice(0,7)===mKey && invDest(v)==="direct" && invIsIn(v); }).reduce(function(a2,v){ return a2+(+v.amount||0); },0));
   add("bankAdj", (t.adjIn||0) - (t.adjOut||0));
@@ -7600,7 +7896,8 @@ var CR_LINES = [
   ["countDiff","Counter short / over at counts"],["bankDiff","Bank higher / lower at balance checks"],["bankAdj","Bank adjustments"]
 ];
 // Partner money, shown apart from what the cafe earned and spent.
-var CR_PARTNER = [["pCapital","Capital put in by partners"],["pLoan","Loans from partners (working capital)"],["pRepay","Partner loans repaid"],["pWithdraw","Partner withdrawals"]];
+var CR_PARTNER = [["pCapital","Capital put in by partners"],["pLoan","Loans from partners (working capital)"],["pRepay","Partner loans repaid"],["pWithdraw","Partner withdrawals"],
+  ["lTaken","Loans taken from others"],["lRepaid","Loans repaid to others"],["lGiven","Loans given by the cafe"],["lBack","Loan repayments received"]];
 function crSum(keys, R){ return r2(keys.reduce(function(a,l){ return a+(R.ext[l[0]]||0); },0)); }
 
 function renderCashReviewView(){
@@ -7631,13 +7928,13 @@ function renderCashReviewView(){
   var opRes = crSum(CR_LINES, R), pRes = crSum(CR_PARTNER, R);
   html += '<div class="psrow"><span><b>Cafe\u2019s own cash result</b></span><b class="'+(opRes<0?"bad":"ok")+'">'+rupeeSigned(opRes)+'</b></div>';
   if(CR_PARTNER.some(function(l){ return Math.abs(R.ext[l[0]]||0) >= 0.005; })){
-    html += '<div class="daygroup" style="margin:10px 0 4px;">Partner money (not cafe earnings)</div>';
+    html += '<div class="daygroup" style="margin:10px 0 4px;">Partner money &amp; loans (not cafe earnings)</div>';
     CR_PARTNER.forEach(function(l){
       var v = R.ext[l[0]] || 0;
       if(Math.abs(v) < 0.005) return;
       html += '<div class="psrow"><span>'+(v>=0?'+ ':'− ')+l[1]+'</span><b>'+rupeeP(Math.abs(v))+'</b></div>';
     });
-    html += '<div class="psrow"><span><b>Net partner money</b></span><b>'+rupeeSigned(pRes)+'</b></div>';
+    html += '<div class="psrow"><span><b>Net partner money &amp; loans</b></span><b>'+rupeeSigned(pRes)+'</b></div>';
   }
   html += '<div class="psrow" style="margin-top:6px;"><span><b>Change in total cafe money</b></span><b class="'+(R.change<0?"bad":"ok")+'">'+rupeeSigned(R.change)+'</b></div>';
   if(R.directIn) html += '<div class="backupnote" style="margin:8px 0 0;">Partners also paid '+rupee(R.directIn)+' straight to sellers / contractors this month (shop purchase, renovation...). That never went through the cafe\u2019s cash or bank, so it isn\u2019t in these totals.</div>';
@@ -7689,16 +7986,16 @@ function exportCashReview(mKey, btn){
     CR_LINES.forEach(function(l){ var v = R.ext[l[0]]||0; if(Math.abs(v) >= 0.005) body.push([(v>=0?"+ ":"- ")+l[1], pdfMoneyP(Math.abs(v))]); });
     body.push(["Cafe's own cash result", pdfMoneyP(crSum(CR_LINES, R))]);
     if(CR_PARTNER.some(function(l){ return Math.abs(R.ext[l[0]]||0) >= 0.005; })){
-      body.push(["Partner money (not cafe earnings)",""]);
+      body.push(["Partner money & loans (not cafe earnings)",""]);
       CR_PARTNER.forEach(function(l){ var v = R.ext[l[0]]||0; if(Math.abs(v) >= 0.005) body.push([(v>=0?"+ ":"- ")+l[1], pdfMoneyP(Math.abs(v))]); });
-      body.push(["Net partner money", pdfMoneyP(crSum(CR_PARTNER, R))]);
+      body.push(["Net partner money & loans", pdfMoneyP(crSum(CR_PARTNER, R))]);
     }
     body.push(["Change in total cafe money", pdfMoneyP(R.change)]);
     doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["What changed it",""]], headStyles:head, theme:"plain",
       styles:{ fontSize:9.5, cellPadding:4 }, columnStyles:{ 1:{halign:"right"} },
       didParseCell: function(d){ var t0 = d.row.raw[0];
         if(d.section==="body" && (d.row.index===body.length-1 || /^Cafe's own|^Net partner/.test(t0))) d.cell.styles.fontStyle = "bold";
-        if(d.section==="body" && (t0==="From running the cafe" || t0==="Partner money (not cafe earnings)")){ d.cell.styles.fontStyle = "bold"; d.cell.styles.textColor = [31,92,82]; } }, body: body });
+        if(d.section==="body" && (t0==="From running the cafe" || t0==="Partner money & loans (not cafe earnings)")){ d.cell.styles.fontStyle = "bold"; d.cell.styles.textColor = [31,92,82]; } }, body: body });
     y = doc.lastAutoTable.finalY + 10;
     if(R.directIn){ doc.setFontSize(8.5); doc.setTextColor(91,80,68); doc.text("Partners also paid "+pdfMoneyP(R.directIn)+" straight to sellers / contractors (not through cafe cash or bank).", M, y+4); y += 14; }
     var tk = Object.keys(R.transfers);
@@ -7849,9 +8146,9 @@ function exportHandoverStatement(mKey, holder, btn){
       if(y > 700){ doc.addPage(); y = 46; }
       doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.setTextColor(36,26,18); doc.text(pdfClean(r.holder), M, y); y += 8;
       var sum = [["With them at the start ("+pdfDate(mKey+"-01")+")", pdfMoneyP(r.opening)]];
-      [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Partner money in (cash)", r.investIn], ["+ Received from others", r.fromOthers],
+      [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Partner / loan money in (cash)", r.investIn], ["+ Received from others", r.fromOthers],
        ["- Spent on expenses", r.expenses], ["- Spent on purchases", r.purchases], ["- Deposited in bank", r.bank], ["- Put back in the counter", r.counter],
-       ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay], ["- Partner withdrawal / loan repaid", r.invOut]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
+       ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay], ["- Partner withdrawal / loan money out", r.invOut]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
       sum.push(["Still with "+pdfClean(r.holder)+" ("+pdfDate(last)+")", pdfMoneyP(r.closing)]);
       doc.autoTable({ startY:y, margin:{left:M,right:M}, theme:"plain", styles:{ fontSize:9.5, cellPadding:3.5 }, body: sum,
         columnStyles:{ 1:{ halign:"right" } },
@@ -8126,7 +8423,14 @@ function cashMovement(dateStr){
     if(!invIsIn(v)) invOut += (+v.amount||0); else invIn += (+v.amount||0);
   });
   inflow += invIn;
-  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, outflow: outPurch + outExp + takenOut + repaid + invOut, outPurch: outPurch, outExp: outExp };
+  // Other loans taken / repaid / given / collected in counter cash.
+  var loanIn = 0, loanOut = 0;
+  loans.forEach(function(l){
+    if(l.date!==dateStr || l.via!=="counter") return;
+    if(loanIsIn(l)) loanIn += (+l.amount||0); else loanOut += (+l.amount||0);
+  });
+  inflow += loanIn;
+  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, loanIn: loanIn, loanOut: loanOut, outflow: outPurch + outExp + takenOut + repaid + invOut + loanOut, outPurch: outPurch, outExp: outExp };
 }
 
 function openingCashFor(dateStr){
@@ -8195,7 +8499,7 @@ function renderCashView(){
       '<div class="backupnote" style="margin:8px 0 4px;">Since then:</div>'+
       bl("UPI / card sales", bm.sales, "+")+bl("Udhaar paid back by UPI / bank", bm.udhaar, "+")+bl("Partner capital in", bm.invest, "+")+bl("Loans from partners", bm.loanin, "+")+
       bl("Handover cash deposited", bm.deposits, "+")+bl("Interest received", bm.interest, "+")+bl("Bills paid by UPI / bank", bm.bills, "−")+bl("Bank charges", bm.charges, "−")+bl("Purchases paid by UPI / bank", bm.purchases, "−")+
-      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+bl("Loans repaid to partners", bm.loanrepay, "−")+bl("Cash withdrawn from the bank", bm.atm, "−")+
+      bl("Partner withdrawals (not cash)", bm.withdraw, "−")+bl("Partners repaid by UPI / bank", bm.repaid, "−")+bl("Loans repaid to partners", bm.loanrepay, "−")+bl("Other loans in", bm.oloanin, "+")+bl("Other loans out", bm.oloanout, "−")+bl("Cash withdrawn from the bank", bm.atm, "−")+
       bl("Adjustments in", bm.adjIn, "+")+bl("Adjustments out", bm.adjOut, "−")+
       '<div class="psrow"><span><b>Cafe bank account now</b></span><b class="'+(bankBalanceNow()<0?"bad":"")+'">'+rupee(bankBalanceNow())+'</b></div>'+
       '<div class="backupnote" style="margin:6px 0 0;">Note the real balance from the bank app each day (calendar day, or Records → Bank) and the app starts again from it.</div>'+
@@ -8221,9 +8525,11 @@ function renderCashView(){
   html += '<div class="card" style="margin-bottom:14px;"><h3>Counter today <span class="muted">· '+parseDate(today).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</span></h3>';
   var m = cashMovement(today);
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(today))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn)+'</b></div>';
   if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
   if(m.invOut) html += '<div class="psrow"><span>− Partner withdrawal in cash</span><b>'+rupee(m.invOut)+'</b></div>';
+  if(m.loanIn) html += '<div class="psrow"><span>+ Loan money in (cash)</span><b>'+rupee(m.loanIn)+'</b></div>';
+  if(m.loanOut) html += '<div class="psrow"><span>− Loan money out (cash)</span><b>'+rupee(m.loanOut)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   if(m.backIn) html += '<div class="psrow"><span>+ Cash put back / withdrawn from bank</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
@@ -8345,9 +8651,11 @@ function openCashDayForm(dateStr){
 
   html += '<div class="card" style="margin-bottom:12px;">';
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(dateStr))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn)+'</b></div>';
   if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
   if(m.invOut) html += '<div class="psrow"><span>− Partner withdrawal in cash</span><b>'+rupee(m.invOut)+'</b></div>';
+  if(m.loanIn) html += '<div class="psrow"><span>+ Loan money in (cash)</span><b>'+rupee(m.loanIn)+'</b></div>';
+  if(m.loanOut) html += '<div class="psrow"><span>− Loan money out (cash)</span><b>'+rupee(m.loanOut)+'</b></div>';
   if(m.inCredit) html += '<div class="psrow"><span>+ Udhaar paid back in cash</span><b>'+rupee(m.inCredit)+'</b></div>';
   if(m.backIn) html += '<div class="psrow"><span>+ Cash put back / withdrawn from bank</span><b>'+rupee(m.backIn)+'</b></div>';
   if(m.takenOut) html += '<div class="psrow"><span>− Cash taken out by a partner</span><b>'+rupee(m.takenOut)+'</b></div>';
@@ -10473,7 +10781,7 @@ document.addEventListener("DOMContentLoaded", function(){
   document.getElementById("fabAdd").addEventListener("click", openAddChooser);
   document.getElementById("sheetBg").addEventListener("click", function(e){ if(e.target===document.getElementById("sheetBg")) closeForm(); });
 
-  function calShift(n){ calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()+n, 1); fcMonth = fmtDate(calCursor).slice(0,7); renderCalendar(); renderFixedView(); }
+  function calShift(n){ calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()+n, 1); fcMonth = fmtDate(calCursor).slice(0,7); lnMonth = fcMonth; renderCalendar(); renderFixedView(); renderLoansView(); }
   document.getElementById("calPrev").addEventListener("click", function(){ calShift(-1); });
   document.getElementById("calNext").addEventListener("click", function(){ calShift(1); });
 

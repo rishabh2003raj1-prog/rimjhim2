@@ -118,6 +118,17 @@ Each entry also says **where the money went**: *paid directly* to a seller, cont
 
 The monthly cash review shows partner money in its own section, separate from what the cafe earned and spent.
 
+## Loans
+
+Records → **Loans** (also from each calendar day) shows every loan in one place, month by month:
+- **Loans the cafe owes:** working capital loans from partners (recorded on the Partners tab) and loans from anyone else - bank / NBFC, relative or friend, supplier, other - with borrowed, repaid and balance at month end, interest and repay-by date if given, and a **Repay** button for each.
+- **Loans given by the cafe** (staff, suppliers, others), with received back and what is still to collect.
+- **Loan entries** day by day (tap a day to open it on the calendar, tap an entry to edit), and staff **salary advances** for reference (they come off salary).
+- **+ Loan taken / + Repay a loan / + Loan given / + Repayment received.** Each entry says where the money went or came from: the cafe bank, the counter (cash loans), cash a person holds, or - for a loan taken - paid directly by the lender (e.g. to a supplier). Bank, counter and handover balances follow it; repaying more than is owed is refused.
+- **Download loan statement PDF** for the month.
+
+The calendar shows a **Loans** card for each day and a brown dot on days with loan entries; the Loans tab and the calendar stay on the same month. Loans never count as cafe income or expense: the cash review shows them under "Partner money & loans", and the Dashboard shows loans owed and to collect.
+
 ## Undoing a settlement
 
 Settled something by mistake (a wrong tap, or worked out wrongly)? **Review settlements** (Expenses → Money owed to partners → Review / undo settled items, Records → Partners, or Staff → Salary → Review settlements) lists every settled partner bill and staff salary month.
