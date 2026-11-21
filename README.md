@@ -233,3 +233,18 @@ Staff meals can also be added from **Master → Quick add**, one per line: "staf
 "staff lunch aloo paratha yesterday", "staff ate egg curry on 4 Nov", "no staff meal today". The note picks the
 closest meal type, lunch / dinner (dinner if not said, the whole day for "no meal" or "both"), the date and the head
 count (from attendance if not said). Undoing or editing the note puts the day back as it was.
+
+### Master quick add: memory and more kinds of entries
+- **Memory from your records:** every item you have bought (name, unit, category, last rate, usual vendor and
+  quantity), vendors and how you usually pay them, udhaar customers, staff, loan parties, bills and meal types are
+  given to the AI and used by the on-phone reader. A purchase without a price uses the last rate; without a vendor,
+  the usual vendor and payment habit (e.g. Sharma Dairy on udhaar).
+- **Hindi / Hinglish words:** doodh, cheeni, anda, pyaz, tamatar, chawal, dahi, murga, sabzi… are understood.
+- **Learns from you:** renaming an item or vendor in a purchase the app filed teaches it that word. *What the app
+  remembers* (link under Quick add) shows what it knows and lets you teach or forget words ("amul gold" → Milk).
+- **One-tap chips:** your most-bought items with your usual quantity and vendor, sales, attendance and staff meal.
+- **New kinds of lines:** attendance ("Ravi absent today", "Sita and Ravi half day yesterday"), salary advance
+  ("Sita advance 2000 upi"), udhaar paid back ("Amit paid udhaar 500"), loans ("loan from Uncle 50000", "repaid
+  loan to Uncle 5000", "gave loan to Ramesh 1000", a partner's loan goes to partner money), and bill amounts
+  arriving ("electricity bill 4100 412 units due 15 Nov"). All can be undone or edited like other notes.
+- Fixed: in the purchase bill form the first tap on Save after editing a field was lost; it now saves at once.

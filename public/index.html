@@ -365,6 +365,8 @@
   .rcover td{font-size:11px;color:var(--ink-soft);} .rcover td.rnone{color:#A6402D;font-weight:700;background:#FBEDEA;}
   .billhist th,.billhist td{text-align:right;white-space:nowrap;} .billhist th:first-child,.billhist td:first-child{text-align:left;}
   .billhist .cur{background:#F2EFE3;} .billhist tr.tot td{border-top:1px solid var(--ink);}
+  .notechips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
+  .notechip{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:5px 10px;font:inherit;font-size:12px;color:var(--ink);}
   .rpdayhead{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:4px;}
   .recper{margin-bottom:8px;}
 
@@ -572,9 +574,10 @@
       <div class="card" style="margin-bottom:14px;">
         <h3>Quick add</h3>
         <div class="field" style="margin-bottom:8px;">
-          <textarea id="noteInput" rows="4" placeholder="Milk 40 rs today&#10;Walk-in sales 4200 cash today&#10;Rishabh invested 50000 for rent deposit on 10 Aug&#10;Electricity bill 3200 paid 3 Sept&#10;Ramesh salary 15000 paid 1 Sept&#10;Staff dinner chicken biryani 6 people"></textarea>
+          <textarea id="noteInput" rows="4" placeholder="Doodh 10 litre&#10;Counter sales 4200 cash today&#10;Ravi absent today&#10;Electricity bill 4100 due 15 Nov&#10;Amit paid udhaar 500 upi&#10;Staff dinner chicken biryani 6 people"></textarea>
         </div>
-        <div class="notehint">One item per line - sale, purchase, partner investment/withdrawal, expense (salary, rent, electricity, wifi...), or staff meal (“staff lunch aloo paratha”, “staff dinner chicken 6 people”, “no staff meal today”). Mention price and date. AI figures out what each line is and files it in the right tab.</div>
+        <div id="noteChips" class="notechips"></div>
+        <div class="notehint">One thing per line: a sale, purchase (“doodh 10 L” — the last price is used if you leave it out), partner money, expense, staff meal, attendance (“Ravi absent today”), salary advance (“Sita advance 2000”), udhaar paid back (“Amit paid udhaar 500”), loan (“loan from Uncle 50000”, “repaid Uncle 5000”), or a bill arriving (“electricity bill 4100 due 15 Nov”). Dates like today, kal, 4 Nov work. <a href="#" id="noteMemBtn">What the app remembers</a></div>
         <div class="sheetbtns" style="margin-top:10px;">
           <button class="btn-save" id="noteAddBtn" style="flex:1;">Add note</button>
         </div>
@@ -4283,7 +4286,7 @@ function renderBillForm(){
     html += '<div class="field two"><div><label>Rate per unit (₹)</label><input type="number" inputmode="decimal" class="bi" data-f="rate" data-i="'+i+'" value="'+(ln.rate===""?"":ln.rate)+'"></div>';
     html += '<div><label>GST %</label><input type="number" inputmode="decimal" class="bi" data-f="gst" data-i="'+i+'" value="'+(ln.gst===""?0:ln.gst)+'"></div></div>';
     var lt = (parseFloat(ln.qty)||0) * (parseFloat(ln.rate)||0) * (1 + (parseFloat(ln.gst)||0)/100);
-    html += '<div class="billrowtot">Line total: <b>'+rupee(lt)+'</b></div></div>';
+    html += '<div class="billrowtot">Line total: <b data-blt="'+i+'">'+rupee(lt)+'</b></div></div>';
   });
   html += '<button class="btn-additem" id="b_additem">+ Add another item</button></div>';
   html += '<div class="field two"><div><label>Delivery / transport (₹)</label><input type="number" inputmode="decimal" id="b_delivery" placeholder="0" value="'+(d.delivery===""||d.delivery===null||d.delivery===undefined?"":d.delivery)+'"></div>';
@@ -4295,11 +4298,9 @@ function renderBillForm(){
   },0);
   var delAmt = (parseFloat(d.delivery)||0) * (1 + (parseFloat(d.deliveryGst)||0)/100);
   var total = itemsTotal + delAmt;
-  if(delAmt>0){
-    html += '<div class="psrow" style="margin-top:8px;"><span>Items</span><b>'+rupee(itemsTotal)+'</b></div>';
-    html += '<div class="psrow"><span>Delivery / transport</span><b>'+rupee(delAmt)+'</b></div>';
-  }
-  html += '<div class="billtotal">Bill total <b>'+rupee(total)+'</b></div>';
+  html += '<div id="b_split" style="display:'+(delAmt>0?'block':'none')+';"><div class="psrow" style="margin-top:8px;"><span>Items</span><b id="b_itemstot">'+rupee(itemsTotal)+'</b></div>'+
+          '<div class="psrow"><span>Delivery / transport</span><b id="b_deltot">'+rupee(delAmt)+'</b></div></div>';
+  html += '<div class="billtotal">Bill total <b id="b_total">'+rupee(total)+'</b></div>';
 
   html += '<div class="field"><label>Bill photo (optional)</label>';
   if(d.image){
@@ -4332,8 +4333,22 @@ function renderBillForm(){
     });
   }
 
+  // Typing only updates the totals in place. Redrawing the form here would replace the
+  // Save button while it is being tapped, so the first tap after editing was lost.
+  function refreshTotals(){
+    syncDraft();
+    var it = 0;
+    billDraft.lines.forEach(function(ln, i){
+      var lt = (parseFloat(ln.qty)||0) * (parseFloat(ln.rate)||0) * (1 + (parseFloat(ln.gst)||0)/100); it += lt;
+      var el = sheet.querySelector('[data-blt="'+i+'"]'); if(el) el.textContent = rupee(lt);
+    });
+    var del = (parseFloat(billDraft.delivery)||0) * (1 + (parseFloat(billDraft.deliveryGst)||0)/100);
+    document.getElementById("b_itemstot").textContent = rupee(it); document.getElementById("b_deltot").textContent = rupee(del);
+    document.getElementById("b_split").style.display = del>0 ? "block" : "none";
+    document.getElementById("b_total").textContent = rupee(it + del);
+  }
   Array.prototype.forEach.call(sheet.querySelectorAll(".bi"), function(inp){
-    inp.addEventListener("change", function(){ syncDraft(); renderBillForm(); });
+    inp.addEventListener("input", refreshTotals); inp.addEventListener("change", refreshTotals);
   });
   document.getElementById("b_paid").addEventListener("change", function(){ syncDraft(); renderBillForm(); });
   // Mode and payer must agree, or the cash counter deducts money that never left the till.
@@ -4344,8 +4359,7 @@ function renderBillForm(){
     if(m==="Cash" && billDraft.paidBy==="Cafe UPI/bank") billDraft.paidBy = "Cafe cash";
     renderBillForm();
   });
-  document.getElementById("b_delivery").addEventListener("change", function(){ syncDraft(); renderBillForm(); });
-  document.getElementById("b_delgst").addEventListener("change", function(){ syncDraft(); renderBillForm(); });
+  ["b_delivery","b_delgst"].forEach(function(id){ var x = document.getElementById(id); x.addEventListener("input", refreshTotals); x.addEventListener("change", refreshTotals); });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-rm]"), function(b){
     b.addEventListener("click", function(){
       syncDraft();
@@ -4416,6 +4430,13 @@ function saveBillDraft(){
   if(delVal<0) return fail("Delivery charge can't be negative.");
 
   var bid = d.id;
+  // Learn from corrections: a line renamed here (e.g. a note filed "Doodh" and you
+  // changed it to "Milk") teaches the notes reader that word for next time.
+  var oldLines = purchases.filter(function(p){ return (p.billId||p.id)===bid; });
+  clean.forEach(function(ln){ var o = oldLines.find(function(x){ return x.id===ln.id; }); if(o && o.item && normItem(o.item)!==normItem(ln.item)) learnAlias("item", o.item, ln.item); });
+  if(oldLines[0] && oldLines[0].vendor && oldLines[0].vendor!=="Unknown vendor" && vendor && normItem(oldLines[0].vendor)!==normItem(vendor)) learnAlias("vendor", oldLines[0].vendor, vendor);
+  if(oldLines.length && settings.noteAliases) saveSettings();
+  NOTE_MEM = null;
   purchases = purchases.filter(function(p){ return (p.billId||p.id)!==bid; });
   clean.forEach(function(ln){
     purchases.push({ id:ln.id||uid(), billId:bid, date:d.date, vendor:vendor, purchasedBy:d.purchasedBy, paidBy:d.paidBy, item:ln.item, category:ln.category,
@@ -11436,7 +11457,7 @@ function openNoteSheet(noteId){
   var html = '<h2 class="serif">Note</h2>';
 
   if(n.status==="processed"){
-    var label = {sale:"Sales", purchase:"Purchases", purchaseBill:"Purchases", investment:"Investments", expense:"Expenses", staffmeal:"Staff meals"}[n.filedType] || "Records";
+    var label = {sale:"Sales", purchase:"Purchases", purchaseBill:"Purchases", investment:"Investments", expense:"Expenses", staffmeal:"Staff meals", attendance:"Attendance", udhaarpay:"Udhaar payments", loan:"Loans", billentry:"Bills"}[n.filedType] || "Records";
     html += '<div class="backupnote">This note created '+(made.length||1)+' entr'+((made.length||1)===1?"y":"ies")+' in '+label+
             '. Editing the note removes those entries and files it again from your new wording.</div>';
   } else if(n.status==="error"){
@@ -11449,6 +11470,11 @@ function openNoteSheet(noteId){
 
   if(made.length){
     html += '<div class="card" style="margin-bottom:12px;"><h3>What it filed</h3>'+made.map(function(m){
+      if(m.store==="attendance"){ var st0 = staffById(m.staffId), a0 = attendFor(m.date, m.staffId); return '<div class="psrow"><span>'+esc(st0?st0.name:"Staff")+' · '+esc(fmtD(m.date))+'</span><b>'+esc(a0?a0.status:"cleared")+'</b></div>'; }
+      if(m.store==="customers"){ var c0 = custById(m.id); return '<div class="psrow"><span>New customer</span><b>'+esc(c0?c0.name:"—")+'</b></div>'; }
+      if(m.store==="creditPayments"){ var p0 = creditPayments.find(function(x){ return x.id===m.id; }), c1 = p0 && custById(p0.customerId); return p0 ? '<div class="psrow"><span>Udhaar paid · '+esc(c1?c1.name:"")+' · '+esc(fmtD(p0.date))+'</span><b>'+rupee(p0.amount)+'</b></div>' : '<div class="psrow"><span style="opacity:.6">entry already deleted</span><b>—</b></div>'; }
+      if(m.store==="loans"){ var l0 = loans.find(function(x){ return x.id===m.id; }); return l0 ? '<div class="psrow"><span>'+esc(loanTypeLabel(l0))+' · '+esc(l0.party)+' · '+esc(fmtD(l0.date))+'</span><b>'+rupee(l0.amount)+'</b></div>' : '<div class="psrow"><span style="opacity:.6">entry already deleted</span><b>—</b></div>'; }
+      if(m.store==="billEntry"){ var be = billEntered(m.month, m.cat); return '<div class="psrow"><span>'+esc(m.cat)+' bill · '+esc(monthLabel(m.month))+'</span><b>'+(be===null?'—':rupee(be))+'</b></div>'; }
       if(m.store==="mealDays"){
         var dp = mealDayPlan(m.date);
         return '<div class="psrow"><span>Staff meals · '+esc(fmtD(m.date))+' · '+esc(dp.slots.map(function(x){ return x.meal ? x.meal.name+" ("+x.people+")" : "no meal"; }).join(" + "))+'</span><b>'+rupeeP(dp.cost)+'</b></div>';
@@ -11499,6 +11525,10 @@ function openNoteSheet(noteId){
     var first = made[0];
     if(!first){ appAlert("Nothing left to open — the entries were already deleted."); return; }
     if(first.store==="mealDays"){ closeForm(); staffDate = first.date; showView("staff"); switchStaffSub("meals"); window.scrollTo(0,0); return; }
+    if(first.store==="attendance"){ closeForm(); staffDate = first.date; attMonth = first.date.slice(0,7); showView("staff"); switchStaffSub("attendance"); window.scrollTo(0,0); return; }
+    if(first.store==="customers" || first.store==="creditPayments"){ closeForm(); showView("records"); switchRecordsSub("customers"); window.scrollTo(0,0); return; }
+    if(first.store==="loans"){ var l1 = loans.find(function(x){ return x.id===first.id; }); closeForm(); openLoansTab(l1 ? l1.date.slice(0,7) : null); return; }
+    if(first.store==="billEntry"){ closeForm(); openBills(first.month); return; }
     if(first.store==="purchases"){
       var p = purchases.find(function(x){ return x.id===first.id; });
       if(p) return openBillForm(p.billId || p.id, p.date);
@@ -11510,7 +11540,60 @@ function openNoteSheet(noteId){
   });
 }
 
+// One-tap starters: the items you buy most (with your usual quantity and vendor) and common lines.
+function renderNoteChips(){
+  var box = document.getElementById("noteChips");
+  if(!box) return;
+  NOTE_MEM = null;
+  var mem = noteMemory(), its = Object.keys(mem.items).map(function(k){ return mem.items[k]; }).sort(function(a,b){ return b.count-a.count; }).slice(0,6);
+  var chips = its.map(function(i){ return { label:i.name+" "+fmtQty(i.usualQty)+" "+(i.unit||""), text:i.name+" "+fmtQty(i.usualQty)+" "+(i.unit||"")+(i.vendor?" from "+i.vendor:"") }; });
+  chips.push({ label:"Counter sales", text:"Counter sales cash ₹" }, { label:"UPI sales", text:"Counter sales UPI ₹" });
+  if(activeStaff().length) chips.push({ label:"Absent", text:activeStaff()[0].name.split(" ")[0]+" absent today" });
+  if(mealTypes().length) chips.push({ label:"Staff meal", text:"Staff dinner "+mealTypes()[0].name.split(" ")[0].toLowerCase() });
+  box.innerHTML = chips.map(function(c, i){ return '<button class="notechip" data-nc="'+i+'">+ '+esc(c.label)+'</button>'; }).join("");
+  Array.prototype.forEach.call(box.querySelectorAll("[data-nc]"), function(b){
+    b.addEventListener("click", function(){
+      var ta = document.getElementById("noteInput"), c = chips[+b.getAttribute("data-nc")];
+      ta.value = (ta.value && !/\n$/.test(ta.value) ? ta.value+"\n" : ta.value) + c.text;
+      ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+    });
+  });
+}
+function openNoteMemory(){
+  NOTE_MEM = null;
+  var mem = noteMemory(), al = noteAliases(), sheet = document.getElementById("sheet");
+  var nItems = Object.keys(mem.items).length, nVend = Object.keys(mem.vendors).length;
+  var html = '<h2 class="serif">What the app remembers</h2>';
+  html += '<div class="backupnote">Notes are read using your own records: '+nItems+' items you buy, '+nVend+' vendors, '+Object.keys(mem.customers).length+' udhaar customers, '+activeStaff().length+' staff, '+Object.keys(mem.parties).length+' loan parties and your bills. It gets better the more you use the app. When you correct a filed purchase (rename an item or vendor), it learns that word.</div>';
+  var top = Object.keys(mem.items).map(function(k){ return mem.items[k]; }).sort(function(a,b){ return b.count-a.count; }).slice(0,12);
+  if(top.length) html += '<div class="card" style="margin-bottom:10px;"><h3>Items it knows best</h3>'+top.map(function(i){
+    return '<div class="psrow"><span>'+esc(i.name)+' <span class="muted">· '+esc(i.unit||"")+(i.vendor?' · '+esc(i.vendor):'')+'</span></span><b>'+rupeeP(i.rate)+'/'+esc(i.unit||"unit")+'</b></div>'; }).join("")+'</div>';
+  var rows = Object.keys(al.item).map(function(k){ return { kind:"item", from:k, to:al.item[k] }; }).concat(Object.keys(al.vendor).map(function(k){ return { kind:"vendor", from:k, to:al.vendor[k] }; }));
+  html += '<div class="card" style="margin-bottom:10px;"><h3>Words you use</h3>'+(rows.length ? rows.map(function(r, i){
+    return '<div class="psrow"><span>“'+esc(r.from)+'” → '+esc(r.to)+(r.kind==="vendor"?' <span class="muted">(vendor)</span>':'')+'</span><b><button class="ndel" data-alrm="'+i+'" aria-label="Forget">×</button></b></div>'; }).join("") :
+    '<div class="backupnote" style="margin:0;">None yet. Common Hindi words (doodh, cheeni, anda, pyaz, tamatar…) are already understood.</div>')+'</div>';
+  html += '<div class="field two"><div><label>When I write</label><input type="text" id="al_from" placeholder="e.g. amul gold"></div><div><label>I mean</label><input type="text" id="al_to" list="al_items" placeholder="e.g. Milk"></div></div>';
+  html += '<datalist id="al_items">'+allTrackedItems().map(function(x){ return '<option value="'+esc(x)+'">'; }).join("")+'</datalist>';
+  html += '<div class="field"><label>It is</label><select id="al_kind"><option value="item">an item</option><option value="vendor">a vendor</option></select></div>';
+  html += '<div class="err" id="al_err"></div><div class="sheetbtns"><button class="btn-cancel" id="al_close">Close</button><button class="btn-save" id="al_add">Teach this word</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("al_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-alrm]"), function(b){
+    b.addEventListener("click", function(){
+      var r = rows[+b.getAttribute("data-alrm")], a = Object.assign({ item:{}, vendor:{} }, settings.noteAliases||{});
+      a[r.kind] = Object.assign({}, a[r.kind]); delete a[r.kind][r.from]; settings.noteAliases = a; saveSettings(); openNoteMemory();
+    });
+  });
+  document.getElementById("al_add").addEventListener("click", function(){
+    var f = document.getElementById("al_from").value.trim(), t = document.getElementById("al_to").value.trim(), err = document.getElementById("al_err");
+    if(!f || !t){ err.textContent = "Fill in both boxes."; err.style.display = "block"; return; }
+    learnAlias(document.getElementById("al_kind").value, f, t); saveSettings(); openNoteMemory();
+  });
+}
+
 function renderNotes(){
+  renderNoteChips();
   var el = document.getElementById("notesList");
   var pending = notes.filter(function(n){return n.status==="pending";});
   var btn = document.getElementById("noteProcessBtn");
@@ -11522,7 +11605,7 @@ function renderNotes(){
 
   if(notes.length===0){ el.innerHTML = '<div class="empty">No notes yet. Jot down what you bought, sold, paid or invested above.</div>'; return; }
   var sorted = notes.slice().sort(function(a,b){ return b.addedAt.localeCompare(a.addedAt); });
-  var filedLabel = {sale:"Sales", purchase:"Purchases", investment:"Investments", expense:"Expenses", staffmeal:"Staff meals"};
+  var filedLabel = {sale:"Sales", purchase:"Purchases", investment:"Investments", expense:"Expenses", staffmeal:"Staff meals", attendance:"Attendance", udhaarpay:"Udhaar payments", loan:"Loans", billentry:"Bills"};
   el.innerHTML = sorted.map(function(n){
     var badge = n.status==="processed" ? '<span class="badge processed">Added to '+(filedLabel[n.filedType]||"Records")+'</span>'
               : n.status==="error" ? '<span class="badge error">'+esc(n.error||"Could not parse")+'</span>'
@@ -11560,16 +11643,19 @@ var ALLOWED_PURCH_MODES = ["Cash","UPI","Card","Bank Transfer","Credit"];
 
 function buildNotesPrompt(batch, todayStr){
   var lines = batch.map(function(n,i){ return (i+1)+". "+n.text; }).join("\n");
-  return "Today's date is "+todayStr+" (YYYY-MM-DD). Below are "+batch.length+" short notes jotted down by the owner of a small cafe run with a business partner. Each note could be about: a sale to a customer, a purchase from a vendor, a partner putting money into or taking money out of the business, a running business expense (staff salary, rent, electricity, wifi/internet, maintenance, etc), or a STAFF MEAL - food the cafe cooked for its own staff (no money changes hands).\n\n"+lines+
-  "\n\nFor EACH note, decide which of these 5 types it is and extract a record. Return ONLY a JSON array (no markdown fences, no extra text), with exactly "+batch.length+" objects in the same order as the notes. Each object must have a \"type\" field set to one of \"sale\", \"purchase\", \"investment\", \"expense\", \"staffmeal\", plus these fields depending on type (leave irrelevant fields as empty string or 0):\n"+
+  return "Today's date is "+todayStr+" (YYYY-MM-DD). Below are "+batch.length+" short notes jotted down by the owner of a small cafe run with a business partner. Each note could be about: a sale to a customer, a purchase from a vendor, a partner putting money into or taking money out of the business, a running business expense (staff salary, rent, electricity, wifi/internet, maintenance, etc), a STAFF MEAL (food cooked for the cafe's own staff), staff ATTENDANCE (absent / leave / half day / present), a staff salary ADVANCE, a customer paying back UDHAAR, a LOAN (taken from / repaid to / given to / collected from someone who is not a partner), or a BILL amount arriving (electricity / wifi / other bill, not yet paid).\n\n"+memoryForPrompt()+"\n\nNOTES:\n"+lines+
+  "\n\nFor EACH note, decide which type it is and extract a record. Return ONLY a JSON array (no markdown fences, no extra text), with exactly "+batch.length+" objects in the same order as the notes. Each object must have a \"type\" field set to one of \"sale\", \"purchase\", \"investment\", \"expense\", \"staffmeal\", \"attendance\", \"advance\", \"udhaarpay\", \"loan\", \"bill\", plus these fields depending on type (leave irrelevant fields as empty string or 0):\n"+
   '{"type":"sale|purchase|investment|expense","date":"YYYY-MM-DD",'+
   '"customer":"string (sale only, default Walk-in)","desc":"string (sale only)","amount":number,"gst":number,"salemode":"one of '+ALLOWED_SALE_MODES.join("/")+' (sale only)",'+
   '"vendor":"string (purchase only, default Unknown vendor)","items":"purchase only - when the note lists SEVERAL items in one bill, an array of {item, qty, unit, rate} where rate is the PER-UNIT price (divide the listed price by the quantity); use this instead of the single item fields","item":"string (purchase only, single-item notes)","category":"one of '+ALLOWED_CATS.join("/")+' (purchase only)","qty":number,"unit":"string like kg/litre/pcs/packet (purchase only)","rate":number,"purchmode":"one of '+ALLOWED_PURCH_MODES.join("/")+' (purchase only)","purchasedby":"who bought it, purchase only - one of these people if the note names them: '+purchaserOptions().map(function(o){return o.name;}).join("/")+', else empty string","paidby":"purchase only - who paid: one of '+payerOptions().map(function(o){return o.value;}).join("/")+'. Use a partner (personal) only if the note says a partner paid from their own money/pocket; if paid by UPI, card or bank from the cafe use Cafe UPI/bank; otherwise Cafe cash",'+
   '"partner":"one of '+PARTNERS.join("/")+' (investment only, guess the closer name match, default '+(PARTNERS[0]||"Owner")+')","invType":"Investment or Withdrawal (investment only)","purpose":"short string (investment only)","investmode":"Cash/UPI/Bank Transfer (investment only)",'+
   '"expcategory":"Staff Salary/Rent/Electricity/Wifi / Internet/Maintenance/Other (expense only)","description":"string (expense only)","expmode":"Cash/UPI/Card/Bank Transfer (expense only)",'+
   '"meal":"staffmeal only - the id of the closest meal type from: '+(mealTypes().map(function(m){ return m.id+" = "+m.name; }).join("; ")||"(none set up)")+'; empty string for no meal","slot":"staffmeal only - 1 for lunch / first meal, 2 for dinner / second meal, all for the whole day, or empty if not said","people":"staffmeal only - number of people eating if stated, else 0",'+
+  '"staff":"attendance / advance only - array of staff names exactly as in STAFF","status":"attendance only - Present/Absent/Leave/Half day",'+
+  '"customer2":"udhaarpay only - customer name (use the CUSTOMERS spelling if it is one of them)","loantype":"loan only - take/repay/give/collect","party":"loan only - who the loan is with","paymode":"advance / udhaarpay / loan - Cash/UPI/Bank Transfer",'+
+  '"billcat":"bill only - one of '+FIXED_CATS.join("/")+'","billmonth":"bill only - YYYY-MM the bill is for","due":"bill only - YYYY-MM-DD or empty",'+
   '"unclear":boolean,"reason":"string or empty"}\n'+
-  "Rules: resolve relative dates (today/yesterday/date without year) against today's date above. amount is the total rupee value for sale/investment/expense. For purchase, rate is the price PER UNIT (divide a total price by qty if the note gives a total for multiple units) and qty defaults to 1 if not stated. If a payment mode isn't mentioned, use Cash unless the note says credit/udhaar/later, then use Credit (sale/purchase) - investments and expenses default to Cash if unclear. Staff names being paid (e.g. \"Ramesh salary 15000\") are an expense with category Staff Salary, description being the staff name. Staff meals (e.g. \"staff dinner chicken biryani 6 people\", \"no staff meal today\") have no amount - never mark them unclear for a missing amount. Set unclear:true with a short reason only if you genuinely cannot tell what the note is about or its amount.";
+  "Rules: resolve relative dates (today/yesterday/date without year) against today's date above. amount is the total rupee value for sale/investment/expense. For purchase, rate is the price PER UNIT (divide a total price by qty if the note gives a total for multiple units) and qty defaults to 1 if not stated. If a payment mode isn't mentioned, use Cash unless the note says credit/udhaar/later, then use Credit (sale/purchase) - investments and expenses default to Cash if unclear. Staff names being paid (e.g. \"Ramesh salary 15000\") are an expense with category Staff Salary, description being the staff name. Staff meals (e.g. \"staff dinner chicken biryani 6 people\", \"no staff meal today\") and attendance have no amount - never mark them unclear for a missing amount. Use the exact names from ITEMS, VENDORS, STAFF and CUSTOMERS when a note means one of them (including Hindi words like doodh = milk, cheeni = sugar, and WORDS THE OWNER USES). If a purchase gives a quantity but no price, set rate to 0 - the app fills the last rate. If no vendor is written, leave vendor empty - the app uses the usual vendor. A loan with a partner (one of '+PARTNERS.join("/")+') is type investment with invType Loan (or Loan repayment). \"Electricity bill 4100 due 15 Nov\" (no payment yet) is type bill; \"paid electricity 4100\" is an expense. Set unclear:true with a short reason only if you genuinely cannot tell what the note is about or its amount.";
 }
 
 // The AI key lives on the server, never in the app. If the server has no key or
@@ -11724,6 +11810,8 @@ function parseNoteLocally(text, todayStr){
   }
   var sm = parseStaffMealNote(text, todayStr);
   if(sm) return sm;
+  var ex = parseExtraNote(text, todayStr);
+  if(ex) return ex;
   var date = parseNoteDate(text, todayStr);
   var nums = numbersIn(text);
   var amounts = moneyAmounts(text);
@@ -11777,7 +11865,7 @@ function parseNoteLocally(text, todayStr){
 
   // A single note often lists a whole bill: "250g mirch - Rs 65, 1kg arhar dal - Rs 130, ...".
   // Split it into proper line items so each one prices and stocks correctly.
-  var multi = parsePurchaseLines(text);
+  var multi = parsePurchaseLines(text).map(function(l){ l.item = canonicalItem(l.item); return fillFromMemory(l); });
   if(multi.length >= 2){
     return { ok:true, type:"purchaseBill", record:{
       billId: uid(), date: date, vendor: vendorFromText(text), purchasedBy: buyerFromText(text),
@@ -11787,7 +11875,19 @@ function parseNoteLocally(text, todayStr){
   // Purchase - needs a quantity and a price to be useful
   var qm = t.match(/(\d+(?:\.\d+)?)\s*(kg|gm|g|litre|ltr|l|ml|pcs|pc|packet|pkt|dozen)\b/);
   var pAmt = amounts.length ? Math.max.apply(null, amounts) : 0;
-  if(pAmt<=0) return { ok:false, reason:"No price found" };
+  // No price: an item you buy regularly gets its last rate (and usual vendor / payment).
+  var known = itemInText(text), kmem = known ? noteMemory().items[normItem(known)] : null;
+  if(kmem && (pAmt<=0 || (qm && amounts.length===1 && amounts[0]===parseFloat(qm[1])))){
+    var kq = qm ? parseFloat(qm[1]) : (amounts.length===1 && !/\b(rs|₹|rupees?)\b/.test(t) ? amounts[0] : kmem.usualQty);
+    var kv = vendorFromText(text); kv = kv==="Unknown vendor" ? (kmem.vendor || kv) : canonicalVendor(kv);
+    var vm0 = noteMemory().vendors[normItem(kv)];
+    var km = /\b(udhaar|udhar|credit|upi|gpay|phonepe|paytm|card|bank|transfer|cash)\b/.test(t) ? purchaseModeFromText(t) : (vm0 && vm0.mode) || "Cash";
+    var kp = payerFor(t, text); if(!/\b(paid|pocket|own money|upi|cash|bank)\b/.test(t) && vm0 && vm0.paidBy && !payerIsPersonal(vm0.paidBy)) kp = vm0.paidBy;
+    if((km==="UPI"||km==="Card"||km==="Bank Transfer") && kp==="Cafe cash") kp = "Cafe UPI/bank";
+    return { ok:true, type:"purchase", record:{ id:uid(), billId:uid(), date:date, vendor:kv, purchasedBy: buyerFromText(text), paidBy:kp,
+      item:kmem.name, category:kmem.category||"Other", qty:kq, unit:kmem.unit||"pcs", rate:kmem.rate, gst:kmem.gst||0, mode:km, rateFromMemory:true } };
+  }
+  if(pAmt<=0) return { ok:false, reason:"No price found — or buy it once with a price so the app remembers its rate" };
 
   var qty = qm ? parseFloat(qm[1]) : 1;
   var unit = qm ? qm[2] : "pcs";
@@ -11828,12 +11928,112 @@ function parseNoteLocally(text, todayStr){
     .replace(/\s+/g," ").trim();
 
   if(!itemName) return { ok:false, reason:"Could not tell what was bought" };
-
+  var cItem = canonicalItem(itemName.split(" ").slice(0,4).join(" ")), imem = noteMemory().items[normItem(cItem)];
+  vendor = canonicalVendor(vendor);
+  if(vendor==="Unknown vendor" && imem && imem.vendor) vendor = imem.vendor;
   return { ok:true, type:"purchase", record:{
     id:uid(), billId:uid(), date:date, vendor:vendor, purchasedBy:buyer, paidBy:payer,
-    item: itemName.split(" ").slice(0,4).join(" "),
-    category:"Other", qty:qty, unit:unit, rate: qty>0 ? +(pAmt/qty).toFixed(2) : pAmt, gst:0,
+    item: cItem,
+    category: (imem && imem.category) || "Other", qty:qty, unit: (!qm && imem && imem.unit) ? imem.unit : unit, rate: qty>0 ? +(pAmt/qty).toFixed(2) : pAmt, gst:0,
     mode: pMode } };
+}
+
+
+// ---------- NOTE MEMORY ----------
+// What the app already knows from your own records, used to read notes better:
+// every item you have bought (usual name, unit, category, last rate, usual vendor),
+// vendors (how you usually pay them), customers, staff, loan parties, bills and
+// meal types - plus words you have taught it or corrected (doodh → Milk).
+var HINGLISH = { "doodh":"Milk","dudh":"Milk","cheeni":"Sugar","chini":"Sugar","shakkar":"Sugar","chai patti":"Tea leaves","chaipatti":"Tea leaves","patti":"Tea leaves",
+  "chawal":"Rice","chaawal":"Rice","anda":"Eggs","ande":"Eggs","anday":"Eggs","aloo":"Potato","alu":"Potato","pyaz":"Onion","pyaaz":"Onion","kanda":"Onion",
+  "tamatar":"Tomato","dahi":"Curd","makhan":"Butter","tel":"Oil","namak":"Salt","mirch":"Chilli","hari mirch":"Green chilli","haldi":"Turmeric","dhaniya":"Coriander",
+  "adrak":"Ginger","lehsun":"Garlic","lahsun":"Garlic","sabzi":"Vegetables","sabji":"Vegetables","murga":"Chicken","murgh":"Chicken","pani":"Water","paani":"Water",
+  "bisleri":"Water bottle","dal":"Dal","daal":"Dal","besan":"Besan","sooji":"Sooji","suji":"Sooji","gobhi":"Cauliflower","gobi":"Cauliflower","bhindi":"Okra",
+  "baingan":"Brinjal","palak":"Spinach","matar":"Peas","nimbu":"Lemon","kela":"Banana","seb":"Apple","jeera":"Cumin","elaichi":"Cardamom","gas":"Gas cylinder" };
+var NOTE_MEM = null;
+function noteAliases(){ var a = (settings && settings.noteAliases) || {}; return { item: a.item || {}, vendor: a.vendor || {} }; }
+function learnAlias(kind, from, to){
+  from = normItem(from); if(!from || !to || from===normItem(to)) return;
+  var a = Object.assign({ item:{}, vendor:{} }, settings.noteAliases || {});
+  a[kind] = Object.assign({}, a[kind] || {}); a[kind][from] = to;
+  settings.noteAliases = a; NOTE_MEM = null;
+}
+function noteMemory(){
+  if(NOTE_MEM) return NOTE_MEM;
+  var items = {}, vendors = {};
+  purchases.slice().sort(function(a,b){ return (a.date||"").localeCompare(b.date||""); }).forEach(function(p){
+    if(p.isDelivery || !p.item) return;
+    var k = normItem(p.item), it = items[k] || (items[k] = { name:p.item, count:0, vendors:{}, qtys:[] });
+    it.name = p.item; it.unit = p.unit; it.category = p.category; it.rate = +p.rate||0; it.gst = +p.gst||0; it.lastDate = p.date; it.count++;
+    it.qtys.push(+p.qty||0); if(p.vendor && p.vendor!=="Unknown vendor") it.vendors[p.vendor] = (it.vendors[p.vendor]||0) + 1;
+    if(p.vendor && p.vendor!=="Unknown vendor"){
+      var v = vendors[normItem(p.vendor)] || (vendors[normItem(p.vendor)] = { name:p.vendor, count:0, modes:{}, payers:{} });
+      v.name = p.vendor; v.count++; v.modes[p.mode||"Cash"] = (v.modes[p.mode||"Cash"]||0)+1; if(p.paidBy) v.payers[p.paidBy] = (v.payers[p.paidBy]||0)+1;
+    }
+  });
+  function top(o){ var k = Object.keys(o).sort(function(a,b){ return o[b]-o[a]; }); return k[0] || ""; }
+  Object.keys(items).forEach(function(k){ var it = items[k]; it.vendor = top(it.vendors); var q = it.qtys.slice(-5).sort(function(a,b){ return a-b; }); it.usualQty = q[Math.floor(q.length/2)] || 1; });
+  Object.keys(vendors).forEach(function(k){ var v = vendors[k]; v.mode = top(v.modes); v.paidBy = top(v.payers); });
+  var custNames = {}; customers.forEach(function(c){ if(c.name) custNames[normItem(c.name)] = c.name; });
+  sales.forEach(function(x){ if(x.customer && !/^walk-?in$/i.test(x.customer) && x.mode==="Credit") custNames[normItem(x.customer)] = custNames[normItem(x.customer)] || x.customer; });
+  var parties = {}; loans.forEach(function(l){ if(l.party) parties[normItem(l.party)] = { name:l.party, type:l.partyType||"Other" }; });
+  NOTE_MEM = { items:items, vendors:vendors, customers:custNames, parties:parties };
+  return NOTE_MEM;
+}
+// The item a word or phrase means: a learned alias, an item you already buy, or a Hinglish word.
+function canonicalItem(name){
+  var n = normItem(name); if(!n) return name;
+  var al = noteAliases().item, mem = noteMemory().items;
+  if(al[n]) return al[n];
+  if(mem[n]) return mem[n].name;
+  if(HINGLISH[n]){ var h = HINGLISH[n]; return mem[normItem(h)] ? mem[normItem(h)].name : h; }
+  // "dudh amul" -> try each word
+  var words = n.split(/\s+/);
+  for(var i=0;i<words.length;i++){ var w = words[i]; if(al[w]) return al[w]; if(HINGLISH[w] && words.length<=2){ var h2 = HINGLISH[w]; return mem[normItem(h2)] ? mem[normItem(h2)].name : h2; } }
+  return name;
+}
+function canonicalVendor(name){
+  var n = normItem(name); if(!n || n==="unknown vendor") return name;
+  var al = noteAliases().vendor, vs = noteMemory().vendors;
+  if(al[n]) return al[n];
+  if(vs[n]) return vs[n].name;
+  var hit = Object.keys(vs).find(function(k){ return k.indexOf(n)===0 || n.indexOf(k)===0; });
+  return hit ? vs[hit].name : name;
+}
+// A known item mentioned anywhere in a note ("milk 10 litre" / "doodh 10 l").
+function itemInText(text){
+  var t = " "+normItem(text)+" ", mem = noteMemory().items, al = noteAliases().item, best = null, bestLen = 0;
+  function consider(word, name){ var w = normItem(word); if(w.length>=3 && t.indexOf(" "+w+" ")>=0 && w.length>bestLen){ best = name; bestLen = w.length; } }
+  Object.keys(mem).forEach(function(k){ consider(k, mem[k].name); });
+  Object.keys(al).forEach(function(k){ consider(k, al[k]); });
+  Object.keys(HINGLISH).forEach(function(k){ consider(k, canonicalItem(k)); });
+  return best;
+}
+// Fill what a purchase line leaves out (rate, unit, category, vendor) from memory.
+function fillFromMemory(line){
+  var it = noteMemory().items[normItem(line.item)];
+  if(!it) return line;
+  if(!(+line.rate>0) && it.rate){ line.rate = it.rate; line.gst = line.gst || it.gst || 0; line.rateFromMemory = true; }
+  if(!line.unit || line.unit==="pcs" && it.unit && it.unit!=="pcs" && line.unitGuessed) line.unit = it.unit;
+  if(!line.category || line.category==="Other") line.category = it.category || line.category;
+  return line;
+}
+function memoryForPrompt(){
+  var m = noteMemory(), out = [];
+  var its = Object.keys(m.items).map(function(k){ return m.items[k]; }).sort(function(a,b){ return b.count-a.count; }).slice(0,80);
+  if(its.length) out.push("ITEMS this cafe buys (name | unit | category | last rate per unit | usual vendor):\n"+its.map(function(i){ return "- "+i.name+" | "+(i.unit||"")+" | "+(i.category||"")+" | "+i.rate+" | "+(i.vendor||"-"); }).join("\n"));
+  var vs = Object.keys(m.vendors).map(function(k){ return m.vendors[k]; }).sort(function(a,b){ return b.count-a.count; }).slice(0,30);
+  if(vs.length) out.push("VENDORS (name | usually paid by mode | paid by):\n"+vs.map(function(v){ return "- "+v.name+" | "+v.mode+" | "+(v.paidBy||""); }).join("\n"));
+  var al = noteAliases(), alk = Object.keys(al.item).concat(Object.keys(al.vendor));
+  if(alk.length) out.push("WORDS THE OWNER USES (word -> means):\n"+Object.keys(al.item).map(function(k){ return "- "+k+" -> "+al.item[k]; }).concat(Object.keys(al.vendor).map(function(k){ return "- "+k+" -> vendor "+al.vendor[k]; })).join("\n"));
+  var cs = Object.keys(m.customers).map(function(k){ return m.customers[k]; }).slice(0,40);
+  if(cs.length) out.push("CUSTOMERS with udhaar: "+cs.join(", "));
+  var st = activeStaff().map(function(x){ return x.name; });
+  if(st.length) out.push("STAFF: "+st.join(", "));
+  var ps = Object.keys(m.parties).map(function(k){ return m.parties[k].name+" ("+m.parties[k].type+")"; });
+  if(ps.length) out.push("LOAN PARTIES (not partners): "+ps.join(", "));
+  out.push("BILLS: "+FIXED_CATS.map(function(c){ return c+" ("+billKind(c)+")"; }).join(", "));
+  return out.join("\n\n");
 }
 
 // ---- staff meals from notes ----
@@ -11890,10 +12090,102 @@ function parseStaffMealNote(text, todayStr){
   return { ok:true, type:"staffmeal", record:{ date:date, slot:slot, meal: m ? m.id : "", people: mealPeopleFromText(t) } };
 }
 
+
+// ---- more kinds of notes: attendance, advance, udhaar collected, loans, bill amounts ----
+function staffInText(text){
+  var t = normItem(text), out = [];
+  staff.filter(function(st){ return st.status!=="Left"; }).forEach(function(st){
+    var first = normItem(st.name).split(" ")[0];
+    if(first.length>=3 && new RegExp("\\b"+first.replace(/[.*+?^${}()|[\]\\]/g,"\\$&")+"\\b").test(t)) out.push(st);
+  });
+  return out;
+}
+function modeFromText(t){ return /\b(upi|gpay|google pay|phonepe|paytm|online)\b/.test(t) ? "UPI" : /\b(bank|transfer|neft|imps|rtgs)\b/.test(t) ? "Bank Transfer" : "Cash"; }
+function parseExtraNote(text, todayStr){
+  var t = " "+text.toLowerCase()+" ";
+  var date = parseNoteDate(text, todayStr), amounts = moneyAmounts(text), amt = amounts.length ? Math.max.apply(null, amounts) : 0;
+  // Attendance: "Ravi absent today", "Sita and Mohan on leave 3 Nov", "Ravi half day"
+  var att = /\b(half[ -]?day|aadha din)\b/.test(t) ? "Half day" : /\b(absent|nahi aaya|nahin aaya|did not come|didn'?t come|not come)\b/.test(t) ? "Absent" :
+            /\b(on leave|leave|chutti|chhutti|off today|week off|weekly off)\b/.test(t) ? "Leave" : /\b(present|came|aaya|attended)\b/.test(t) ? "Present" : "";
+  var who = staffInText(text);
+  if(att && who.length && !amt && !/\b(salary|advance|paid|meal|khana)\b/.test(t)){
+    return { ok:true, type:"attendance", record:{ date:date, entries: who.map(function(st){ return { staffId:st.id, status:att }; }) } };
+  }
+  // Salary advance: "Ravi advance 2000", "gave 1500 advance to Sita by UPI"
+  if(/\badvance\b/.test(t) && who.length===1 && amt>0){
+    var st = who[0], m = modeFromText(t), mk = date.slice(0,7);
+    var mm = t.match(/\b(?:for|against)\s+(january|february|march|april|may|june|july|august|september|october|november|december)\b/);
+    if(mm){ var mi = MONTH_NAMES.map(function(x){ return x.toLowerCase(); }).indexOf(mm[1]); mk = date.slice(0,4)+"-"+String(mi+1).padStart(2,"0"); }
+    return { ok:true, type:"expense", record:{ id:uid(), staffId:st.id, date:date, category:"Staff Salary", description: st.name+" - "+monthLabel(mk)+" salary advance", amount:amt,
+             mode:m, paidBy: m==="Cash" ? "Cafe cash" : "Cafe UPI/bank", settled:false, advance:true } };
+  }
+  // Udhaar collected: "Amit paid udhaar 500", "udhaar received from Amit 300 upi"
+  if(/\b(udhaar|udhar|baki|baaki|due|credit)\b/.test(t) && /\b(paid|received|returned|wapas|diya|de diya|cleared|collected|got)\b/.test(t) && amt>0 && !/\b(vendor|supplier|bought)\b/.test(t)){
+    var mem = noteMemory(), cname = null;
+    Object.keys(mem.customers).forEach(function(k){ var first = k.split(" ")[0]; if(first.length>=3 && t.indexOf(first)>=0 && (!cname || k.length > normItem(cname).length)) cname = mem.customers[k]; });
+    if(!cname){ var cm = text.match(/\bfrom\s+([A-Za-z][A-Za-z ]{1,25}?)(?=\s+(?:\d|₹|(?:rs|today|yesterday|by|via|upi|cash|on)\b)|$)/i) || text.match(/^([A-Za-z][A-Za-z ]{1,25}?)\s+(?:paid|returned|gave|cleared)\b/i); if(cm) cname = cm[1].trim(); }
+    if(!cname) return { ok:false, reason:"Whose udhaar? Write the customer’s name" };
+    return { ok:true, type:"udhaarpay", record:{ date:date, customer:cname, amount:amt, mode:modeFromText(t) } };
+  }
+  // Loans: "loan from Uncle 50000", "repaid 5000 loan to Uncle", "gave loan 2000 to Ramesh", "Ramesh returned loan 1000"
+  if(/\b(loan|karz|karza|qarz|borrowed)\b/.test(t) && amt>0){
+    var lt = /\b(repaid|repay|returned to|paid back|chukaya|paid to)\b/.test(t) ? "repay" :
+             /\b(gave|given|lent|diya)\b.*\bloan\b|\bloan\b.*\b(to|given|diya)\b/.test(t) && !/\bloan from\b/.test(t) ? "give" :
+             /\b(returned|got back|received back|collected|wapas)\b/.test(t) ? "collect" : "take";
+    if(lt==="give" && /\b(returned|got back|wapas mila|received back)\b/.test(t)) lt = "collect";
+    var pm = text.match(/\b(?:from|to|by)\s+([A-Za-z][A-Za-z .]{1,30}?)(?=\s+(?:\d|₹|(?:rs|today|yesterday|by|via|upi|cash|on|in|at|for|loan)\b)|[,.]|$)/i);
+    var party = pm ? pm[1].trim() : null, mem2 = noteMemory();
+    if(!party){ Object.keys(mem2.parties).forEach(function(k){ if(t.indexOf(k.split(" ")[0])>=0) party = mem2.parties[k].name; }); }
+    var partner = matchPerson(text, PARTNERS);
+    if(partner && (!party || normItem(party).indexOf(normItem(partner).split(" ")[0])===0)){
+      if(lt==="take" || lt==="repay"){
+        var m2 = modeFromText(t);
+        return { ok:true, type:"investment", record:{ id:uid(), date:date, partner:partner, invType: lt==="take" ? "Loan" : "Loan repayment", purpose:"Working capital", amount:amt, mode:m2, via: m2==="Cash" ? "counter" : "bank", notes:"" } };
+      }
+    }
+    if(!party) return { ok:false, reason:"Who is the loan with? Write “loan from …” or “loan to …”" };
+    var known = mem2.parties[normItem(party)];
+    var m3 = modeFromText(t);
+    return { ok:true, type:"loan", record:{ id:uid(), date:date, type:lt, party: known ? known.name : party.replace(/\b\w/g, function(c){ return c.toUpperCase(); }),
+             partyType: known ? known.type : (/\b(bank|nbfc|finance|bajaj|hdfc|sbi|icici|axis)\b/.test(t) ? "Bank / NBFC" : "Relative / friend"), amount:amt, via: m3==="Cash" ? "counter" : "bank", note:"" } };
+  }
+  // A variable bill's amount for a month: "electricity bill 4100 due 15 nov", "wifi bill october 799"
+  var cat = FIXED_CATS.find(function(c){ var w = normItem(c).split(/[^a-z]+/)[0]; return w.length>=3 && t.indexOf(w)>=0; }) || (/\bbijli\b/.test(t) ? "Electricity" : null);
+  if(cat && /\b(bill|aaya|came|received)\b/.test(t) && !/\b(paid|payment|pay kiya|diya|de diya)\b/.test(t) && amt>0){
+    var mk2 = date.slice(0,7);
+    var mo = t.match(/\b(?:for\s+)?(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b(?!\s*\d)/);
+    var due = "", dm = t.match(/\bdue\s+(?:on\s+|by\s+)?([^,]+)$/);
+    if(dm){ due = parseNoteDate(dm[1], todayStr); if(due===todayStr && !/today/.test(dm[1])) due = ""; }
+    if(mo && !dm){ var idx = MONTHS[mo[1].slice(0,3)==="sep" ? "sep" : mo[1].slice(0,3)]; if(idx!==undefined) mk2 = date.slice(0,4)+"-"+String(idx+1).padStart(2,"0"); }
+    var units = t.match(/\b(\d+)\s*units?\b/);
+    return { ok:true, type:"billentry", record:{ month:mk2, cat:cat, amount:amt, due:due, note: units ? units[1]+" units" : "" } };
+  }
+  return null;
+}
+
 // Returns what was created, so a note can be undone or re-processed later.
 function fileParsedRecord(res){
   var made = [];
   if(res.type==="staffmeal"){ return applyStaffMeal(res.record.date, res.record.slot, res.record.meal, res.record.people); }
+  if(res.type==="attendance"){
+    res.record.entries.forEach(function(e){ var prev = attendFor(res.record.date, e.staffId); made.push({ store:"attendance", date:res.record.date, staffId:e.staffId, prev: prev ? prev.status : null }); setAttendanceOn(res.record.date, e.staffId, e.status); });
+    return made;
+  }
+  if(res.type==="udhaarpay"){
+    var c = customers.find(function(x){ return normItem(x.name)===normItem(res.record.customer); });
+    if(!c){ c = { id:uid(), name:res.record.customer, phone:"" }; customers.push(c); made.push({ store:"customers", id:c.id }); }
+    var cp = { id:uid(), customerId:c.id, date:res.record.date, amount:res.record.amount, mode:res.record.mode };
+    creditPayments.push(cp); made.push({ store:"creditPayments", id:cp.id });
+    return made;
+  }
+  if(res.type==="loan"){ loans.push(res.record); made.push({ store:"loans", id:res.record.id }); return made; }
+  if(res.type==="billentry"){
+    var r0 = res.record, prevAmt = billEntered(r0.month, r0.cat), prevMeta = billMeta(r0.month, r0.cat);
+    var months = Object.assign({}, settings.fixedCostMonths||{}); months[r0.month] = Object.assign({}, months[r0.month]||{}); months[r0.month][r0.cat] = r0.amount; settings.fixedCostMonths = months;
+    if(r0.due || r0.note){ var bm = Object.assign({}, settings.billMeta||{}); bm[r0.month] = Object.assign({}, bm[r0.month]||{}); bm[r0.month][r0.cat] = { due:r0.due, note:r0.note }; settings.billMeta = bm; }
+    made.push({ store:"billEntry", month:r0.month, cat:r0.cat, prev:prevAmt, prevMeta: (prevMeta.due||prevMeta.note) ? prevMeta : null });
+    return made;
+  }
   if(res.type==="sale"){ sales.push(res.record); made.push({store:"sales", id:res.record.id}); }
   else if(res.type==="purchase"){ purchases.push(res.record); made.push({store:"purchases", id:res.record.id}); }
   else if(res.type==="purchaseBill"){
@@ -11920,6 +12212,18 @@ function undoNoteRecords(n){
     else if(m.store==="purchases"){ purchases = purchases.filter(function(x){ return x.id!==m.id; }); }
     else if(m.store==="investments"){ investments = investments.filter(function(x){ return x.id!==m.id; }); }
     else if(m.store==="expenses"){ expenses = expenses.filter(function(x){ return x.id!==m.id; }); }
+    else if(m.store==="attendance"){ setAttendanceOn(m.date, m.staffId, m.prev); }
+    else if(m.store==="creditPayments"){ creditPayments = creditPayments.filter(function(x){ return x.id!==m.id; }); }
+    else if(m.store==="customers"){ customers = customers.filter(function(x){ return x.id!==m.id; }); }
+    else if(m.store==="loans"){ loans = loans.filter(function(x){ return x.id!==m.id; }); }
+    else if(m.store==="billEntry"){
+      var mo2 = Object.assign({}, settings.fixedCostMonths||{}); mo2[m.month] = Object.assign({}, mo2[m.month]||{});
+      if(m.prev===null || m.prev===undefined) delete mo2[m.month][m.cat]; else mo2[m.month][m.cat] = m.prev;
+      if(!Object.keys(mo2[m.month]).length) delete mo2[m.month]; settings.fixedCostMonths = mo2;
+      var bm2 = Object.assign({}, settings.billMeta||{}); bm2[m.month] = Object.assign({}, bm2[m.month]||{});
+      if(m.prevMeta) bm2[m.month][m.cat] = m.prevMeta; else delete bm2[m.month][m.cat];
+      if(!Object.keys(bm2[m.month]).length) delete bm2[m.month]; settings.billMeta = bm2;
+    }
     else if(m.store==="mealDays"){ var md = Object.assign({}, settings.mealDays||{}); if(m.prev) md[m.date] = m.prev; else delete md[m.date]; settings.mealDays = md; }
     touched[m.store] = true;
   });
@@ -11927,7 +12231,11 @@ function undoNoteRecords(n){
   if(touched.purchases) savePurch();
   if(touched.investments) saveInvest();
   if(touched.expenses) saveExpense();
-  if(touched.mealDays) saveSettings();
+  if(touched.mealDays || touched.billEntry) saveSettings();
+  if(touched.attendance) saveAttend();
+  if(touched.creditPayments) saveCreditPayments();
+  if(touched.customers) saveCustomers();
+  if(touched.loans) saveLoans();
   n.created = [];
   n.status = "pending";
   n.error = null;
@@ -11947,12 +12255,13 @@ function processNotes(){
   var chunks = [];
   for(var i=0;i<pending.length;i+=8){ chunks.push(pending.slice(i,i+8)); }
 
-  var counts = {sale:0, purchase:0, investment:0, expense:0, staffmeal:0}, needsReview = 0, usedOffline = false;
+  var counts = {sale:0, purchase:0, investment:0, expense:0, staffmeal:0, attendance:0, udhaarpay:0, loan:0, billentry:0}, needsReview = 0, usedOffline = false;
+  NOTE_MEM = null;   // read the latest records
 
   function runChunk(idx){
     if(idx>=chunks.length){
       processing = false;
-      var okAll = [saveNotes(), savePurch(), saveSales(), saveInvest(), saveExpense(), (counts.staffmeal ? saveSettings() : true)].every(function(x){ return x !== false; });
+      var okAll = [saveNotes(), savePurch(), saveSales(), saveInvest(), saveExpense(), saveSettings(), saveAttend(), saveCreditPayments(), saveCustomers(), saveLoans()].every(function(x){ return x !== false; });
       renderAll();
       if(!okAll){
         appAlert("Could not save — storage is full. The entries you just processed are NOT stored and will be lost when you close the app.\n\nOpen Backup & restore → Free up space, then process the notes again.");
@@ -11980,6 +12289,17 @@ function processNotes(){
         var ok = false;
         var made = [];
         function track(store, id){ made.push({store:store, id:id}); return id; }
+        // Purchases: use the names you already use, and fill a missing rate / vendor from memory.
+        if(r && r.type==="purchase"){
+          var lines0 = Array.isArray(r.items) && r.items.length ? r.items : [r];
+          lines0.forEach(function(it){ if(it.item){ it.item = canonicalItem(it.item); fillFromMemory(it); } });
+          var firstMem = noteMemory().items[normItem(lines0[0].item||"")];
+          r.vendor = r.vendor ? canonicalVendor(r.vendor) : ((firstMem && firstMem.vendor) || "");
+          var vm1 = noteMemory().vendors[normItem(r.vendor||"")];
+          if(vm1 && !/\b(udhaar|udhar|credit|upi|gpay|phonepe|paytm|card|bank|cash)\b/i.test(note.text)){ r.purchmode = vm1.mode || r.purchmode; if(vm1.paidBy && !payerIsPersonal(vm1.paidBy)) r.paidby = vm1.paidBy; }
+          if(!r.vendor) r.vendor = "Unknown vendor";
+          if(!(+r.qty>0) && r.item) r.qty = (firstMem && firstMem.usualQty) || 1;
+        }
 
         if(r && !r.unclear && r.type==="sale" && (r.amount>0)){
           var smode = ALLOWED_SALE_MODES.indexOf(r.salemode)>=0 ? r.salemode : "Cash";
@@ -12021,6 +12341,20 @@ function processNotes(){
           var imode = ["Cash","UPI","Bank Transfer"].indexOf(r.investmode)>=0 ? r.investmode : "Cash";
           investments.push({ id:track("investments", uid()), date:dateVal, partner:partner, invType:invType, purpose:r.purpose||"Other", amount:+r.amount, mode:imode, notes:"" });
           ok = true; counts.investment++;
+        } else if(r && ["attendance","advance","udhaarpay","loan","bill"].indexOf(r.type)>=0){
+          // Read with the same rules as on the phone, guided by what the AI found.
+          var hint = note.text;
+          if(r.type==="attendance" && Array.isArray(r.staff)) hint = r.staff.join(" and ")+" "+(r.status||"")+" "+note.text;
+          if(r.type==="advance" && Array.isArray(r.staff) && r.staff[0]) hint = r.staff[0]+" advance "+(+r.amount||"")+" "+note.text;
+          if(r.type==="udhaarpay" && r.customer2) hint = r.customer2+" paid udhaar "+(+r.amount||"")+" "+(r.paymode||"")+" "+note.text;
+          if(r.type==="loan" && r.party) hint = ({take:"loan from ",repay:"repaid loan to ",give:"gave loan to ",collect:"loan returned by "}[r.loantype]||"loan from ")+r.party+" "+(+r.amount||"")+" "+(r.paymode||"")+" "+note.text.replace(/\b(from|to|by)\b/gi," ");
+          if(r.type==="bill" && r.billcat) hint = r.billcat+" bill "+(+r.amount||"")+(r.due?" due "+r.due:"")+" "+note.text;
+          var ex2 = parseExtraNote(hint, dateVal);
+          if(ex2 && ex2.ok){
+            if(ex2.type==="billentry" && /^\d{4}-\d{2}$/.test(r.billmonth||"")) ex2.record.month = r.billmonth;
+            if(ex2.record && ex2.record.date) ex2.record.date = dateVal;
+            made = fileParsedRecord(ex2); ok = true; counts[ex2.type] = (counts[ex2.type]||0) + 1; r.type = ex2.type;
+          } else { r.reason = (ex2 && ex2.reason) || "Couldn't work out the details"; }
         } else if(r && r.type==="staffmeal"){
           var local = parseStaffMealNote(note.text, todayStr);
           var mid = mealTypeById(r.meal) ? r.meal : (local && local.ok ? local.record.meal : "");
@@ -12079,6 +12413,10 @@ function showAiBanner(counts, needsReview, usedOffline){
   if(counts.investment) parts.push(counts.investment+" investment entr"+(counts.investment!==1?"ies":"y"));
   if(counts.expense) parts.push(counts.expense+" expense"+(counts.expense!==1?"s":""));
   if(counts.staffmeal) parts.push(counts.staffmeal+" staff meal"+(counts.staffmeal!==1?"s":""));
+  if(counts.attendance) parts.push(counts.attendance+" attendance note"+(counts.attendance!==1?"s":""));
+  if(counts.udhaarpay) parts.push(counts.udhaarpay+" udhaar payment"+(counts.udhaarpay!==1?"s":""));
+  if(counts.loan) parts.push(counts.loan+" loan entr"+(counts.loan!==1?"ies":"y"));
+  if(counts.billentry) parts.push(counts.billentry+" bill amount"+(counts.billentry!==1?"s":""));
   var msg = parts.length ? "Added: "+parts.join(", ")+"." : "Nothing could be filed automatically.";
   if(needsReview>0){ msg += " " + needsReview + " note" + (needsReview!==1?"s":"") + " need a closer look - edit or delete them below."; }
   if(usedOffline){ msg += " (Read on this phone, without the AI service - check the filed entries are right.)"; }
@@ -12133,6 +12471,7 @@ document.addEventListener("DOMContentLoaded", function(){
 
   document.getElementById("noteAddBtn").addEventListener("click", addNoteLines);
   document.getElementById("noteProcessBtn").addEventListener("click", processNotes);
+  document.getElementById("noteMemBtn").addEventListener("click", function(e){ e.preventDefault(); openNoteMemory(); });
   document.getElementById("fixDatesBtn").addEventListener("click", openFixDates);
   document.getElementById("reportsBtn").addEventListener("click", openReportsSheet);
 
