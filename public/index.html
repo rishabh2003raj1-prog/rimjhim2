@@ -6233,6 +6233,7 @@ function openQuoteForm(vendId, quoteIdx, presetItem){
 // keeps working offline. Standard PDF fonts have no ₹ glyph, so PDFs use "Rs.".
 var REPORT_SECTIONS = [
   { id:"summary",   label:"Business summary (profit & loss)" },
+  { id:"funding",   label:"How the cafe got by, month by month (loans & funding)" },
   { id:"sales",     label:"Sales report" },
   { id:"purchases", label:"Purchase report" },
   { id:"expenses",  label:"Expenditure report" },
@@ -6243,7 +6244,7 @@ var REPORT_SECTIONS = [
   { id:"customers", label:"Customer dues & loyalty" },
   { id:"cash",      label:"Cash counter report" }
 ];
-var reportState = { preset:"month", from:null, to:null, sections:{summary:true, sales:true, purchases:true, expenses:true} };
+var reportState = { preset:"month", from:null, to:null, sections:{summary:true, funding:true, sales:true, purchases:true, expenses:true} };
 
 function loadScript(src){
   return new Promise(function(resolve, reject){
@@ -6316,6 +6317,7 @@ function openReportsSheet(){
 
   html += '<div class="err" id="rpErr"></div>';
   html += '<div class="sheetbtns" style="margin-top:14px;"><button class="btn-cancel" id="rpView">View on screen</button><button class="btn-save" id="rpGo">Create PDF</button></div>';
+  html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="rpFund" style="flex:1;">Profit &amp; loss + how the cafe got by (PDF)</button></div>';
   html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="rpCancel" style="flex:1;">Close</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
@@ -6343,13 +6345,13 @@ function openReportsSheet(){
   document.getElementById("rpAll").addEventListener("click", function(){ syncCustom(); REPORT_SECTIONS.forEach(function(x){ reportState.sections[x.id]=true; }); openReportsSheet(); });
   document.getElementById("rpNone").addEventListener("click", function(){ syncCustom(); reportState.sections = {}; openReportsSheet(); });
   document.getElementById("rpCancel").addEventListener("click", closeForm);
-  function pickedOrError(){
+  function pickedOrError(only){
     syncCustom();
     var rr = reportRange();
     var err = document.getElementById("rpErr");
     err.style.display = "none";
     if(!rr.from || !rr.to || rr.to < rr.from){ err.textContent = 'The "to" date must be on or after the "from" date.'; err.style.display="block"; return null; }
-    var chosen = REPORT_SECTIONS.filter(function(x){ return reportState.sections[x.id]; }).map(function(x){ return x.id; });
+    var chosen = only || REPORT_SECTIONS.filter(function(x){ return reportState.sections[x.id]; }).map(function(x){ return x.id; });
     if(chosen.length===0){ err.textContent = "Pick at least one report to include."; err.style.display="block"; return null; }
     return { rr:rr, chosen:chosen, err:err };
   }
@@ -6357,20 +6359,104 @@ function openReportsSheet(){
     var p = pickedOrError(); if(!p) return;
     showReportOnScreen(p.rr, p.chosen);
   });
-  document.getElementById("rpGo").addEventListener("click", function(){
-    var p = pickedOrError(); if(!p) return;
+  function makePdf(btnId, onlySections){
+    var p = pickedOrError(onlySections); if(!p) return;
     var rr = p.rr, chosen = p.chosen, err = p.err;
-    var btn = document.getElementById("rpGo");
+    var btn = document.getElementById(btnId), label = btn.textContent;
     btn.disabled = true; btn.textContent = "Creating…";
     ensurePdfLib().then(function(){
       var out = buildReportPdf(rr, chosen);
-      btn.disabled = false; btn.textContent = "Create PDF";
+      btn.disabled = false; btn.textContent = label;
       deliverPdf(out.doc, out.fname, rr, chosen);
     }).catch(function(e){
-      btn.disabled = false; btn.textContent = "Create PDF";
+      btn.disabled = false; btn.textContent = label;
       err.textContent = "Couldn't load the PDF tool. Check your internet connection and try again.";
       err.style.display = "block";
     });
+  }
+  document.getElementById("rpGo").addEventListener("click", function(){ makePdf("rpGo"); });
+  document.getElementById("rpFund").addEventListener("click", function(){ makePdf("rpFund", ["summary","funding"]); });
+}
+
+// ---- How the cafe got by, month by month ----
+// Starts from the month's profit or loss, then follows the money that came in or went
+// out without being profit: udhaar given and collected, vendor bills left unpaid, bills
+// partners paid from their own pocket (and repayments to them), loans taken / repaid /
+// given / collected, partner capital and withdrawals. What is left is how much the
+// cafe's own cash & bank went up or down. Capital paid straight to a seller or
+// contractor never reached the cafe, so it is noted but not counted.
+function monthsInRange(F, T){
+  var out = [], m = F.slice(0,7);
+  while(m <= T.slice(0,7)){
+    out.push(m);
+    var y = +m.slice(0,4), mo = +m.slice(5,7) + 1;
+    if(mo > 12){ mo = 1; y++; }
+    m = y + "-" + String(mo).padStart(2,"0");
+  }
+  return out;
+}
+function monthFunding(F, T){
+  var reps = partnerRepayments(), loanList = allLoanEntries();
+  return monthsInRange(F, T).map(function(mKey){
+    var from = mKey+"-01" < F ? F : mKey+"-01";
+    var end = loanMonthEnd(mKey), to = end > T ? T : end;
+    function inR(d){ return d && d>=from && d<=to; }
+    var S = sales.filter(function(x){ return inR(x.date); });
+    var P = purchases.filter(function(x){ return inR(x.date); });
+    var E = expenses.filter(function(x){ return inR(expBookDate(x)); });
+    var sTot = S.reduce(function(a,x){ return a+saleTotal(x); },0);
+    var pTot = P.reduce(function(a,x){ return a+purchTotal(x); },0);
+    var eTot = E.reduce(function(a,x){ return a+expAmt(x); },0);
+    var net = r2(sTot - pTot - eTot + otherIncomeIn(inR));
+    var rows = [], f = { month:mKey, from:from, to:to, sales:r2(sTot), net:net, loans:0, partner:0, timing:0, directCapital:0 };
+    function add(label, amt, group){ amt = r2(amt); if(!amt) return; rows.push({ label:label, amt:amt, group:group }); f[group] = r2(f[group] + amt); }
+
+    add("Customer udhaar given (not collected yet)", -S.filter(function(x){ return x.mode==="Credit"; }).reduce(function(a,x){ return a+saleTotal(x); },0), "timing");
+    add("Old customer udhaar collected", creditPayments.filter(function(p){ return inR(p.date); }).reduce(function(a,p){ return a+(+p.amount||0); },0), "timing");
+    add("Vendor bills left unpaid (udhaar)", P.filter(function(p){ return (p.mode||"Cash")==="Credit"; }).reduce(function(a,p){ return a+purchTotal(p); },0), "timing");
+
+    var pocket = {}, repaid = {}, cap = {}, wd = {};
+    P.forEach(function(p){ if((p.mode||"Cash")!=="Credit" && payerIsPersonal(p.paidBy)){ var n = payerPartner(p.paidBy); pocket[n] = (pocket[n]||0) + purchTotal(p); } });
+    E.forEach(function(x){ if(payerIsPersonal(x.paidBy)){ var n = payerPartner(x.paidBy); pocket[n] = (pocket[n]||0) + expAmt(x); } });
+    reps.forEach(function(r){ if(inR(r.date)) repaid[r.partner] = (repaid[r.partner]||0) + r.amount; });
+    investments.forEach(function(v){
+      if(!inR(v.date)) return;
+      var k = invKind(v), a = +v.amount||0;
+      if(k==="capital"){ if(invDest(v)==="direct") f.directCapital = r2(f.directCapital + a); else cap[v.partner] = (cap[v.partner]||0) + a; }
+      else if(k==="withdraw") wd[v.partner] = (wd[v.partner]||0) + a;
+    });
+    cashMoves.forEach(function(m){ if(m.type==="withdraw" && inR(m.date)) wd[m.holder] = (wd[m.holder]||0) + (+m.amount||0); });
+    Object.keys(pocket).forEach(function(n){ add("Bills "+n+" paid from own pocket", pocket[n], "partner"); });
+    Object.keys(repaid).forEach(function(n){ add(n+" paid back for bills", -repaid[n], "partner"); });
+    Object.keys(cap).forEach(function(n){ add("Capital from "+n, cap[n], "partner"); });
+    Object.keys(wd).forEach(function(n){ add("Withdrawn by "+n, -wd[n], "partner"); });
+
+    var ln = {};
+    loanList.forEach(function(e){
+      if(!inR(e.date)) return;
+      var key = e.type+"|"+e.party;
+      ln[key] = (ln[key]||0) + e.amount;
+    });
+    var LN_LABEL = { take:"Loan from ", repay:"Loan repaid to ", give:"Loan given to ", collect:"Loan repayment from " };
+    Object.keys(ln).sort().forEach(function(k){
+      var t = k.split("|")[0], party = k.slice(t.length+1);
+      add(LN_LABEL[t]+party, (t==="take"||t==="collect") ? ln[k] : -ln[k], "loans");
+    });
+
+    f.rows = rows;
+    f.change = r2(net + f.loans + f.partner + f.timing);
+    var ins = rows.filter(function(r){ return r.amt>0; }).sort(function(a,b){ return b.amt-a.amt; });
+    var outs = rows.filter(function(r){ return r.amt<0; }).sort(function(a,b){ return a.amt-b.amt; });
+    function list(arr){ return arr.slice(0,4).map(function(r){ return r.label.charAt(0).toLowerCase()+r.label.slice(1)+" "+pdfMoney(Math.abs(r.amt)); }).join(", ") + (arr.length>4 ? " and more" : ""); }
+    var s = sTot===0 && pTot===0 && eTot===0 && !rows.length ? "Nothing recorded this month." :
+      (net<0 ? "Ran at a loss of "+pdfMoney(-net)+"." : net>0 ? "Made a profit of "+pdfMoney(net)+"." : "Broke even.");
+    if(ins.length) s += (net<0 ? " Kept going with: " : " Extra money came from: ")+list(ins)+".";
+    if(outs.length) s += " Money also went to: "+list(outs)+".";
+    if(rows.length || net) s += f.change<0 ? " The cafe's own cash & bank went down by "+pdfMoney(-f.change)+"." :
+                              f.change>0 ? " The cafe's own cash & bank went up by "+pdfMoney(f.change)+"." : " The cafe's own cash & bank stayed the same.";
+    if(net<0 && f.change>=0 && ins.length) s += " The loss was fully covered by the money above.";
+    f.story = s;
+    return f;
   });
 }
 
@@ -6456,6 +6542,40 @@ function buildReportPdf(rr, chosen, Ctor){
       if(mk.length){ sub("Sales by payment mode");
         table(["Mode","Amount","Share"], mk.sort(function(a,b){return modes[b]-modes[a];}).map(function(k){
           return [k, pdfMoney(modes[k]), sTot>0 ? Math.round(modes[k]/sTot*100)+"%" : "-"]; }), { cols:{1:{halign:"right"},2:{halign:"right"}} }); }
+      // How each month's needs were met (loans, partner money, unpaid bills).
+      var fm = monthFunding(F, T);
+      var ft2 = { net:0, loans:0, partner:0, timing:0, change:0 };
+      fm.forEach(function(m){ ["net","loans","partner","timing","change"].forEach(function(k){ ft2[k] += m[k]; }); });
+      sub("How the cafe met its needs");
+      note("Profit or loss, plus money from loans, partners and unpaid bills, gives the change in the cafe's own cash & bank. Details: \"How the cafe got by\" report.");
+      table(["Month","Profit / loss","Loans (net)","Partner money (net)","Udhaar & unpaid bills","Cash & bank change"],
+        fm.map(function(m){ return [monthLabel(m.month), pdfMoney(m.net), pdfMoney(m.loans), pdfMoney(m.partner), pdfMoney(m.timing), pdfMoney(m.change)]; }),
+        { foot: fm.length>1 ? ["Total", pdfMoney(ft2.net), pdfMoney(ft2.loans), pdfMoney(ft2.partner), pdfMoney(ft2.timing), pdfMoney(ft2.change)] : undefined,
+          cols:{1:{halign:"right"},2:{halign:"right"},3:{halign:"right"},4:{halign:"right"},5:{halign:"right"}} });
+    }
+
+    if(sec==="funding"){
+      title("How the cafe got by, month by month");
+      note("Each month starts from its profit or loss. Then come the money that came in or went out without being profit: loans, partner money, udhaar and unpaid bills. The last line is how much the cafe's own cash & bank went up or down.");
+      monthFunding(F, T).forEach(function(m){
+        sub(monthLabel(m.month) + (m.from.slice(8)!=="01" || m.to!==loanMonthEnd(m.month) ? "  ("+pdfDate(m.from)+" to "+pdfDate(m.to)+")" : ""));
+        note(m.story);
+        var body = [[m.net<0 ? "Loss from running the cafe" : "Profit from running the cafe", pdfMoney(m.net)]];
+        var GROUP = { timing:"Udhaar & unpaid bills", partner:"Partner money", loans:"Loans" };
+        ["loans","partner","timing"].forEach(function(g){
+          m.rows.filter(function(r){ return r.group===g; }).forEach(function(r){ body.push([r.label+"  ·  "+GROUP[g], (r.amt>0?"+ ":"- ")+pdfMoney(Math.abs(r.amt))]); });
+        });
+        table(["What","Amount"], body,
+          { foot:[m.change<0 ? "Cafe cash & bank went down by" : "Cafe cash & bank went up by", pdfMoney(Math.abs(m.change))], cols:{1:{halign:"right"}} });
+        if(m.directCapital) note("Also: partner capital of "+pdfMoney(m.directCapital)+" was paid straight to a seller or contractor (shop, renovation, equipment), so it never passed through the cafe.");
+      });
+      var lt = loanTotals(T);
+      sub("Loans still open on " + pdfDate(T));
+      var lp = loanParties(T).filter(function(p){ return Math.abs(p.balance) >= 0.5; });
+      table(["Party","Type","Direction","Borrowed / lent","Repaid","Still open"],
+        lp.map(function(p){ return [p.party, p.partyType||"", p.dir==="owe" ? "Cafe owes" : "Owed to cafe", pdfMoney(p.out), pdfMoney(p.back), pdfMoney(p.balance)]; }),
+        { foot: lp.length ? ["","","","Cafe owes "+pdfMoney(lt.cafeOwes), "", "To collect "+pdfMoney(lt.owedToCafe)] : undefined,
+          cols:{3:{halign:"right"},4:{halign:"right"},5:{halign:"right"}} });
     }
 
     if(sec==="sales"){
@@ -6715,7 +6835,7 @@ ReportRecorder.prototype.text = function(t){
   this.ops.push({ kind:"text", text: Array.isArray(t)?t.join(" "):String(t), size:this._size, bold:this._bold });
 };
 ReportRecorder.prototype.autoTable = function(o){
-  this.ops.push({ kind:"table", head:o.head?o.head[0]:null, body:o.body||[], foot:o.foot?o.foot[0]:null, plain:o.theme==="plain" });
+  this.ops.push({ kind:"table", head:o.head?o.head[0]:null, body:o.body||[], foot:o.foot?o.foot[0]:null, plain:o.theme==="plain", cols:o.columnStyles||{} });
   this.lastAutoTable = { finalY:(o.startY||0) + 20*((o.body||[]).length+1) };
 };
 ReportRecorder.prototype.output = function(){ return null; };
@@ -6735,10 +6855,11 @@ function reportHtml(rr, chosen){
           return '<div class="psrow"><span>'+esc(r[0])+'</span><b>'+esc(r[1])+'</b></div>';
         }).join("")+'</div>';
       } else {
+        var al = function(i){ var c = op.cols[i]; return c && c.halign==="right" ? ' style="text-align:right"' : ''; };
         h += '<div class="rptablewrap"><table class="rptable">';
-        if(op.head) h += '<thead><tr>'+op.head.map(function(c){ return '<th>'+esc(c)+'</th>'; }).join("")+'</tr></thead>';
-        h += '<tbody>'+op.body.map(function(r){ return '<tr>'+r.map(function(c){ return '<td>'+esc(c)+'</td>'; }).join("")+'</tr>'; }).join("")+'</tbody>';
-        if(op.foot) h += '<tfoot><tr>'+op.foot.map(function(c){ return '<td>'+esc(c)+'</td>'; }).join("")+'</tr></tfoot>';
+        if(op.head) h += '<thead><tr>'+op.head.map(function(c,i){ return '<th'+al(i)+'>'+esc(c)+'</th>'; }).join("")+'</tr></thead>';
+        h += '<tbody>'+op.body.map(function(r){ return '<tr>'+r.map(function(c,i){ return '<td'+al(i)+'>'+esc(c)+'</td>'; }).join("")+'</tr>'; }).join("")+'</tbody>';
+        if(op.foot) h += '<tfoot><tr>'+op.foot.map(function(c,i){ return '<td'+al(i)+'>'+esc(c)+'</td>'; }).join("")+'</tr></tfoot>';
         h += '</table></div>';
       }
     }

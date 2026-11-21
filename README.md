@@ -174,3 +174,10 @@ Staff → **Salary** shows each person's salary for a month:
 - Changes from the other phone appear within a few seconds, or straight away when the app is reopened.
 - **↻ Refresh** in the top bar pulls the latest data from the server and recalculates every screen. Screens also recalculate after every saved change, when the Dashboard is opened, and when the date changes.
 - **Backup & restore → Download backup** still produces a full JSON backup for safekeeping.
+
+### How the cafe got by (monthly funding)
+Reports → **Profit & loss + how the cafe got by (PDF)**, or tick *How the cafe got by, month by month* in the report list.
+The profit & loss summary now has a **How the cafe met its needs** table: for each month, the profit or loss, loans (net),
+partner money (net), udhaar & unpaid bills, and the resulting change in the cafe's own cash & bank. The detailed section
+explains every month in words, lists each loan (by lender), partner capital, own-pocket bills, repayments, withdrawals,
+customer udhaar and unpaid vendor bills, notes capital paid straight to a seller, and ends with the loans still open.
