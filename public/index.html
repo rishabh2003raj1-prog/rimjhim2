@@ -363,6 +363,8 @@
   .rcell.roff{opacity:.45;}
   .rout{color:var(--line);} .rcount{font-weight:700;}
   .rcover td{font-size:11px;color:var(--ink-soft);} .rcover td.rnone{color:#A6402D;font-weight:700;background:#FBEDEA;}
+  .billhist th,.billhist td{text-align:right;white-space:nowrap;} .billhist th:first-child,.billhist td:first-child{text-align:left;}
+  .billhist .cur{background:#F2EFE3;} .billhist tr.tot td{border-top:1px solid var(--ink);}
   .rpdayhead{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:4px;}
   .recper{margin-bottom:8px;}
 
@@ -2217,12 +2219,44 @@ function fixedPlanFor(mKey){
   fixedCostPlans().forEach(function(p){ if(p.from <= mKey) plan = p; });
   return plan;
 }
+// Two kinds of bills. FIXED bills (rent) cost the same every month until the amount is
+// changed. VARIABLE bills (electricity, wifi, mobile...) are different every month, so
+// nothing is assumed: a month has an amount only once that month's bill is entered or
+// a payment is recorded. Recent months are shown for reference, never counted as owed.
+function billKind(cat){ var k = settings && settings.billKinds && settings.billKinds[cat]; return k==="fixed" || k==="variable" ? k : (cat==="Rent" ? "fixed" : "variable"); }
+function billEntered(mKey, cat){ var one = settings.fixedCostMonths && settings.fixedCostMonths[mKey]; return (one && one[cat]!==undefined && one[cat]!==null) ? (+one[cat] || 0) : null; }
+function billMeta(mKey, cat){ return (settings.billMeta && settings.billMeta[mKey] && settings.billMeta[mKey][cat]) || {}; }
+function billDueDate(mKey, cat){
+  var m = billMeta(mKey, cat);
+  if(m.due) return m.due;
+  var dd = settings.billDueDay && +settings.billDueDay[cat];
+  return dd ? mKey+"-"+String(Math.min(dd, daysInMonthOf(mKey))).padStart(2,"0") : "";
+}
+// The amount a bill comes to for a month, and where that figure came from.
+function billFor(cat, mKey){
+  var paid = actualInMonth([cat], mKey), entered = billEntered(mKey, cat);
+  if(billKind(cat)==="fixed"){
+    var plan = fixedPlanFor(mKey), amt = entered!==null ? entered : (+(plan && plan.costs[cat]) || 0);
+    return { amount:amt, paid:paid, source: entered!==null ? "oneoff" : (amt ? "fixed" : "none"), kind:"fixed" };
+  }
+  if(entered!==null) return { amount:entered, paid:paid, source:"entered", kind:"variable" };
+  if(paid>0) return { amount:paid, paid:paid, source:"paid", kind:"variable" };
+  return { amount:0, paid:0, source:"none", kind:"variable", recent: billRecent(cat, mKey) };
+}
+// Up to three earlier months with a known amount, for reference only.
+function billRecent(cat, mKey){
+  var out = [], d = parseDate(mKey+"-01");
+  for(var i=1; i<=12 && out.length<3; i++){
+    var mk = fmtDate(new Date(d.getFullYear(), d.getMonth()-i, 1)).slice(0,7);
+    var e = billEntered(mk, cat), pd = actualInMonth([cat], mk), v = e!==null ? e : pd;
+    if(v>0) out.push({ month:mk, amount:v });
+  }
+  return out;
+}
 function plannedFixed(mKey){
   mKey = mKey || fmtDate(new Date()).slice(0,7);
-  var plan = fixedPlanFor(mKey), pf = plan ? plan.costs : {};
-  var one = (settings.fixedCostMonths && settings.fixedCostMonths[mKey]) || {};
   var out = {};
-  FIXED_CATS.forEach(function(c){ out[c] = one[c]!==undefined && one[c]!==null ? (+one[c] || 0) : (+pf[c] || 0); });
+  FIXED_CATS.forEach(function(c){ out[c] = billFor(c, mKey).amount; });
   return out;
 }
 // A different amount for one month only (e.g. a bigger electricity bill in May).
@@ -2414,9 +2448,11 @@ function staffPaidFor(st, mKey){
 }
 function fixedMonthSummary(mKey){
   var planned = plannedFixed(mKey), rows = [], staffRows = [];
+  var todayS = fmtDate(new Date());
   FIXED_CATS.forEach(function(c){
-    var plan = +planned[c] || 0, paid = actualInMonth([c], mKey);
-    rows.push({ name:c, planned:plan, paid:paid, due:Math.max(0, plan-paid) });
+    var b = billFor(c, mKey), plan = b.amount, paid = b.paid, dueAmt = r2(Math.max(0, plan-paid)), dd = billDueDate(mKey, c);
+    rows.push({ name:c, planned:plan, paid:paid, due:dueAmt, kind:b.kind, source:b.source, recent:b.recent||[], dueDate:dd,
+                overdue: dueAmt>0 && dd && todayS > dd, meta: billMeta(mKey, c) });
   });
   var isCur = mKey===fmtDate(new Date()).slice(0,7);
   staff.filter(function(st){
@@ -2441,7 +2477,8 @@ function fixedMonthSummary(mKey){
     return (FIXED_CATS.indexOf(x.category)>=0 || STAFF_CATS.indexOf(x.category)>=0) && expenseMonth(x)===mKey && payerIsPersonal(x.paidBy);
   }).reduce(function(t,x){ return t+expAmt(x); },0);
   var dueTot = rows.concat(staffRows).reduce(function(t,r){ return t+r.due; },0);
-  return { rows:rows, staffRows:staffRows, planned:planTot, paid:paidTot, due:r2(dueTot), partner:partner };
+  var missing = rows.filter(function(r){ return r.kind==="variable" && r.source==="none" && r.recent.length; });
+  return { rows:rows, staffRows:staffRows, planned:planTot, paid:paidTot, due:r2(dueTot), partner:partner, missing:missing };
 }
 
 function renderFixedView(){
@@ -2453,9 +2490,9 @@ function renderFixedView(){
              first.toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'</h2><button id="fcNext">›</button></div>';
 
   html += '<div class="kpis fckpis" style="margin-bottom:12px;">'+
-    '<div class="kpi"><div class="lbl">Fixed cost</div><div class="val">'+rupee(sm.planned)+'</div><div class="sub2">'+rupee(sm.planned/daysInMonthOf(fcMonth))+' a day</div></div>'+
+    '<div class="kpi"><div class="lbl">Bills + staff</div><div class="val">'+rupee(sm.planned)+'</div><div class="sub2">'+rupee(sm.planned/daysInMonthOf(fcMonth))+' a day</div></div>'+
     '<div class="kpi"><div class="lbl">Paid</div><div class="val pos">'+rupee(sm.paid)+'</div><div class="sub2">'+(sm.partner>0?rupee(sm.partner)+' by partners':'&nbsp;')+'</div></div>'+
-    '<div class="kpi"><div class="lbl">Still to pay</div><div class="val '+(sm.due>0?"neg":"pos")+'">'+rupee(sm.due)+'</div><div class="sub2">&nbsp;</div></div>'+
+    '<div class="kpi"><div class="lbl">Still to pay</div><div class="val '+(sm.due>0?"neg":"pos")+'">'+rupee(sm.due)+'</div><div class="sub2">'+(sm.missing.length ? sm.missing.length+' bill'+(sm.missing.length!==1?'s':'')+' not entered' : '&nbsp;')+'</div></div>'+
     '</div>';
 
   // Each payment made FOR this month; tap to edit it, 📅 to see that day on the calendar.
@@ -2472,19 +2509,34 @@ function renderFixedView(){
          : paid>0 ? '<span class="pill bad">part paid</span>' : '<span class="pill bad">due</span>';
   }
 
-  html += '<div class="card" style="margin-bottom:12px;"><h3>Rent, bills &amp; overheads</h3>';
-  sm.rows.forEach(function(r){
+  function billRow(r){
     var pays = expenses.filter(function(x){ return x.category===r.name && expenseMonth(x)===fcMonth; }).sort(function(a,b){ return a.date.localeCompare(b.date); });
-    if(r.planned===0 && r.paid===0 && r.name!=="Rent" && r.name!=="Electricity") return;
-    html += '<div class="billitem"><div class="billtop"><div><b>'+esc(r.name)+'</b> '+billPill(r.planned, r.paid, r.due)+
-            '<span>'+rupee(r.planned)+' for '+esc(monthLabel(fcMonth))+(fixedIsOneOff(fcMonth, r.name)?' <i>(this month only)</i>':'')+' · '+rupee(r.paid)+' paid</span></div>'+
-            '<button class="bpamt" data-bamt="'+esc(r.name)+'">Edit amount</button></div>'+
-            payRows(pays)+
-            '<button class="btn-additem bpadd" data-fcpay="'+esc(r.name)+'" data-amt="'+Math.round(Math.max(0,r.due))+'">+ '+(r.due>0?'Pay '+rupee(r.due):'Add payment')+'</button></div>';
-  });
+    var h = '<div class="billitem"><div class="billtop"><div><b>'+esc(r.name)+'</b> ';
+    if(r.kind==="variable" && r.source==="none"){
+      h += '<span class="pill">not entered</span>';
+      h += '<span>'+(r.recent.length ? 'Earlier: '+r.recent.map(function(x){ return esc(monthLabel(x.month).slice(0,3))+' '+rupee(x.amount); }).join(' · ')+' — reference only, not counted' : 'No bill entered for '+esc(monthLabel(fcMonth))+' yet')+'</span>';
+    } else {
+      h += billPill(r.planned, r.paid, r.due)+(r.overdue?' <span class="pill bad">overdue</span>':'');
+      var src = r.kind==="fixed" ? (r.source==="oneoff" ? 'this month only' : 'same every month') : (r.source==="entered" ? 'bill entered' : 'from the payment');
+      h += '<span>'+rupee(r.planned)+' · '+src+(r.dueDate ? ' · due '+esc(fmtD(r.dueDate)) : '')+' · '+rupee(r.paid)+' paid'+(r.meta && r.meta.note ? ' · '+esc(r.meta.note) : '')+'</span>';
+    }
+    h += '</div><button class="bpamt" data-bamt="'+esc(r.name)+'">'+(r.kind==="variable" ? (r.source==="none" ? 'Enter bill' : 'Edit bill') : 'Change amount')+'</button></div>';
+    h += payRows(pays);
+    h += '<button class="btn-additem bpadd" data-fcpay="'+esc(r.name)+'" data-amt="'+(r.due>0?Math.round(r.due):"")+'">+ '+(r.due>0?'Pay '+rupee(r.due):'Add payment')+'</button></div>';
+    return h;
+  }
+  var fixedRows = sm.rows.filter(function(r){ return r.kind==="fixed" && (r.planned || r.paid || r.name==="Rent"); });
+  var varRows = sm.rows.filter(function(r){ return r.kind==="variable" && (r.planned || r.paid || r.recent.length || BASE_FIXED_CATS.indexOf(r.name)>=0); });
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Fixed bills <span class="muted">· same every month</span></h3>';
+  html += fixedRows.length ? fixedRows.map(billRow).join("") : '<div class="backupnote" style="margin:0;">No fixed bills. Rent and anything else that costs the same every month goes here.</div>';
   var pl = fixedPlanFor(fcMonth);
-  html += '<div class="backupnote" style="margin:8px 0 0;">'+(pl ? 'Amounts in use since '+parseDate(pl.from+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"})+'.' : 'No amounts set for this month yet.')+'</div>';
-  html += '<button class="btn-additem" id="fc_setup" style="margin-top:10px;">Change all amounts / add an item</button></div>';
+  if(pl && fixedRows.length) html += '<div class="backupnote" style="margin:8px 0 0;">Amounts in use since '+esc(monthLabel(pl.from))+'.</div>';
+  html += '</div>';
+  html += '<div class="card" style="margin-bottom:12px;"><h3>Variable bills <span class="muted">· different every month</span></h3>';
+  html += '<div class="backupnote" style="margin:0 0 6px;">Enter each bill when it arrives (or just record the payment). Nothing is copied from other months.</div>';
+  html += varRows.length ? varRows.map(billRow).join("") : '<div class="backupnote" style="margin:0;">No variable bills.</div>';
+  html += '</div>';
+  html += '<button class="btn-additem" id="fc_setup" style="margin:-4px 0 12px;">Manage bills (add, remove, fixed or variable, due dates)</button>';
 
   html += '<div class="card" style="margin-bottom:12px;"><h3>Staff salary &amp; allowances</h3>';
   if(!sm.staffRows.length) html += '<div class="backupnote" style="margin:0;">'+(staff.length ? 'Nobody was employed this month (going by joining dates in the Staff tab).' : 'No staff added yet (Staff tab).')+'</div>';
@@ -2514,14 +2566,20 @@ function renderFixedView(){
             '<div class="stockbar" style="margin-top:8px;"><i style="width:'+pct+'%;background:'+(pct>=100?"#1F5C52":"#CE9A2E")+'"></i></div></div>';
   }
 
-  // Last six months, to spot a bill creeping up.
-  html += '<div class="card"><h3>Last 6 months <span class="muted">· paid</span></h3><div class="rptablewrap"><table class="rptable"><thead><tr><th>Month</th><th>Overheads</th><th>Staff</th><th>Total</th></tr></thead><tbody>';
-  for(var i=5;i>=0;i--){
-    var mk = fmtDate(new Date(first.getFullYear(), first.getMonth()-i, 1)).slice(0,7);
-    var oh = actualInMonth(FIXED_CATS, mk), sf = actualInMonth(STAFF_CATS, mk);
-    html += '<tr><td>'+parseDate(mk+"-01").toLocaleDateString("en-IN",{month:"short",year:"2-digit"})+'</td><td>'+rupee(oh)+'</td><td>'+rupee(sf)+'</td><td><b>'+rupee(oh+sf)+'</b></td></tr>';
-  }
-  html += '</tbody></table></div></div>';
+  // Each bill over the last six months, to compare and spot one creeping up.
+  var hm = []; for(var i=5;i>=0;i--) hm.push(fmtDate(new Date(first.getFullYear(), first.getMonth()-i, 1)).slice(0,7));
+  html += '<div class="card"><h3>Bill history <span class="muted">· last 6 months</span></h3><div class="rptablewrap"><table class="rptable billhist"><thead><tr><th>Bill</th>'+
+          hm.map(function(mk){ return '<th'+(mk===fcMonth?' class="cur"':'')+'>'+parseDate(mk+"-01").toLocaleDateString("en-IN",{month:"short"})+'</th>'; }).join("")+'</tr></thead><tbody>';
+  var hTot = hm.map(function(){ return 0; });
+  FIXED_CATS.forEach(function(c){
+    var vals = hm.map(function(mk){ var b = billFor(c, mk); return b.source==="none" ? null : Math.max(b.amount, b.paid); });
+    if(!vals.some(function(v){ return v; })) return;
+    html += '<tr><td>'+esc(c)+'</td>'+vals.map(function(v, k){ if(v) hTot[k] += v; return '<td'+(hm[k]===fcMonth?' class="cur"':'')+'>'+(v===null ? '<span class="muted">—</span>' : rupee(v))+'</td>'; }).join("")+'</tr>';
+  });
+  var sfv = hm.map(function(mk){ return actualInMonth(STAFF_CATS, mk); });
+  html += '<tr><td>Staff (paid)</td>'+sfv.map(function(v, k){ hTot[k] += v; return '<td'+(hm[k]===fcMonth?' class="cur"':'')+'>'+rupee(v)+'</td>'; }).join("")+'</tr>';
+  html += '<tr class="tot"><td><b>Total</b></td>'+hTot.map(function(v, k){ return '<td'+(hm[k]===fcMonth?' class="cur"':'')+'><b>'+rupee(v)+'</b></td>'; }).join("")+'</tr>';
+  html += '</tbody></table></div><div class="barsub" style="margin-top:6px;">— means no bill entered and nothing paid that month.</div></div>';
 
   el.innerHTML = html;
   function shift(n){ setAppMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderAll(); }
@@ -2596,35 +2654,70 @@ function openCalendarOn(dateStr){
   window.scrollTo(0,0);
 }
 
-// Change one bill's amount: for this month only, or from this month onward.
+// Enter a variable bill for one month, or change a fixed bill's amount.
 function openBillAmount(cat, mKey){
-  var cur = plannedFixed(mKey)[cat] || 0, oneOff = fixedIsOneOff(mKey, cat);
+  var kind = billKind(cat), b = billFor(cat, mKey), meta = billMeta(mKey, cat), oneOff = fixedIsOneOff(mKey, cat);
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">'+esc(cat)+' · '+esc(monthLabel(mKey))+'</h2>';
-  html += '<div class="field"><label>Amount (₹)</label><input type="number" inputmode="decimal" id="ba_amt" value="'+(cur||"")+'"></div>';
-  html += '<div class="field"><label>Applies to</label><select id="ba_scope">'+
-          '<option value="on"'+(oneOff?'':' selected')+'>'+esc(monthLabel(mKey))+' and the months after</option>'+
-          '<option value="one"'+(oneOff?' selected':'')+'>Only '+esc(monthLabel(mKey))+'</option></select></div>';
-  html += '<div class="backupnote">Earlier months keep their own amounts. Use "only this month" for a bill that changes every month, like electricity.</div>';
-  html += '<div class="err" id="ba_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ba_cancel">Cancel</button><button class="btn-save" id="ba_save">Save</button></div>';
+  if(kind==="variable"){
+    var entered = billEntered(mKey, cat);
+    html += '<div class="backupnote">The bill for '+esc(monthLabel(mKey))+' only. Other months are not changed.'+(b.recent && b.recent.length ? ' Earlier: '+b.recent.map(function(x){ return esc(monthLabel(x.month))+' '+rupee(x.amount); }).join(', ')+'.' : '')+'</div>';
+    html += '<div class="field two"><div><label>Bill amount (₹)</label><input type="number" inputmode="decimal" id="ba_amt" value="'+(entered!==null?entered:"")+'" placeholder="as on the bill"></div>';
+    html += '<div><label>Due date (optional)</label><input type="date" id="ba_due" value="'+esc(meta.due||"")+'"></div></div>';
+    html += '<div class="field"><label>Note (optional)</label><input type="text" id="ba_note" value="'+esc(meta.note||"")+'" placeholder="e.g. 412 units, plan ₹799, bill no."></div>';
+  } else {
+    html += '<div class="field"><label>Amount (₹)</label><input type="number" inputmode="decimal" id="ba_amt" value="'+(b.amount||"")+'"></div>';
+    html += '<div class="field"><label>Applies to</label><select id="ba_scope">'+
+            '<option value="on"'+(oneOff?'':' selected')+'>'+esc(monthLabel(mKey))+' and the months after</option>'+
+            '<option value="one"'+(oneOff?' selected':'')+'>Only '+esc(monthLabel(mKey))+'</option></select></div>';
+    html += '<div class="field"><label>Due every month on day (optional)</label><input type="number" inputmode="numeric" id="ba_dd" min="1" max="31" value="'+esc((settings.billDueDay&&settings.billDueDay[cat])||"")+'" placeholder="e.g. 5"></div>';
+    html += '<div class="backupnote">Earlier months keep their own amounts.</div>';
+  }
+  html += '<div class="err" id="ba_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ba_cancel">Cancel</button>'+
+          (kind==="variable" && billEntered(mKey, cat)!==null ? '<button class="btn-del" id="ba_clear">Clear</button>' : '')+'<button class="btn-save" id="ba_save">Save</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("ba_cancel").addEventListener("click", closeForm);
-  document.getElementById("ba_save").addEventListener("click", function(){
-    var raw = document.getElementById("ba_amt").value, v = raw==="" ? 0 : parseFloat(raw);
-    if(isNaN(v) || v<0){ var e = document.getElementById("ba_err"); e.textContent = "Enter a valid amount."; e.style.display = "block"; return; }
+  function setMonth(v){
     var months = Object.assign({}, settings.fixedCostMonths || {});
-    if(document.getElementById("ba_scope").value==="one"){
-      months[mKey] = Object.assign({}, months[mKey] || {}); months[mKey][cat] = v;
-    } else {
-      if(months[mKey]){ months[mKey] = Object.assign({}, months[mKey]); delete months[mKey][cat]; if(!Object.keys(months[mKey]).length) delete months[mKey]; }
-      var plan = fixedPlanFor(mKey), costs = Object.assign({}, plan ? plan.costs : {});
-      if(v>0) costs[cat] = v; else delete costs[cat];
-      var hist = fixedCostPlans().filter(function(p){ return p.from!==mKey; }).map(function(p){ return { from:p.from, costs:p.costs }; });
-      hist.push({ from:mKey, costs:costs });
-      settings.fixedCostHistory = hist.sort(function(a,b){ return a.from.localeCompare(b.from); });
-    }
+    months[mKey] = Object.assign({}, months[mKey] || {});
+    if(v===null) delete months[mKey][cat]; else months[mKey][cat] = v;
+    if(!Object.keys(months[mKey]).length) delete months[mKey];
     settings.fixedCostMonths = months;
+  }
+  function setMeta(m){
+    var all = Object.assign({}, settings.billMeta || {});
+    all[mKey] = Object.assign({}, all[mKey] || {});
+    if(m && (m.due || m.note)) all[mKey][cat] = m; else delete all[mKey][cat];
+    if(!Object.keys(all[mKey]).length) delete all[mKey];
+    settings.billMeta = all;
+  }
+  var clr = document.getElementById("ba_clear");
+  if(clr) clr.addEventListener("click", function(){ setMonth(null); setMeta(null); saveSettings(); closeForm(); renderAll(); });
+  document.getElementById("ba_save").addEventListener("click", function(){
+    var raw = document.getElementById("ba_amt").value, v = raw==="" ? null : parseFloat(raw);
+    if(v!==null && (isNaN(v) || v<0)){ var e = document.getElementById("ba_err"); e.textContent = "Enter a valid amount."; e.style.display = "block"; return; }
+    if(kind==="variable"){
+      if(v===null){ var e2 = document.getElementById("ba_err"); e2.textContent = "Enter the amount on the bill."; e2.style.display = "block"; return; }
+      setMonth(v); setMeta({ due: document.getElementById("ba_due").value, note: document.getElementById("ba_note").value.trim() });
+    } else {
+      v = v || 0;
+      var months = Object.assign({}, settings.fixedCostMonths || {});
+      if(document.getElementById("ba_scope").value==="one"){
+        months[mKey] = Object.assign({}, months[mKey] || {}); months[mKey][cat] = v;
+      } else {
+        if(months[mKey]){ months[mKey] = Object.assign({}, months[mKey]); delete months[mKey][cat]; if(!Object.keys(months[mKey]).length) delete months[mKey]; }
+        var plan = fixedPlanFor(mKey), costs = Object.assign({}, plan ? plan.costs : {});
+        if(v>0) costs[cat] = v; else delete costs[cat];
+        var hist = fixedCostPlans().filter(function(p){ return p.from!==mKey; }).map(function(p){ return { from:p.from, costs:p.costs }; });
+        hist.push({ from:mKey, costs:costs });
+        settings.fixedCostHistory = hist.sort(function(a,b){ return a.from.localeCompare(b.from); });
+      }
+      settings.fixedCostMonths = months;
+      var dd = parseInt(document.getElementById("ba_dd").value, 10);
+      settings.billDueDay = Object.assign({}, settings.billDueDay || {});
+      if(dd>=1 && dd<=31) settings.billDueDay[cat] = dd; else delete settings.billDueDay[cat];
+    }
     settings.fixedCosts = plannedFixed(fmtDate(new Date()).slice(0,7));
     saveSettings(); closeForm(); renderAll();
   });
@@ -2666,26 +2759,30 @@ function openSalaryAmount(st, mKey){
   });
 }
 
+// Manage the list of bills: fixed or variable, due day, amounts for fixed bills, add / remove.
 function openFixedCostForm(){
   var fromM = (typeof fcMonth==="string" && fcMonth) ? fcMonth : fmtDate(new Date()).slice(0,7);
-  var planned = plannedFixed(fromM);
-  var sheet = document.getElementById("sheet");
-  var html = '<h2 class="serif">Monthly fixed costs</h2>';
-  html += '<div class="backupnote">What these cost each month. New amounts apply from the month you pick until you change them again - earlier months keep their old amounts (for example ₹1 fit-out rent in July, full rent from August).</div>';
-  html += '<div class="field"><label>These amounts apply from</label><input type="month" id="fc_from" value="'+fromM+'"></div>';
-  FIXED_CATS.forEach(function(c){
-    html += '<div class="field"><label>'+esc(c)+' (₹/month)</label><input type="number" inputmode="decimal" class="fcin" data-c="'+esc(c)+'" value="'+(planned[c]||"")+'"></div>';
-  });
-  html += '<div class="field"><label>Add another monthly cost (e.g. Gas cylinder, Water, Security)</label><input type="text" id="fc_newname" placeholder="Name of the cost"></div>';
+  var plan = fixedPlanFor(fromM), pc = plan ? plan.costs : {};
   var extra = Array.isArray(settings.fixedExtra) ? settings.fixedExtra : [];
-  if(extra.length) html += '<div class="backupnote">To remove an added item, clear its amount and tick it: '+extra.map(function(n){
-    return '<label style="display:inline-flex;gap:4px;margin-right:10px;"><input type="checkbox" class="fcdel" data-c="'+esc(n)+'">'+esc(n)+'</label>'; }).join("")+'</div>';
-  html += '<div class="backupnote">Staff cost is taken from each person’s salary and allowances in the Staff tab, so it is not typed here.</div>';
-  html += '<div class="card" style="margin:10px 0;"><div class="psrow"><span>Staff, from the Staff tab ('+esc(monthLabel(fromM))+')</span><b>'+rupee(plannedStaffCost(fromM))+'</b></div></div>';
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Manage bills</h2>';
+  html += '<div class="backupnote"><b>Fixed</b> bills cost the same every month until you change them (rent). <b>Variable</b> bills are different every month (electricity, wifi, mobile): you enter each month’s bill, and nothing is copied to other months.</div>';
+  html += '<div class="field"><label>Fixed amounts below apply from</label><input type="month" id="fc_from" value="'+fromM+'"></div>';
+  html += FIXED_CATS.map(function(c){
+    var k = billKind(c), dd = (settings.billDueDay && settings.billDueDay[c]) || "";
+    return '<div class="card mbill" style="margin-bottom:8px;padding:10px 12px;"><div class="billtop"><b>'+esc(c)+'</b>'+
+      (extra.indexOf(c)>=0 ? '<label style="font-size:12px;display:inline-flex;gap:4px;align-items:center;"><input type="checkbox" class="fcdel" data-c="'+esc(c)+'"> remove</label>' : '')+'</div>'+
+      '<div class="field two" style="margin:6px 0 0;"><div><label>Kind</label><select class="fckind" data-c="'+esc(c)+'"><option value="fixed"'+(k==="fixed"?" selected":"")+'>Fixed (same monthly)</option><option value="variable"'+(k==="variable"?" selected":"")+'>Variable (changes)</option></select></div>'+
+      '<div><label>Due on day (optional)</label><input type="number" inputmode="numeric" min="1" max="31" class="fcdd" data-c="'+esc(c)+'" value="'+esc(dd)+'"></div></div>'+
+      '<div class="field fcamtwrap" data-c="'+esc(c)+'" style="margin:6px 0 0;display:'+(k==="fixed"?"block":"none")+';"><label>Monthly amount (₹)</label><input type="number" inputmode="decimal" class="fcin" data-c="'+esc(c)+'" value="'+(pc[c]||"")+'"></div></div>';
+  }).join("");
+  html += '<div class="field two" style="margin-top:10px;"><div><label>Add a bill</label><input type="text" id="fc_newname" placeholder="e.g. Gas cylinder, Water, Security"></div>'+
+          '<div><label>Kind</label><select id="fc_newkind"><option value="variable">Variable (changes)</option><option value="fixed">Fixed (same monthly)</option></select></div></div>';
+  html += '<div class="backupnote">Staff cost comes from each person’s salary and allowances in the Staff tab.</div>';
   var plans = fixedCostPlans();
   if(plans.length){
-    html += '<div class="card" style="margin:10px 0;"><h3>Amount changes</h3>'+plans.map(function(p){
-      var sum = Object.keys(p.costs||{}).map(function(k){ return esc(k)+" "+rupee(p.costs[k]); }).join(", ") || "all zero";
+    html += '<div class="card" style="margin:10px 0;"><h3>Fixed amount changes</h3>'+plans.map(function(p){
+      var sum = Object.keys(p.costs||{}).filter(function(k){ return billKind(k)==="fixed"; }).map(function(k){ return esc(k)+" "+rupee(p.costs[k]); }).join(", ") || "none";
       return '<div class="psrow"><span>From '+esc(monthLabel(p.from))+'</span><b style="font-size:12px;font-weight:500;text-align:right;">'+sum+
              ' <button class="ndel" data-fcrm="'+p.from+'" aria-label="Remove">×</button></b></div>';
     }).join("")+'</div>';
@@ -2694,38 +2791,44 @@ function openFixedCostForm(){
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("fc_cancel").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll(".fckind"), function(sel){
+    sel.addEventListener("change", function(){ sheet.querySelector('.fcamtwrap[data-c="'+sel.getAttribute("data-c")+'"]').style.display = sel.value==="fixed" ? "block" : "none"; });
+  });
   document.getElementById("fc_from").addEventListener("change", function(){
     var v = this.value; if(!v) return;
-    var pl = plannedFixed(v);
-    Array.prototype.forEach.call(sheet.querySelectorAll(".fcin"), function(inp){ inp.value = pl[inp.getAttribute("data-c")] || ""; });
+    var pl = fixedPlanFor(v), c2 = pl ? pl.costs : {};
+    Array.prototype.forEach.call(sheet.querySelectorAll(".fcin"), function(inp){ inp.value = c2[inp.getAttribute("data-c")] || ""; });
   });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-fcrm]"), function(b){
     b.addEventListener("click", function(){
       var f = b.getAttribute("data-fcrm");
-      askConfirm("Remove the amounts that start "+monthLabel(f)+"? Those months will use the earlier amounts.", function(){
+      askConfirm("Remove the fixed amounts that start "+monthLabel(f)+"? Those months will use the earlier amounts.", function(){
         settings.fixedCostHistory = fixedCostPlans().filter(function(p){ return p.from!==f; });
         saveSettings(); renderAll(); openFixedCostForm();
       });
     });
   });
   document.getElementById("fc_save").addEventListener("click", function(){
-    var fc = {};
+    var kinds = Object.assign({}, settings.billKinds || {}), due = Object.assign({}, settings.billDueDay || {}), fc = {};
+    Array.prototype.forEach.call(sheet.querySelectorAll(".fckind"), function(sel){ kinds[sel.getAttribute("data-c")] = sel.value; });
+    Array.prototype.forEach.call(sheet.querySelectorAll(".fcdd"), function(inp){ var c = inp.getAttribute("data-c"), d = parseInt(inp.value, 10); if(d>=1 && d<=31) due[c] = d; else delete due[c]; });
     Array.prototype.forEach.call(sheet.querySelectorAll(".fcin"), function(inp){
-      var v = parseFloat(inp.value);
-      if(!isNaN(v) && v>0) fc[inp.getAttribute("data-c")] = v;
+      var c = inp.getAttribute("data-c"), v = parseFloat(inp.value);
+      if(kinds[c]==="fixed" && !isNaN(v) && v>0) fc[c] = v;
     });
     var from = document.getElementById("fc_from").value || fromM;
-    var hist = fixedCostPlans().filter(function(p){ return p.from!==from; });
-    hist = hist.map(function(p){ return { from:p.from, costs:p.costs }; });
-    hist.push({ from: from, costs: fc });
-    settings.fixedCostHistory = hist.sort(function(a,b){ return a.from.localeCompare(b.from); });
-    var extra = (Array.isArray(settings.fixedExtra) ? settings.fixedExtra : []).slice();
-    Array.prototype.forEach.call(sheet.querySelectorAll(".fcdel"), function(cb){
-      if(cb.checked){ var n = cb.getAttribute("data-c"); extra = extra.filter(function(x){ return x!==n; }); delete fc[n]; }
-    });
+    var old = fixedPlanFor(from), oldCosts = old ? old.costs : {};
+    var changed = Object.keys(fc).concat(Object.keys(oldCosts)).some(function(c){ return kinds[c]==="fixed" && (+fc[c]||0) !== (+oldCosts[c]||0); });
+    if(changed){
+      var hist = fixedCostPlans().filter(function(p){ return p.from!==from; }).map(function(p){ return { from:p.from, costs:p.costs }; });
+      hist.push({ from: from, costs: fc });
+      settings.fixedCostHistory = hist.sort(function(a,b){ return a.from.localeCompare(b.from); });
+    }
+    var ex = extra.slice();
+    Array.prototype.forEach.call(sheet.querySelectorAll(".fcdel"), function(cb){ if(cb.checked){ var n = cb.getAttribute("data-c"); ex = ex.filter(function(x){ return x!==n; }); } });
     var nn = document.getElementById("fc_newname").value.trim();
-    if(nn && extra.indexOf(nn)<0 && BASE_EXP_CATS.indexOf(nn)<0) extra.push(nn);
-    settings.fixedExtra = extra;
+    if(nn && ex.indexOf(nn)<0 && BASE_EXP_CATS.indexOf(nn)<0 && FIXED_CATS.indexOf(nn)<0){ ex.push(nn); kinds[nn] = document.getElementById("fc_newkind").value; }
+    settings.fixedExtra = ex; settings.billKinds = kinds; settings.billDueDay = due;
     refreshCats();
     settings.fixedCosts = plannedFixed(fmtDate(new Date()).slice(0,7)); // kept for older copies of the app
     saveSettings(); closeForm(); renderAll();

@@ -210,3 +210,12 @@ repayments, withdrawals, own-pocket bills and paybacks) and every balance "as at
 - **Salary card:** earnings and deductions listed separately, total, payments, balance.
 - **Payslip:** A4 PDF with employee details, earnings vs deductions, gross, total deductions, net pay in words,
   payments, balance and signature lines; the same layout on screen and as WhatsApp text.
+
+### Bills: fixed vs variable
+Every bill is either **Fixed** (same every month until changed — rent by default) or **Variable** (different every
+month — electricity, wifi, mobile and new bills by default). Variable bills are never copied between months: a month
+has an amount only once you **Enter bill** (amount, optional due date and a note such as units or bill number) or
+record a payment. Until then the month shows *not entered*, with up to three earlier months for reference only —
+they are not counted in "Still to pay". Fixed bills change from a month onward (or for one month only) and can have
+a due day; unpaid bills past their due date are marked **overdue**. *Manage bills* sets each bill's kind and due day,
+fixed amounts, and adds or removes bills. **Bill history** shows every bill for the last six months side by side.
