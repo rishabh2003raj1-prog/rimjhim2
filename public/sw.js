@@ -15,6 +15,7 @@ self.addEventListener("activate", function(e){
 self.addEventListener("fetch", function(e){
   var url = new URL(e.request.url);
   if(e.request.method!=="GET" || url.origin!==location.origin || url.pathname.indexOf("/api/")===0) return;
+  if(/\/build\.json$/.test(url.pathname)) return;   // version check: always straight from the server, never cached
   e.respondWith(fetch(e.request).then(function(res){
     if(res.ok){ var copy = res.clone(); caches.open(CACHE).then(function(c){ c.put(e.request, copy); }); }
     return res;

@@ -621,6 +621,10 @@
 (function(){
 "use strict";
 
+// Build id, stamped at deploy (scripts/stamp-build.mjs). Refresh compares it with
+// public/build.json to notice a newer version of the app and reload it.
+var APP_BUILD = "dev";
+
 // ---- OUTLETS ----
 // Every outlet has its own books on the server (sales, stock, staff, cash...).
 // The list of outlets is shared by everyone who signs in; which one this phone is
@@ -1126,22 +1130,47 @@ function refreshNow(){
       cloud.since = r.data.serverTime;
       var items = r.data.items || {};
       Object.keys(items).forEach(function(key){
-        if(SYNC_KEYS.indexOf(key)<0 || cloud.dirty[key]) return;
-        setKeyValue(key, items[key].value);
-        cloud.rev[key] = items[key].rev;
-        cloud.base[key] = JSON.stringify(items[key].value);
+        if(SYNC_KEYS.indexOf(key)<0) return;
+        var it = items[key];
+        if(cloud.dirty[key]){
+          // This phone still has changes that haven't uploaded: show the server's
+          // latest merged with them (both kept) instead of skipping the list, and
+          // keep it marked so the upload is retried.
+          if((cloud.rev[key]||0) < it.rev){
+            var base = null; try{ base = cloud.base[key]!==undefined ? JSON.parse(cloud.base[key]) : null; }catch(e){}
+            setKeyValue(key, mergeValues(base, cloud.values[key], it.value));
+            cloud.rev[key] = it.rev;
+            cloud.base[key] = JSON.stringify(it.value);
+            cacheWrite(key);
+          }
+          return;
+        }
+        setKeyValue(key, it.value);
+        cloud.rev[key] = it.rev;
+        cloud.base[key] = JSON.stringify(it.value);
         cacheWrite(key);
       });
       loadOutlets();
       cloud.deferred = {};
-      finish(null);
-      var st = document.getElementById("saveStatus");
-      if(st && !pendingCount()){ st.textContent = "Refreshed " + new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}); st.className = ""; }
+      if(pendingCount()) scheduleFlush(0);
+      // A newer version of the app is live: reload to run it (changes upload first).
+      checkAppUpdate(function(newer){
+        if(newer && !pendingCount()){ btn.textContent = "↻ Updating app…"; location.reload(); return; }
+        finish(newer ? "A new version of the app is ready - it will load once this phone's changes have uploaded." : null);
+        var st = document.getElementById("saveStatus");
+        if(st && !pendingCount()){ st.textContent = "Refreshed " + new Date().toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"}); st.className = ""; }
+      });
     }).catch(function(){
       cloud.state = "offline";
       finish("Couldn't reach the server — showing the copy saved on this phone. Check the internet connection and try again.");
     });
   })();
+}
+
+function checkAppUpdate(cb){
+  if(APP_BUILD==="dev"){ cb(false); return; }
+  fetch("build.json?t=" + Date.now(), { cache:"no-store" }).then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(d){ cb(!!(d && d.build && d.build!==APP_BUILD)); }).catch(function(){ cb(false); });
 }
 
 function pollRemote(){
@@ -1359,6 +1388,10 @@ function startCloud(done){
       // Back after 4 AM: the day's sign-in has ended, ask again.
       if(!sessionValid() && cloud.state!=="login" && cloud.state!=="offline"){ lockApp(function(){ pollRemote(); if(pendingCount()) scheduleFlush(0); }); return; }
       pollRemote(); if(pendingCount()) scheduleFlush(0);
+      // Pick up a newer version of the app quietly - never mid-entry or with changes waiting.
+      checkAppUpdate(function(newer){
+        if(newer && !pendingCount() && !document.getElementById("sheetBg").classList.contains("on") && cloud.state!=="login") location.reload();
+      });
     });
     window.addEventListener("online", function(){ pollRemote(); scheduleFlush(0); });
     window.addEventListener("beforeunload", function(e){
