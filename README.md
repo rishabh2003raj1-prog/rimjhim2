@@ -195,3 +195,18 @@ sales, paid from till, should-be, counted, difference, handover) with a button t
 Month shows cash sales, paid from the till, short / extra, handovers by person and the counter log; Year shows one
 row per month. The **Partners** tab shows what each partner put in or took out in the period (capital, loans,
 repayments, withdrawals, own-pocket bills and paybacks) and every balance "as at" the end of the period.
+
+### Staff: roster, flexible allowances, salary and payslips
+- **Shifts:** two by default (Morning 8am–4pm, Evening 4pm–12am). Rename them, change timings or add/remove shifts
+  under Staff → Roster → *Edit shifts* (renaming updates the roster and usual shifts).
+- **Roster week grid:** staff × days; tap a box to cycle Morning → Evening → both → off. *Fill empty days with usual
+  shifts*, *Copy last week*, *Clear this week*, and a cover row per shift (red when nobody is on). *One day* view too.
+  A usual shift can be a shift, *Both shifts* or *Flexible*.
+- **Allowances that change:** house rent (per month), food and travel (per month or **per day worked**). Change them
+  for one month only or from a month onward (Staff → Salary → *Edit month*, or the staff form for "from this month").
+- **One-off lines per month:** overtime, festival bonus (add) or damage, fine, canteen (deduct).
+- **Unused paid leave is never paid or turned into goodwill automatically.** Each month choose *Pay extra*, *Don't pay*
+  or *Goodwill*; final settlement asks if no choice was made. Salary rules can switch this to always / never pay.
+- **Salary card:** earnings and deductions listed separately, total, payments, balance.
+- **Payslip:** A4 PDF with employee details, earnings vs deductions, gross, total deductions, net pay in words,
+  payments, balance and signature lines; the same layout on screen and as WhatsApp text.
