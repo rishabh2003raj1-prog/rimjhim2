@@ -6408,7 +6408,12 @@ function buildReportPdf(rr, chosen, Ctor){
       theme:"striped", styles:{ fontSize:8.5, cellPadding:4, textColor:ink, overflow:"linebreak" },
       headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" },
       footStyles:{ fillColor:[242,239,227], textColor:ink, fontStyle:"bold" },
-      columnStyles: opts.cols || {} });
+      columnStyles: opts.cols || {},
+      // Headings and the total row line up with their column (amounts on the right).
+      didParseCell: function(d){
+        var c = (opts.cols || {})[d.column.index];
+        if(c && c.halign && (d.section==="head" || d.section==="foot")) d.cell.styles.halign = c.halign;
+      } });
     y = doc.lastAutoTable.finalY + 16;
   }
   function sub(t){ ensure(24); doc.setFont("helvetica","bold"); doc.setFontSize(10.5); doc.setTextColor.apply(doc, ink); doc.text(t, M, y); y += 12; }
