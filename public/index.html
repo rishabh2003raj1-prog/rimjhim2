@@ -9550,7 +9550,7 @@ function staffMealEntries(mKey){
 }
 
 function staffMealCost(mKey, staffId){
-  var total = 0;
+  var total = mealPlanMonth(mKey, staffId).cost;
   staffMealEntries(mKey).forEach(function(d){
     if(staffId && d.staffId !== staffId) return;
     var m = menuById(d.menuId);
@@ -10128,42 +10128,310 @@ function openSalarySlip(st, mKey){
   });
 }
 
+// ---------- STAFF MEALS ----------
+// Staff eat from the cafe kitchen, so meals cost raw material even without a sale.
+// Each MEAL TYPE lists what goes into it: some lines per person (2 eggs, 100 g rice)
+// and some per cooking (1.5 kg chicken for everyone). Rates come from the last
+// purchase of that item unless typed. Oil, masala and gas from the cafe are an
+// amount per plate. A WEEKLY MENU says what is cooked each day (two meals by
+// default), and the number eating comes from attendance: everyone employed that day
+// who isn't marked absent or on leave. Any day can be changed. Meal cost is already
+// inside purchases - it is shown so you can see how much of that spend feeds staff.
+function mealTypes(){ return (settings && Array.isArray(settings.mealTypes)) ? settings.mealTypes : []; }
+function mealTypeById(id){ return mealTypes().find(function(m){ return m.id===id; }) || null; }
+function mealSlots(){ var n = settings && settings.mealWeek && +settings.mealWeek.slots; return n>=1 && n<=3 ? n : 2; }
+function mealBasics(){ return +(settings && settings.mealBasics) || 0; }
+function mealRate(line){
+  if(line.rate!==undefined && line.rate!==null && line.rate!=="") return { rate:+line.rate||0, from:"typed" };
+  var rows = purchases.filter(function(p){ return !p.isDelivery && normItem(p.item)===normItem(line.item); }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+  if(rows.length) return { rate: r2(rows[0].rate * (1 + (rows[0].gst||0)/100)), from:"purchase", date:rows[0].date, unit:rows[0].unit };
+  return { rate:0, from:"missing" };
+}
+// Cost of cooking one meal type for n people.
+function mealCost(m, n){
+  var out = { cost:0, missing:[] };
+  if(!m || !(n>0)) return out;
+  (m.lines||[]).forEach(function(l){
+    var r = mealRate(l), q = +l.qty || 0;
+    if(r.from==="missing" && q) out.missing.push(l.item);
+    out.cost += l.per==="batch" ? q * r.rate : q * r.rate * n;
+  });
+  out.cost = r2(out.cost + mealBasics() * n);
+  return out;
+}
+// Who eats on a day: employed that day and not marked absent / on leave.
+function mealEaters(d){
+  return staff.filter(function(st){
+    if(!employedOn(st, d)) return false;
+    var a = attendFor(d, st.id);
+    return !(a && (a.status==="Absent" || a.status==="Leave"));
+  });
+}
+function mealDayPlan(d){
+  var ov = settings.mealDays && settings.mealDays[d];
+  var wk = (settings.mealWeek && settings.mealWeek.days && settings.mealWeek.days[String(parseDate(d).getDay())]) || [];
+  var eaters = mealEaters(d), slots = [];
+  for(var i=0;i<mealSlots();i++){
+    var o = ov && ov.slots && ov.slots[i];
+    var mealId = o && o.meal!==undefined ? o.meal : (wk[i] || "");
+    var people = o && o.people!==undefined && o.people!==null && o.people!=="" ? +o.people : eaters.length;
+    var m = mealId ? mealTypeById(mealId) : null, c = mealCost(m, people);
+    slots.push({ meal:m, mealId:mealId, people:people, auto: !(o && o.people!==undefined && o.people!==null && o.people!==""), changed: !!(o && o.meal!==undefined), cost:c.cost, missing:c.missing });
+  }
+  var cost = r2(slots.reduce(function(t,x){ return t+x.cost; },0));
+  return { date:d, slots:slots, eaters:eaters, cost:cost, overridden: !!ov };
+}
+// Month total (up to today for the running month); with staffId, that person's share.
+function mealPlanMonth(mKey, staffId){
+  var res = { cost:0, plates:0, days:0, byMeal:{}, byStaff:{}, missing:{} };
+  if(!mealTypes().length) return res;
+  var today = fmtDate(new Date()), last = loanMonthEnd(mKey);
+  if(last > today) last = today;
+  if(mKey+"-01" > last) return res;
+  datesBetween(mKey+"-01", last).forEach(function(d){
+    var dp = mealDayPlan(d);
+    if(dp.cost>0) res.days++;
+    dp.slots.forEach(function(sl){
+      if(!sl.meal || !(sl.people>0)) return;
+      res.plates += sl.people;
+      var k = sl.meal.name, b = res.byMeal[k] || (res.byMeal[k] = { times:0, plates:0, cost:0 });
+      b.times++; b.plates += sl.people; b.cost += sl.cost;
+      sl.missing.forEach(function(x){ res.missing[x] = true; });
+      var per = sl.cost / sl.people;
+      dp.eaters.forEach(function(st){ res.byStaff[st.id] = (res.byStaff[st.id]||0) + per; });
+      res.cost += staffId ? 0 : sl.cost;
+    });
+  });
+  if(staffId) res.cost = r2(res.byStaff[staffId] || 0);
+  res.cost = r2(res.cost);
+  return res;
+}
+// A starting menu matching a typical small cafe; quantities and rates are meant to be edited.
+function mealTemplate(){
+  function L(item, qty, unit, per){ return { item:item, qty:qty, unit:unit, per:per }; }
+  return [
+    { id:"ml_veg", name:"Rice / roti + seasonal sabzi", lines:[L("Rice",0.08,"kg","person"),L("Atta",0.08,"kg","person"),L("Seasonal vegetables",0.15,"kg","person")] },
+    { id:"ml_aloo", name:"Aloo paratha", lines:[L("Atta",0.15,"kg","person"),L("Potato",0.15,"kg","person")] },
+    { id:"ml_chicken", name:"Chicken + rice / roti", lines:[L("Chicken",1.5,"kg","batch"),L("Rice",0.08,"kg","person"),L("Atta",0.08,"kg","person")] },
+    { id:"ml_biryani", name:"Chicken biryani + raita", lines:[L("Chicken",1.5,"kg","batch"),L("Basmati rice",0.12,"kg","person"),L("Curd",0.08,"kg","person"),L("Onion",0.05,"kg","person")] },
+    { id:"ml_egg", name:"Egg (2 per person) + rice / roti", lines:[L("Eggs",2,"pcs","person"),L("Rice",0.08,"kg","person"),L("Atta",0.08,"kg","person"),L("Onion",0.03,"kg","person")] }
+  ];
+}
+function mealTemplateWeek(){
+  // 0 = Sunday. Two meals a day: sabzi most days, chicken on Sunday, egg on Wednesday, aloo paratha Friday morning.
+  var d = {}; for(var i=0;i<7;i++) d[String(i)] = ["ml_veg","ml_veg"];
+  d["0"] = ["ml_veg","ml_chicken"]; d["3"] = ["ml_veg","ml_egg"]; d["5"] = ["ml_aloo","ml_veg"];
+  return { slots:2, days:d };
+}
+
 function renderMealsView(){
   var el = document.getElementById("mealsView");
   if(!el) return;
-  var mKey = monthKey(fmtDate(new Date()));
-  var monthName = parseDate(mKey+"-01").toLocaleDateString("en-IN",{month:"long",year:"numeric"});
-
-  var html = dateStepper("mel");
-  html += '<button class="btn-save" id="meal_log" style="width:100%;margin-bottom:12px;">+ Log staff meals for this day</button>';
-
-  var dayEntries = dishLog.filter(function(d){ return d.staffMeal && d.date===staffDate; });
-  if(dayEntries.length===0){
-    html += '<div class="empty">Nothing logged for this day.</div>';
+  var mKey = monthKey(staffDate), html = dateStepper("mel");
+  if(!mealTypes().length){
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Set up staff meals</h3>'+
+      '<div class="backupnote" style="margin:0 0 8px;">Tell the app what staff eat and how much goes into it, once. After that each day’s and month’s food cost works itself out from attendance.</div>'+
+      '<div class="psrow"><span>1. Meal types</span><b style="font-weight:500;">what goes into each, per person or per cooking</b></div>'+
+      '<div class="psrow"><span>2. Weekly menu</span><b style="font-weight:500;">what is cooked each day</b></div>'+
+      '<div class="psrow"><span>3. Oil, masala, gas</span><b style="font-weight:500;">an amount per plate</b></div>'+
+      '<button class="btn-save" id="ml_start" style="width:100%;margin-top:10px;">Start with a typical menu (edit it after)</button>'+
+      '<button class="btn-additem" id="ml_blank" style="margin-top:8px;">Start empty</button></div>';
   } else {
-    html += dayEntries.map(function(d){
-      var m = menuById(d.menuId);
-      if(!m) return "";
-      var who = d.staffId ? staffById(d.staffId) : null;
-      var cost = recipeCost(m).cost * (d.qty||0);
-      return '<div class="entry"><div><div class="who">'+esc(m.name)+' × '+d.qty+'</div>'+
-             '<div class="meta">'+(who?esc(who.name):"Shared / everyone")+'</div></div>'+
-             '<div class="amt purch">'+rupee(cost)+'</div></div>';
-    }).join("");
+    var dp = mealDayPlan(staffDate);
+    html += '<div class="card" style="margin-bottom:12px;"><h3>'+esc(parseDate(staffDate).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"}))+(dp.overridden?' <span class="pill">changed</span>':'')+'</h3>';
+    dp.slots.forEach(function(sl, i){
+      html += '<div class="psrow"><span><b>Meal '+(i+1)+'</b> · '+(sl.meal ? esc(sl.meal.name) : '<span class="muted">no meal</span>')+
+              (sl.meal ? '<br><span class="muted" style="font-size:11.5px;">'+sl.people+' '+(sl.people===1?'person':'people')+(sl.auto?' (from attendance)':'')+(sl.people?' · '+rupeeP(r2(sl.cost/sl.people))+' a plate':'')+'</span>' : '')+'</span><b>'+rupeeP(sl.cost)+'</b></div>';
+      if(sl.missing.length) html += '<div class="barsub warnline">No rate for '+esc(sl.missing.join(", "))+' — add it in the meal type or buy it once in Purchases.</div>';
+    });
+    html += '<div class="psrow"><span><b>Day total</b></span><b>'+rupeeP(dp.cost)+'</b></div>';
+    html += '<div class="barsub">Eating today: '+(dp.eaters.length ? esc(dp.eaters.map(function(x){ return x.name; }).join(", ")) : 'nobody (no staff employed / all absent)')+'</div>';
+    html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" id="ml_day">Change this day</button>'+(dp.overridden?'<button class="btn-additem" id="ml_dayreset">Use weekly menu</button>':'')+'</div></div>';
+
+    var mm = mealPlanMonth(mKey, null), legacy = staffMealEntries(mKey).length ? staffMealCost(mKey, null) - mm.cost : 0;
+    var heads = mealEaters(staffDate).length || activeStaff().length;
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Food cost <span class="muted">· '+esc(monthLabel(mKey))+(mKey===fmtDate(new Date()).slice(0,7)?' so far':'')+'</span></h3>';
+    html += '<div class="kpis fckpis" style="margin:0 0 8px;"><div class="kpi"><div class="lbl">Meals cost</div><div class="val">'+rupee(mm.cost + Math.max(0,legacy))+'</div><div class="sub2">'+mm.days+' days</div></div>'+
+            '<div class="kpi"><div class="lbl">Plates</div><div class="val">'+mm.plates+'</div><div class="sub2">'+(mm.plates?rupeeP(r2(mm.cost/mm.plates))+' a plate':'&nbsp;')+'</div></div>'+
+            '<div class="kpi"><div class="lbl">Per person</div><div class="val">'+rupee(Object.keys(mm.byStaff).length ? mm.cost/Object.keys(mm.byStaff).length : 0)+'</div><div class="sub2">this month</div></div></div>';
+    Object.keys(mm.byMeal).sort(function(a,b){ return mm.byMeal[b].cost - mm.byMeal[a].cost; }).forEach(function(k){
+      var b = mm.byMeal[k];
+      html += '<div class="psrow"><span>'+esc(k)+' <span class="muted">× '+b.times+' · '+b.plates+' plates</span></span><b>'+rupee(b.cost)+'</b></div>';
+    });
+    if(legacy>0) html += '<div class="psrow"><span>Dishes logged from the menu</span><b>'+rupee(legacy)+'</b></div>';
+    var sk = Object.keys(mm.byStaff);
+    if(sk.length){
+      html += '<div class="daygroup" style="margin:8px 0 2px;">By person</div>'+sk.map(function(id){ var st = staffById(id);
+        return '<div class="psrow"><span>'+esc(st?st.name:"(removed)")+'</span><b>'+rupee(mm.byStaff[id])+'</b></div>'; }).join("");
+    }
+    if(Object.keys(mm.missing).length) html += '<div class="attmwarn">Some items have no rate yet ('+esc(Object.keys(mm.missing).join(", "))+'), so they count as ₹0. Add rates in the meal types.</div>';
+    if(!mealBasics()) html += '<div class="attmwarn">Oil, masala and gas are not counted yet. Set an amount per plate below.</div>';
+    html += '<div class="backupnote" style="margin-top:8px;">This food comes out of your purchases, so it is not charged again — it shows how much of that spend feeds staff. Cash food allowances are separate (Salary tab).</div></div>';
+
+    // weekly menu
+    var dn = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"], wk = (settings.mealWeek && settings.mealWeek.days) || {};
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Weekly menu</h3>';
+    [1,2,3,4,5,6,0].forEach(function(d){
+      var row = wk[String(d)] || [], names = [];
+      for(var i=0;i<mealSlots();i++){ var m = mealTypeById(row[i]); names.push(m ? m.name : "—"); }
+      html += '<div class="psrow"><span><b>'+dn[d]+'</b></span><b style="font-weight:500;font-size:12.5px;text-align:right;">'+names.map(esc).join(" · ")+'</b></div>';
+    });
+    html += '<button class="btn-additem" id="ml_week" style="margin-top:8px;">Change weekly menu</button></div>';
+
+    // meal types
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Meal types <span class="muted">· cost for '+heads+' people</span></h3>';
+    mealTypes().forEach(function(m){
+      var c = mealCost(m, heads);
+      html += '<div class="psrow" data-mledit="'+esc(m.id)+'" style="cursor:pointer;"><span>'+esc(m.name)+' <span class="muted">›</span><br><span class="muted" style="font-size:11.5px;">'+
+              esc((m.lines||[]).map(function(l){ return l.item+" "+fmtQty(+l.qty||0)+" "+(l.unit||"")+(l.per==="batch"?" (total)":" each"); }).join(", "))+'</span></span>'+
+              '<b>'+rupee(c.cost)+'<br><span class="muted" style="font-size:11px;font-weight:500;">'+(heads?rupeeP(r2(c.cost/heads))+'/plate':'')+'</span></b></div>';
+    });
+    html += '<button class="btn-additem" id="ml_new" style="margin-top:8px;">+ Add a meal type</button></div>';
+    html += '<div class="card" style="margin-bottom:12px;"><h3>Settings</h3>'+
+      '<div class="psrow"><span>Meals a day</span><b>'+mealSlots()+'</b></div>'+
+      '<div class="psrow"><span>Oil, masala, gas (per plate)</span><b>'+(mealBasics()?rupeeP(mealBasics()):'not set')+'</b></div>'+
+      '<button class="btn-additem" id="ml_settings" style="margin-top:8px;">Change</button>'+
+      (menuItems.length ? '<button class="btn-additem" id="meal_log" style="margin-top:8px;">Log dishes from the cafe menu (optional)</button>' : '')+'</div>';
   }
-
-  var monthCost = staffMealCost(mKey, null);
-  var monthAllow = activeStaff().reduce(function(a,st){ return a + (+st.foodAllowance||0); },0);
-  html += '<div class="card" style="margin-top:14px;"><h3>Food cost <span class="muted">· '+monthName+'</span></h3>';
-  html += '<div class="psrow"><span>Raw material for staff meals</span><b>'+rupee(monthCost)+'</b></div>';
-  html += '<div class="psrow"><span>Cash food allowances</span><b>'+rupee(monthAllow)+'</b></div>';
-  html += '<div class="psrow"><span><b>Total food cost</b></span><b>'+rupee(monthCost+monthAllow)+'</b></div>';
-  html += '<div class="backupnote" style="margin-top:8px;">Meal raw material is already inside your purchases — it is shown here so you can see how much of that spend feeds staff rather than customers. It is not charged twice.</div></div>';
-
   el.innerHTML = html;
   wireDateStepper("mel");
-  document.getElementById("meal_log").addEventListener("click", function(){ openStaffMealForm(staffDate); });
+  function on(id, fn){ var b = document.getElementById(id); if(b) b.addEventListener("click", fn); }
+  on("ml_start", function(){ settings.mealTypes = mealTemplate(); settings.mealWeek = mealTemplateWeek(); saveSettings(); renderStaffSection();
+    appAlert("A typical menu was added. Check the quantities and rates in each meal type, and set oil / masala / gas per plate."); });
+  on("ml_blank", function(){ settings.mealTypes = []; openMealTypeForm(null); });
+  on("ml_day", function(){ openMealDayForm(staffDate); });
+  on("ml_dayreset", function(){ var md = Object.assign({}, settings.mealDays||{}); delete md[staffDate]; settings.mealDays = md; saveSettings(); renderStaffSection(); });
+  on("ml_week", openMealWeekForm);
+  on("ml_new", function(){ openMealTypeForm(null); });
+  on("ml_settings", openMealSettingsForm);
+  on("meal_log", function(){ openStaffMealForm(staffDate); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-mledit]"), function(r){ r.addEventListener("click", function(){ openMealTypeForm(r.getAttribute("data-mledit")); }); });
   if(staffSub==="meals") updateStaffTotal();
+}
+
+function openMealTypeForm(id){
+  var m = id ? mealTypeById(id) : null;
+  var lines = m ? (m.lines||[]).map(function(l){ return Object.assign({}, l); }) : [{ item:"", qty:"", unit:"kg", per:"person" }];
+  var name = m ? m.name : "";
+  var sheet = document.getElementById("sheet");
+  function draw(){
+    var heads = activeStaff().length || 1;
+    var html = '<h2 class="serif">'+(m?"Edit meal type":"New meal type")+'</h2>';
+    html += '<div class="field"><label>Name</label><input type="text" id="mt_name" value="'+esc(name)+'" placeholder="e.g. Chicken + rice / roti"></div>';
+    html += '<div class="backupnote" style="margin-top:0;"><b>Each</b> = per person (2 eggs, 0.08 kg rice). <b>Total</b> = for the whole cooking (1.5 kg chicken). Leave the rate empty to use your last purchase price.</div>';
+    html += lines.map(function(l, i){
+      var r = mealRate(l);
+      return '<div class="card" style="margin-bottom:8px;padding:8px 10px;"><div class="field two" style="margin:0;"><div><label>Item</label><input type="text" class="mt_item" data-i="'+i+'" value="'+esc(l.item||"")+'" list="mt_items"></div>'+
+        '<div style="display:flex;gap:6px;align-items:end;"><div style="flex:1;"><label>Qty</label><input type="number" inputmode="decimal" class="mt_qty" data-i="'+i+'" value="'+esc(l.qty)+'"></div>'+
+        '<div style="flex:1;"><label>Unit</label><input type="text" class="mt_unit" data-i="'+i+'" value="'+esc(l.unit||"")+'"></div></div></div>'+
+        '<div class="field two" style="margin:6px 0 0;"><div><label>Quantity is</label><select class="mt_per" data-i="'+i+'"><option value="person"'+(l.per!=="batch"?" selected":"")+'>each person</option><option value="batch"'+(l.per==="batch"?" selected":"")+'>total for everyone</option></select></div>'+
+        '<div style="display:flex;gap:6px;align-items:end;"><div style="flex:1;"><label>Rate ₹ per unit</label><input type="number" inputmode="decimal" class="mt_rate" data-i="'+i+'" value="'+esc(l.rate===undefined||l.rate===null?"":l.rate)+'" placeholder="'+(r.from==="purchase"?r.rate+" (last bought)":"needed")+'"></div>'+
+        '<button class="ndel" data-mtdel="'+i+'" aria-label="Remove item">×</button></div></div></div>';
+    }).join("");
+    html += '<datalist id="mt_items">'+allTrackedItems().map(function(x){ return '<option value="'+esc(x)+'">'; }).join("")+'</datalist>';
+    html += '<button class="btn-additem" id="mt_add" style="margin-bottom:10px;">+ Add item</button>';
+    html += '<div class="card" id="mt_prev" style="margin-bottom:10px;"></div><div class="err" id="mt_err"></div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="mt_cancel">Cancel</button>'+(m?'<button class="btn-del" id="mt_del">Delete</button>':'')+'<button class="btn-save" id="mt_save">Save</button></div>';
+    sheet.innerHTML = html;
+    document.getElementById("sheetBg").classList.add("on");
+    function read(){
+      name = document.getElementById("mt_name").value;
+      ["item","qty","unit","per","rate"].forEach(function(k){
+        Array.prototype.forEach.call(sheet.querySelectorAll(".mt_"+k), function(x){ lines[+x.getAttribute("data-i")][k] = x.value; });
+      });
+    }
+    function prev(){
+      read();
+      var c = mealCost({ lines: lines.filter(function(l){ return l.item; }) }, heads);
+      document.getElementById("mt_prev").innerHTML = '<div class="psrow"><span>Cost for '+heads+' people'+(mealBasics()?' (incl. oil / masala)':'')+'</span><b>'+rupeeP(c.cost)+'</b></div>'+
+        '<div class="psrow"><span>Per plate</span><b>'+rupeeP(r2(c.cost/heads))+'</b></div>'+(c.missing.length?'<div class="barsub warnline">No rate for '+esc(c.missing.join(", "))+'.</div>':'');
+    }
+    Array.prototype.forEach.call(sheet.querySelectorAll("input,select"), function(x){ x.addEventListener("input", prev); x.addEventListener("change", prev); });
+    prev();
+    document.getElementById("mt_add").addEventListener("click", function(){ read(); lines.push({ item:"", qty:"", unit:"kg", per:"person" }); draw(); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-mtdel]"), function(b){ b.addEventListener("click", function(){ read(); lines.splice(+b.getAttribute("data-mtdel"),1); draw(); }); });
+    document.getElementById("mt_cancel").addEventListener("click", closeForm);
+    var del = document.getElementById("mt_del");
+    if(del) del.addEventListener("click", function(){ askConfirm("Delete “"+m.name+"”? Days that used it will show no meal.", function(){
+      settings.mealTypes = mealTypes().filter(function(x){ return x.id!==m.id; }); saveSettings(); closeForm(); renderStaffSection(); }); });
+    document.getElementById("mt_save").addEventListener("click", function(){
+      read();
+      var err = document.getElementById("mt_err");
+      if(!name.trim()){ err.textContent = "Give the meal a name."; err.style.display = "block"; return; }
+      var clean = lines.filter(function(l){ return (l.item||"").trim(); }).map(function(l){
+        var o = { item:l.item.trim(), qty:+l.qty||0, unit:(l.unit||"").trim(), per: l.per==="batch" ? "batch" : "person" };
+        if(l.rate!=="" && l.rate!==undefined && l.rate!==null && !isNaN(parseFloat(l.rate))) o.rate = parseFloat(l.rate);
+        return o; });
+      if(!clean.length){ err.textContent = "Add at least one item."; err.style.display = "block"; return; }
+      var list = mealTypes().slice(), rec = { id: m ? m.id : "ml_"+uid(), name:name.trim(), lines:clean };
+      var idx = list.findIndex(function(x){ return x.id===rec.id; });
+      if(idx>=0) list[idx] = rec; else list.push(rec);
+      settings.mealTypes = list;
+      if(!settings.mealWeek){ settings.mealWeek = { slots:2, days:{} }; }
+      saveSettings(); closeForm(); renderStaffSection();
+    });
+  }
+  draw();
+}
+
+function mealSelect(cls, attrs, val){
+  return '<select class="'+cls+'" '+attrs+'><option value="">No meal</option>'+mealTypes().map(function(m){ return '<option value="'+esc(m.id)+'"'+(m.id===val?" selected":"")+'>'+esc(m.name)+'</option>'; }).join("")+'</select>';
+}
+function openMealWeekForm(){
+  var dn = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"], wk = (settings.mealWeek && settings.mealWeek.days) || {};
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Weekly menu</h2><div class="backupnote">What is usually cooked for staff each day. Change any single day from the day card.</div>';
+  [1,2,3,4,5,6,0].forEach(function(d){
+    html += '<div class="field"><label>'+dn[d]+'</label><div style="display:flex;gap:6px;">';
+    for(var i=0;i<mealSlots();i++) html += '<div style="flex:1;">'+mealSelect("mw", 'data-d="'+d+'" data-i="'+i+'"', (wk[String(d)]||[])[i])+'</div>';
+    html += '</div></div>';
+  });
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="mw_cancel">Cancel</button><button class="btn-save" id="mw_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("mw_cancel").addEventListener("click", closeForm);
+  document.getElementById("mw_save").addEventListener("click", function(){
+    var days = {};
+    Array.prototype.forEach.call(sheet.querySelectorAll(".mw"), function(x){ var d = x.getAttribute("data-d"); (days[d] = days[d] || [])[+x.getAttribute("data-i")] = x.value; });
+    settings.mealWeek = { slots: mealSlots(), days: days };
+    saveSettings(); closeForm(); renderStaffSection();
+  });
+}
+function openMealDayForm(d){
+  var dp = mealDayPlan(d);
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Staff meals · '+esc(fmtD(d))+'</h2><div class="backupnote">'+dp.eaters.length+' people eating going by attendance. Change the meal or the count for this day only (e.g. a guest, someone skipped a meal).</div>';
+  dp.slots.forEach(function(sl, i){
+    html += '<div class="field two"><div><label>Meal '+(i+1)+'</label>'+mealSelect("md_meal", 'data-i="'+i+'"', sl.mealId)+'</div>'+
+            '<div><label>People</label><input type="number" inputmode="numeric" class="md_people" data-i="'+i+'" value="'+(sl.auto?"":sl.people)+'" placeholder="'+dp.eaters.length+' (attendance)"></div></div>';
+  });
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="md_cancel">Cancel</button><button class="btn-save" id="md_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("md_cancel").addEventListener("click", closeForm);
+  document.getElementById("md_save").addEventListener("click", function(){
+    var slots = [];
+    Array.prototype.forEach.call(sheet.querySelectorAll(".md_meal"), function(x){ var i = +x.getAttribute("data-i"); slots[i] = { meal:x.value }; });
+    Array.prototype.forEach.call(sheet.querySelectorAll(".md_people"), function(x){ var i = +x.getAttribute("data-i"); if(x.value!=="") slots[i].people = Math.max(0, parseInt(x.value,10)||0); });
+    var md = Object.assign({}, settings.mealDays||{}); md[d] = { slots:slots }; settings.mealDays = md;
+    saveSettings(); closeForm(); renderStaffSection();
+  });
+}
+function openMealSettingsForm(){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Staff meal settings</h2>';
+  html += '<div class="field two"><div><label>Meals a day</label><select id="ms_slots">'+[1,2,3].map(function(n){ return '<option'+(n===mealSlots()?" selected":"")+'>'+n+'</option>'; }).join("")+'</select></div>';
+  html += '<div><label>Oil, masala, gas (₹ per plate)</label><input type="number" inputmode="decimal" id="ms_basics" value="'+(mealBasics()||"")+'" placeholder="e.g. 6"></div></div>';
+  html += '<div class="backupnote">A simple way to work out the per-plate amount: what the cafe spends on oil, masala and gas in a month for staff cooking, divided by the plates served (about people × meals × 30).</div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="ms_cancel">Cancel</button><button class="btn-save" id="ms_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("ms_cancel").addEventListener("click", closeForm);
+  document.getElementById("ms_save").addEventListener("click", function(){
+    settings.mealWeek = Object.assign({ days:{} }, settings.mealWeek||{}, { slots:+document.getElementById("ms_slots").value });
+    settings.mealBasics = parseFloat(document.getElementById("ms_basics").value) || 0;
+    saveSettings(); closeForm(); renderStaffSection();
+  });
 }
 
 function openStaffMealForm(dateStr){

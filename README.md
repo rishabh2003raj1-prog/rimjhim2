@@ -219,3 +219,13 @@ record a payment. Until then the month shows *not entered*, with up to three ear
 they are not counted in "Still to pay". Fixed bills change from a month onward (or for one month only) and can have
 a due day; unpaid bills past their due date are marked **overdue**. *Manage bills* sets each bill's kind and due day,
 fixed amounts, and adds or removes bills. **Bill history** shows every bill for the last six months side by side.
+
+### Staff meals (cost of feeding staff)
+Staff → Meals. Set up once: **meal types** list what goes into each meal — quantities per person (2 eggs, 0.08 kg
+rice) or for the whole cooking (1.5 kg chicken) — with rates taken from your last purchase of that item unless typed;
+**oil, masala, gas** is an amount per plate; the **weekly menu** says what is cooked each day (2 meals by default,
+1–3 possible). "Start with a typical menu" adds sabzi with rice / roti, aloo paratha, chicken, chicken biryani with
+raita and egg days, to edit. The number eating comes from attendance (employed, not absent / on leave); any day can be
+changed (another meal, a guest). The tab shows each day's cost, the month's cost, plates and cost per plate, by meal
+and by person, and warns about items without a rate. The cost is part of purchases already, so it is not charged
+again; it also appears in each person's "what they cost" and the dashboard's fixed cost card.
