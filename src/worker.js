@@ -371,10 +371,11 @@ async function handlePhotoUpload(req, env, url, who) {
   return json({ url: "/api/photos/" + id });
 }
 
-async function handlePhotoGet(env, id) {
+async function handlePhotoGet(env, id, who) {
   if (!/^[a-f0-9]{32}$/.test(id)) return new Response("Not found", { status: 404 });
-  const row = await env.DB.prepare("SELECT mime, data FROM photos WHERE id = ?").bind(id).first();
-  if (!row) return new Response("Not found", { status: 404 });
+  const row = await env.DB.prepare("SELECT outlet, mime, data FROM photos WHERE id = ?").bind(id).first();
+  // A store login only sees its own store's bill photos.
+  if (!row || !canUseOutlet(who, row.outlet)) return new Response("Not found", { status: 404 });
   return new Response(new Uint8Array(row.data), {
     headers: { "Content-Type": row.mime, "Cache-Control": "private, max-age=31536000, immutable" }
   });
@@ -538,7 +539,7 @@ export default {
         if (who.role !== "owner") return json({ error: "Only the owner can manage logins." }, 403);
         return await handleUsers(req, env, path);
       }
-      if (path.startsWith("/api/photos/") && req.method === "GET") return await handlePhotoGet(env, path.slice(12));
+      if (path.startsWith("/api/photos/") && req.method === "GET") return await handlePhotoGet(env, path.slice(12), who);
       if (path === "/api/ai" && req.method === "POST") return await handleAi(req, env);
       return json({ error: "not found" }, 404);
     } catch (e) {
