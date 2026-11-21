@@ -181,3 +181,12 @@ The profit & loss summary now has a **How the cafe met its needs** table: for ea
 partner money (net), udhaar & unpaid bills, and the resulting change in the cafe's own cash & bank. The detailed section
 explains every month in words, lists each loan (by lender), partner capital, own-pocket bills, repayments, withdrawals,
 customer udhaar and unpaid vendor bills, notes capital paid straight to a seller, and ends with the loans still open.
+
+### One date for the whole app (day / month / year)
+The calendar's selected day and month are shared by the whole app. Records → Sales, Purchases, Invest and Expenses
+have a **Day / Month / Year** switch with ‹ › arrows: day and month views group entries by day with day totals
+(tap a day to open it), the year view lists one row per month (tap to open that month). Each view starts with
+totals for the period (payment modes, paid-how, by partner, by category). Bills, Handover, Bank, Cash review,
+Loans and the Cash tab's counter log all show the same month — moving any of them (or the calendar) moves all of
+them. Under the calendar, **Month at a glance** shows sales, purchases, expenses, profit and partner money, and
+opens the matching Records view.

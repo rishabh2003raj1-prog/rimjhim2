@@ -333,6 +333,8 @@
   .monthtot{font-size:12.5px;color:var(--ink-soft);}
   .daygroup{font-size:11.5px;font-weight:600;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.03em;margin:14px 0 6px;}
   .daygroup:first-child{margin-top:0;}
+  .rpdayhead{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:4px;}
+  .recper{margin-bottom:8px;}
 
   .fab{position:fixed;bottom:78px;right:calc(50% - 240px + 20px);width:54px;height:54px;border-radius:50%;background:var(--ink);color:#fff;border:none;font-size:26px;box-shadow:0 4px 14px rgba(36,26,18,0.28);z-index:20;}
   @media(max-width:480px){.fab{right:20px;}}
@@ -485,6 +487,7 @@
         <button id="calNext">›</button>
       </div>
       <div class="calgrid" id="calGrid"></div>
+      <div class="card calbills" id="calMonth"></div>
       <div class="card calbills" id="calBills"></div>
       <div class="daypanel" id="dayPanel"></div>
     </div>
@@ -2492,7 +2495,7 @@ function renderFixedView(){
   html += '</tbody></table></div></div>';
 
   el.innerHTML = html;
-  function shift(n){ setBillsMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderFixedView(); renderCalendar(); updateRecordsTotal(); }
+  function shift(n){ setAppMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderAll(); }
   document.getElementById("fcPrev").addEventListener("click", function(){ shift(-1); });
   document.getElementById("fcNext").addEventListener("click", function(){ shift(1); });
   document.getElementById("fc_setup").addEventListener("click", openFixedCostForm);
@@ -2531,12 +2534,22 @@ function renderFixedView(){
   if(recSub==="fixed") updateRecordsTotal();
 }
 
-// The Monthly bills tab and the Calendar always show the same month.
-function setBillsMonth(mKey){
-  fcMonth = mKey;
+// ---------- ONE DATE FOR THE WHOLE APP ----------
+// The calendar's selected day and month drive everything that is shown by period:
+// Records (sales, purchases, partner money, expenses, cash log) by day, month or
+// year, and Bills, Handover, Bank, Cash review and Loans by month. Moving any of
+// them moves the calendar and all the others with it.
+var recPeriod = "month";   // "day" | "month" | "year" for the Records lists
+function appMonth(){ return fmtDate(calCursor).slice(0,7); }
+function setAppMonth(mKey){
   calCursor = new Date(+mKey.slice(0,4), +mKey.slice(5,7)-1, 1);
+  fcMonth = hoMonth = lnMonth = bkMonth = crMonth = mKey;
   if(selectedDate.slice(0,7)!==mKey) selectedDate = billDefaultDate(mKey);
 }
+function setAppDate(d){ selectedDate = d; setAppMonth(d.slice(0,7)); selectedDate = d; }
+function shiftAppMonth(n){ setAppMonth(fmtDate(new Date(calCursor.getFullYear(), calCursor.getMonth()+n, 1)).slice(0,7)); }
+function renderRecordLists(){ renderSalesList(); renderPurchList(); renderInvestList(); renderExpenseList(); renderCashView(); updateRecordsTotal(); }
+function setBillsMonth(mKey){ setAppMonth(mKey); }
 function billDefaultDate(mKey){
   var today = fmtDate(new Date());
   if(today.slice(0,7)===mKey) return today;
@@ -2549,8 +2562,8 @@ function openBills(mKey){
   window.scrollTo(0,0);
 }
 function openCalendarOn(dateStr){
-  selectedDate = dateStr; calCursor = parseDate(dateStr.slice(0,7)+"-01"); fcMonth = dateStr.slice(0,7);
-  showView("calendar"); renderCalendar(); renderDayPanel();
+  setAppDate(dateStr);
+  showView("calendar"); renderAll();
   window.scrollTo(0,0);
 }
 
@@ -2838,10 +2851,33 @@ function renderCalendar(){
     html += '<div class="'+cls+'" data-date="'+ds+'">'+day+'<span class="dots">'+dots+'</span></div>';
   }
   grid.innerHTML = html;
+  renderCalMonth(fmtDate(new Date(y,m,1)).slice(0,7));
   renderCalBills(fmtDate(new Date(y,m,1)).slice(0,7));
   Array.prototype.forEach.call(grid.querySelectorAll(".daycell[data-date]"), function(cell){
-    cell.addEventListener("click", function(){ selectedDate = cell.getAttribute("data-date"); renderCalendar(); renderDayPanel(); });
+    cell.addEventListener("click", function(){ setAppDate(cell.getAttribute("data-date")); renderCalendar(); renderDayPanel(); renderRecordLists(); });
   });
+}
+
+// The calendar month at a glance; each line opens that month in Records.
+function renderCalMonth(mKey){
+  var el = document.getElementById("calMonth");
+  if(!el) return;
+  function inM(d){ return (d||"").slice(0,7)===mKey; }
+  var sT = sales.filter(function(x){ return inM(x.date); }).reduce(function(a,x){ return a+saleTotal(x); },0);
+  var pT = purchases.filter(function(x){ return inM(x.date); }).reduce(function(a,x){ return a+purchTotal(x); },0);
+  var eT = expenses.filter(function(x){ return inM(expBookDate(x)); }).reduce(function(a,x){ return a+expAmt(x); },0);
+  var iT = investments.filter(function(x){ return inM(x.date); }).reduce(function(a,x){ return a+investAmt(x); },0);
+  var net = sT - pT - eT + otherIncomeIn(inM);
+  function row(k, lbl, v, cls){ return '<div class="psrow" data-calrec="'+k+'" style="cursor:pointer;"><span>'+lbl+' <span class="muted">›</span></span><b class="'+(cls||"")+'">'+v+'</b></div>'; }
+  el.innerHTML = '<h3>'+esc(monthLabel(mKey))+' at a glance</h3>'+
+    row("sales", "Sales", rupee(sT), "ok")+row("purchases", "Purchases", rupee(pT))+row("expenses", "Expenses", rupee(eT))+
+    '<div class="psrow"><span><b>Profit</b></span><b class="'+(net<0?"bad":"ok")+'">'+rupeeSigned(net)+'</b></div>'+
+    row("investments", "Partner money (net)", rupeeSigned(iT))+
+    '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" data-calyear="1">Year '+mKey.slice(0,4)+' in Records</button><button class="btn-additem" data-calday="1">'+esc(fmtD(selectedDate))+' in Records</button></div>';
+  function go(sub, per){ recPeriod = per; showView("records"); switchRecordsSub(sub); renderAll(); window.scrollTo(0,0); }
+  Array.prototype.forEach.call(el.querySelectorAll("[data-calrec]"), function(r){ r.addEventListener("click", function(){ go(r.getAttribute("data-calrec"), "month"); }); });
+  el.querySelector("[data-calyear]").addEventListener("click", function(){ go(["sales","purchases","investments","expenses"].indexOf(recSub)>=0 ? recSub : "sales", "year"); });
+  el.querySelector("[data-calday]").addEventListener("click", function(){ go(["sales","purchases","investments","expenses"].indexOf(recSub)>=0 ? recSub : "sales", "day"); });
 }
 
 // This month's rent, bills and salaries under the calendar (purple dots = bill payments).
@@ -3044,10 +3080,11 @@ function switchRecordsSub(name){
 
 function updateRecordsTotal(){
   var lbl = document.getElementById("recordsTotalLbl");
-  if(recSub==="sales"){ var t=sales.reduce(function(a,s){return a+saleTotal(s);},0); lbl.textContent = sales.length+" entries · "+rupee(t); }
-  else if(recSub==="purchases"){ var t2=purchases.reduce(function(a,p){return a+purchTotal(p);},0); lbl.textContent = purchases.length+" entries · "+rupee(t2); }
-  else if(recSub==="investments"){ var t3=investments.reduce(function(a,v){return a+investAmt(v);},0); lbl.textContent = investments.length+" entries · net "+rupeeSigned(t3); }
-  else if(recSub==="expenses"){ var t4=expenses.reduce(function(a,x){return a+expAmt(x);},0); lbl.textContent = expenses.length+" entries · "+rupee(t4); }
+  var rl = recRange().label;
+  if(recSub==="sales"){ var ls = recSalesIn(); lbl.textContent = rl+" · "+rupee(ls.reduce(function(a,s){return a+saleTotal(s);},0)); }
+  else if(recSub==="purchases"){ var lp = recPurchIn(); lbl.textContent = rl+" · "+rupee(lp.reduce(function(a,p){return a+purchTotal(p);},0)); }
+  else if(recSub==="investments"){ var li = recInvestIn(); lbl.textContent = rl+" · net "+rupeeSigned(li.reduce(function(a,v){return a+investAmt(v);},0)); }
+  else if(recSub==="expenses"){ var le = recExpIn(); lbl.textContent = rl+" · "+rupee(le.reduce(function(a,x){return a+expAmt(x);},0)); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
   else if(recSub==="bank"){ lbl.textContent = rupee(bankBalanceNow())+" now"; }
@@ -3064,19 +3101,103 @@ function updateRecordsTotal(){
   else { lbl.textContent = PARTNERS.length+" partner"+(PARTNERS.length!==1?"s":""); }
 }
 
+// ---- Records by day / month / year (same date as the calendar) ----
+function recRange(){
+  if(recPeriod==="day") return { from:selectedDate, to:selectedDate, days:1,
+    label: parseDate(selectedDate).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric"}) };
+  if(recPeriod==="year"){ var y = String(calCursor.getFullYear()); return { from:y+"-01-01", to:y+"-12-31", label:y, days:datesBetween(y+"-01-01", y+"-12-31").length }; }
+  var mk = appMonth(); return { from:mk+"-01", to:loanMonthEnd(mk), label:monthLabel(mk), days:daysInMonthOf(mk) };
+}
+function inRecRange(d){ var r = recRange(); return !!d && d>=r.from && d<=r.to; }
+function recPeriodBar(addType, addLabel){
+  var r = recRange();
+  return '<div class="segctl recper" style="margin-bottom:8px;">'+[["day","Day"],["month","Month"],["year","Year"]].map(function(o){
+      return '<button data-rper="'+o[0]+'" class="'+(recPeriod===o[0]?"on":"")+'">'+o[1]+'</button>'; }).join("")+'</div>'+
+    '<div class="calhead" style="margin-bottom:10px;"><button data-rpshift="-1" aria-label="Previous">‹</button>'+
+    '<h2 class="serif" style="font-size:18px;cursor:pointer;" data-rpcal="1">'+esc(r.label)+' <span style="font-size:13px;">📅</span></h2>'+
+    '<button data-rpshift="1" aria-label="Next">›</button></div>'+
+    (recPeriod==="day" && addType ? '<button class="btn-additem" data-rpadd="'+addType+'" style="margin-bottom:10px;">+ Add '+addLabel+' on '+esc(fmtD(selectedDate))+'</button>' : '');
+}
+function wireRecPeriodBar(el){
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rper]"), function(b){
+    b.addEventListener("click", function(){ recPeriod = b.getAttribute("data-rper"); renderRecordLists(); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rpshift]"), function(b){
+    b.addEventListener("click", function(){
+      var n = +b.getAttribute("data-rpshift");
+      if(recPeriod==="day") setAppDate(addDays(selectedDate, n));
+      else if(recPeriod==="year") setAppMonth(fmtDate(new Date(calCursor.getFullYear()+n, calCursor.getMonth(), 1)).slice(0,7));
+      else shiftAppMonth(n);
+      renderAll();
+    });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rpcal]"), function(b){ b.addEventListener("click", function(){ openCalendarOn(selectedDate); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rpday]"), function(b){
+    b.addEventListener("click", function(e){ e.stopPropagation(); setAppDate(b.getAttribute("data-rpday")); recPeriod = "day"; renderAll(); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rpmonth]"), function(b){
+    b.addEventListener("click", function(e){ e.stopPropagation(); setAppMonth(b.getAttribute("data-rpmonth")); recPeriod = "month"; renderAll(); });
+  });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rpadd]"), function(b){
+    b.addEventListener("click", function(){ openForm(b.getAttribute("data-rpadd"), null, selectedDate); });
+  });
+}
+// Lists entries of the period: grouped by day (day / month view, each day with its
+// total) or, for a year, one row per month (tap to open that month).
+function recGrouped(items, o){
+  var r = recRange(), html = "";
+  if(!items.length) return '<div class="empty">No '+o.word+' in '+esc(r.label)+'.'+(recPeriod!=="day"?'':' Use ‹ › to move between days.')+'</div>';
+  var money = o.signed ? rupeeSigned : rupee;
+  if(recPeriod==="year"){
+    var by = {};
+    items.forEach(function(x){ var mk = o.date(x).slice(0,7); var g = by[mk] || (by[mk] = { n:0, t:0 }); g.n++; g.t += o.amt(x); });
+    html += '<div class="daygroup">Month by month</div>';
+    Object.keys(by).sort().reverse().forEach(function(mk){
+      html += '<div class="entry rpmonthrow" data-rpmonth="'+mk+'"><div><div class="who">'+esc(monthLabel(mk))+'</div><div class="meta">'+by[mk].n+' '+(by[mk].n===1?o.one:o.word)+' · tap to open the month</div></div>'+
+              '<div class="amt '+(o.cls(by[mk].t))+'">'+money(by[mk].t)+'</div></div>';
+    });
+    return html;
+  }
+  var days = {}, order = [];
+  items.forEach(function(x){ var d = o.date(x); if(!days[d]){ days[d] = []; order.push(d); } days[d].push(x); });
+  order.sort().reverse().forEach(function(d){
+    var list = days[d], t = list.reduce(function(a,x){ return a+o.amt(x); },0);
+    html += '<div class="daygroup rpdayhead"'+(recPeriod==="day"?'':' data-rpday="'+d+'" style="cursor:pointer;"')+'><span>'+parseDate(d).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</span>'+
+            '<span>'+list.length+' · '+money(t)+'</span></div>';
+    if(o.dayExtra) html += o.dayExtra(d, list);
+    html += list.map(o.row).join("");
+  });
+  return html;
+}
+function recKpis(cells){
+  return '<div class="kpis fckpis" style="margin-bottom:12px;">'+cells.map(function(c){
+    return '<div class="kpi"><div class="lbl">'+c[0]+'</div><div class="val '+(c[2]||"")+'">'+c[1]+'</div><div class="sub2">'+(c[3]||"&nbsp;")+'</div></div>'; }).join("")+'</div>';
+}
+function recSalesIn(){ return sales.filter(function(x){ return inRecRange(x.date); }); }
+function recPurchIn(){ return purchases.filter(function(x){ return inRecRange(x.date); }); }
+function recInvestIn(){ return investments.filter(function(x){ return inRecRange(x.date); }); }
+function recExpIn(){ return expenses.filter(function(x){ return inRecRange(x.date); }); }
+
 function renderSalesList(){
   var el = document.getElementById("salesList");
-  var sorted = sales.slice().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
-  if(sorted.length===0){ el.innerHTML = '<div class="empty">No sales logged yet. Tap + to add one.</div>'; }
-  else {
-    var html = "", lastDate = null;
-    sorted.forEach(function(s){
-      if(s.date!==lastDate){ html += '<div class="daygroup">'+parseDate(s.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</div>'; lastDate=s.date; }
-      html += entryRow(s,"sale");
-    });
-    el.innerHTML = html;
-    wireEntryClicks(el);
-  }
+  var list = recSalesIn().sort(function(a,b){ return b.date.localeCompare(a.date); });
+  var r = recRange(), tot = list.reduce(function(a,x){ return a+saleTotal(x); },0);
+  var html = recPeriodBar("sale", "sale");
+  var modes = {};
+  list.forEach(function(x){ var m = x.mode==="Credit" ? "Udhaar" : (x.mode||"Other"); modes[m] = (modes[m]||0) + saleTotal(x); });
+  var daysWithSales = {}; list.forEach(function(x){ daysWithSales[x.date] = true; });
+  var nd = Object.keys(daysWithSales).length;
+  html += recKpis([["Sales", rupee(tot), "pos", list.length+" entr"+(list.length===1?"y":"ies")],
+                   ["Cash", rupee(modes.Cash||0), "", rupee(modes.UPI||0)+" UPI"],
+                   [recPeriod==="day" ? "Udhaar" : "Per day", recPeriod==="day" ? rupee(modes.Udhaar||0) : rupee(nd ? tot/nd : 0), "", recPeriod==="day" ? "&nbsp;" : nd+" day"+(nd!==1?"s":"")+" with sales"]]);
+  var mk = Object.keys(modes).sort(function(a,b){ return modes[b]-modes[a]; });
+  if(mk.length>1 || (mk.length && ["Cash","UPI"].indexOf(mk[0])<0))
+    html += '<div class="card" style="margin-bottom:12px;padding:8px 12px;"><div class="barsub" style="margin:0 0 4px;font-weight:600;">By payment mode · '+esc(r.label)+'</div>'+
+      mk.map(function(k){ return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+esc(k)+'</span><b>'+rupee(modes[k])+(tot>0?' · '+Math.round(modes[k]/tot*100)+'%':'')+'</b></div>'; }).join("")+'</div>';
+  html += recGrouped(list, { word:"sales", one:"sale", date:function(x){ return x.date; }, amt:saleTotal, cls:function(){ return "sale"; }, row:function(x){ return entryRow(x,"sale"); } });
+  el.innerHTML = html;
+  wireRecPeriodBar(el);
+  wireEntryClicks(el);
   if(recSub==="sales") updateRecordsTotal();
 }
 
@@ -3363,10 +3484,10 @@ function markSettled(billId, how, quiet){
 
 // Spend grouped by who did the buying - makes an odd pattern easy to spot.
 function purchaserSummary(){
-  var mKey = fmtDate(new Date()).slice(0,7);
+  var r = recRange();
   var totals = {}, unknown = 0;
   billGroups().forEach(function(g){
-    if(g.date.slice(0,7)!==mKey) return;
+    if(!inRecRange(g.date)) return;
     var amt = g.lines.reduce(function(a,p){ return a+purchTotal(p); },0);
     if(g.purchasedBy){ totals[g.purchasedBy] = (totals[g.purchasedBy]||0) + amt; }
     else { unknown += amt; }
@@ -3377,7 +3498,7 @@ function purchaserSummary(){
     return '<div class="psrow"><span>'+esc(k)+'</span><b>'+rupee(totals[k])+'</b></div>';
   }).join("");
   if(unknown>0){ rows += '<div class="psrow"><span class="warnline">Purchaser not recorded</span><b>'+rupee(unknown)+'</b></div>'; }
-  return '<div class="card" style="margin-bottom:14px;"><h3>Spend by purchaser <span class="muted">· this month</span></h3>'+rows+'</div>';
+  return '<div class="card" style="margin-bottom:14px;"><h3>Spend by purchaser <span class="muted">· '+esc(r.label)+'</span></h3>'+rows+'</div>';
 }
 
 // How a purchase was paid: cash from the counter, UPI / card / bank, vendor credit
@@ -3408,37 +3529,41 @@ function purchasePaySummary(lines, title){
 
 function renderPurchList(){
   var el = document.getElementById("purchList");
-  var groups = billGroups().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
-  if(groups.length===0){ el.innerHTML = owedSummary() + '<div class="empty">No purchases logged yet. Tap + to add a bill.</div>'; }
-  else {
-    var mNow = fmtDate(new Date()).slice(0,7);
-    var monthLines = purchases.filter(function(p){ return (p.date||"").slice(0,7)===mNow; });
-    var html = owedSummary() + purchaserSummary() + (monthLines.length ? purchasePaySummary(monthLines, "Paid how · "+monthLabel(mNow)) : ""), lastDate = null;
-    groups.forEach(function(g){
-      if(g.date!==lastDate){
-        var dayLines = purchases.filter(function(p){ return p.date===g.date; });
-        html += '<div class="daygroup">'+parseDate(g.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+' · '+rupee(dayLines.reduce(function(a,p){ return a+purchTotal(p); },0))+'</div>';
-        html += purchasePaySummary(dayLines);
-        lastDate=g.date;
-      }
-      var tot = g.lines.reduce(function(a,p){ return a+purchTotal(p); },0);
-      var itemLines = g.lines.filter(function(p){ return !p.isDelivery; });
-      var delLines = g.lines.filter(function(p){ return p.isDelivery; });
-      var delTot = delLines.reduce(function(a,p){ return a+purchTotal(p); },0);
-      var names = itemLines.map(function(p){ return p.item; }).join(", ");
-      var hasPhoto = !!getBill(g.id);
-      html += '<div class="entry" data-type="purchase" data-id="'+g.lines[0].id+'">'+
-              '<div><div class="who">'+esc(g.vendor)+(hasPhoto?' <span class="billclip">📎</span>':'')+'</div>'+
-              '<div class="meta">'+itemLines.length+' item'+(itemLines.length!==1?'s':'')+' · '+esc(names)+
-              (delTot>0?' · +'+rupee(delTot)+' delivery':'')+'</div>'+
-              '<div class="meta byline">'+(g.purchasedBy? 'Bought by '+esc(g.purchasedBy) : '<span class="warnline">Purchaser not recorded</span>')+
-              ' · '+esc(purchasePay(g.lines[0]).label)+
-              (payerIsPersonal(g.paidBy) && !billSettled(g.id) ? ' <span class="pill bad">owed</span>' : '')+'</div></div>'+
-              '<div class="amt purch">'+rupee(tot)+'</div></div>';
-    });
-    el.innerHTML = html;
-    wireEntryClicks(el);
+  var r = recRange();
+  var lines = recPurchIn();
+  var groups = billGroups().filter(function(g){ return inRecRange(g.date); }).sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
+  var tot = lines.reduce(function(a,p){ return a+purchTotal(p); },0);
+  var credit = lines.filter(function(p){ return (p.mode||"Cash")==="Credit"; }).reduce(function(a,p){ return a+purchTotal(p); },0);
+  var deliv = lines.filter(function(p){ return p.isDelivery; }).reduce(function(a,p){ return a+purchTotal(p); },0);
+  var html = owedSummary() + recPeriodBar("purchase", "purchase");
+  html += recKpis([["Purchases", rupee(tot), "neg", groups.length+" bill"+(groups.length!==1?"s":"")],
+                   ["Udhaar", rupee(credit), credit>0?"neg":"", "not paid yet"],
+                   ["Delivery", rupee(deliv), "", tot>0 ? Math.round(deliv/tot*100)+"% of spend" : "&nbsp;"]]);
+  if(lines.length){
+    html += purchasePaySummary(lines, "Paid how · "+esc(r.label));
+    html += purchaserSummary();
   }
+  function billRow(g){
+    var gt = g.lines.reduce(function(a,p){ return a+purchTotal(p); },0);
+    var itemLines = g.lines.filter(function(p){ return !p.isDelivery; });
+    var delTot = g.lines.filter(function(p){ return p.isDelivery; }).reduce(function(a,p){ return a+purchTotal(p); },0);
+    var names = itemLines.map(function(p){ return p.item; }).join(", ");
+    var hasPhoto = !!getBill(g.id);
+    return '<div class="entry" data-type="purchase" data-id="'+g.lines[0].id+'">'+
+            '<div><div class="who">'+esc(g.vendor)+(hasPhoto?' <span class="billclip">📎</span>':'')+'</div>'+
+            '<div class="meta">'+itemLines.length+' item'+(itemLines.length!==1?'s':'')+' · '+esc(names)+
+            (delTot>0?' · +'+rupee(delTot)+' delivery':'')+'</div>'+
+            '<div class="meta byline">'+(g.purchasedBy? 'Bought by '+esc(g.purchasedBy) : '<span class="warnline">Purchaser not recorded</span>')+
+            ' · '+esc(purchasePay(g.lines[0]).label)+
+            (payerIsPersonal(g.paidBy) && !billSettled(g.id) ? ' <span class="pill bad">owed</span>' : '')+'</div></div>'+
+            '<div class="amt purch">'+rupee(gt)+'</div></div>';
+  }
+  html += recGrouped(groups, { word:"purchases", one:"bill", date:function(g){ return g.date; },
+    amt:function(g){ return g.lines.reduce(function(a,p){ return a+purchTotal(p); },0); }, cls:function(){ return "purch"; }, row:billRow,
+    dayExtra: recPeriod==="month" ? function(d){ return purchasePaySummary(lines.filter(function(p){ return p.date===d; })); } : null });
+  el.innerHTML = html;
+  wireRecPeriodBar(el);
+  wireEntryClicks(el);
   var ov = document.getElementById("owed_view");
   if(ov) ov.addEventListener("click", openOwedSheet);
   if(recSub==="purchases") updateRecordsTotal();
@@ -3446,48 +3571,56 @@ function renderPurchList(){
 
 function renderInvestList(){
   var el = document.getElementById("investList");
-  var sorted = investments.slice().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
-  if(sorted.length===0){ el.innerHTML = '<div class="empty">No partner investments logged yet. Tap + to add one.</div>'; }
-  else {
-    var html = "", lastDate = null;
-    sorted.forEach(function(v){
-      if(v.date!==lastDate){ html += '<div class="daygroup">'+parseDate(v.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</div>'; lastDate=v.date; }
-      html += entryRow(v,"investment");
-    });
-    el.innerHTML = html;
-    wireEntryClicks(el);
+  var r = recRange();
+  var list = recInvestIn().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
+  var inn = 0, out = 0, byP = {};
+  list.forEach(function(v){
+    var a = investAmt(v);
+    if(a>=0) inn += a; else out -= a;
+    var p = byP[v.partner] || (byP[v.partner] = { capital:0, loan:0, repay:0, withdraw:0 });
+    p[invKind(v)] += +v.amount||0;
+  });
+  var html = recPeriodBar("investment", "partner entry");
+  html += recKpis([["Money in", rupee(inn), "pos", "capital + loans"], ["Money out", rupee(out), out>0?"neg":"", "repaid + withdrawn"], ["Net", rupeeSigned(inn-out), (inn-out)<0?"neg":"pos", list.length+" entr"+(list.length===1?"y":"ies")]]);
+  var pk = Object.keys(byP);
+  if(pk.length){
+    html += '<div class="card" style="margin-bottom:12px;padding:8px 12px;"><div class="barsub" style="margin:0 0 4px;font-weight:600;">By partner · '+esc(r.label)+'</div>'+
+      pk.map(function(n){ var p = byP[n], bits = [];
+        if(p.capital) bits.push("capital "+rupee(p.capital)); if(p.loan) bits.push("loan "+rupee(p.loan));
+        if(p.repay) bits.push("repaid "+rupee(p.repay)); if(p.withdraw) bits.push("withdrew "+rupee(p.withdraw));
+        return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+esc(n)+'</span><b>'+bits.join(" · ")+'</b></div>'; }).join("")+'</div>';
   }
+  html += recGrouped(list, { word:"partner entries", one:"entry", signed:true, date:function(v){ return v.date; }, amt:investAmt,
+    cls:function(t){ return t<0 ? "purch" : "sale"; }, row:function(v){ return entryRow(v,"investment"); } });
+  el.innerHTML = html;
+  wireRecPeriodBar(el);
+  wireEntryClicks(el);
   if(recSub==="investments") updateRecordsTotal();
 }
 
 function renderExpenseList(){
   var el = document.getElementById("expenseList");
-  var mKey = monthKey(fmtDate(new Date()));
-  var fixedAct = actualInMonth(FIXED_CATS.concat(STAFF_CATS), mKey);
-  var varAct = expenses.filter(function(x){
-    return monthKey(x.date)===mKey && FIXED_CATS.indexOf(x.category)<0 && STAFF_CATS.indexOf(x.category)<0;
-  }).reduce(function(a,x){ return a+expAmt(x); },0);
-  var head = "";
-  if(fixedAct>0 || varAct>0){
-    head = '<div class="card" style="margin-bottom:14px;"><h3>This month <span class="muted">· fixed vs variable</span></h3>'+
-      '<div class="psrow"><span>Fixed (rent, bills, staff)</span><b>'+rupee(fixedAct)+'</b></div>'+
-      '<div class="psrow"><span>Variable (everything else)</span><b>'+rupee(varAct)+'</b></div>'+
-      '<div class="psrow"><span><b>Total paid</b></span><b>'+rupee(fixedAct+varAct)+'</b></div></div>';
-  }
+  var r = recRange();
+  var list = recExpIn().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
+  var fixedAct = 0, staffAct = 0, varAct = 0, byCat = {};
+  list.forEach(function(x){
+    var a = expAmt(x);
+    if(FIXED_CATS.indexOf(x.category)>=0) fixedAct += a; else if(STAFF_CATS.indexOf(x.category)>=0) staffAct += a; else varAct += a;
+    byCat[x.category||"Other"] = (byCat[x.category||"Other"]||0) + a;
+  });
+  var tot = fixedAct + staffAct + varAct;
   var owedCard = owedSummary().replace('id="owed_view"', 'id="owed_view_x"');
   if(!owedCard && settledOwedItems().length) owedCard = '<button class="btn-additem" id="owed_rev_x" style="margin-bottom:12px;">Review / undo settled partner bills ('+settledOwedItems().length+')</button>';
-  head = owedCard + head;
-  var sorted = expenses.slice().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
-  if(sorted.length===0){ el.innerHTML = head + '<div class="empty">No expenses logged yet. Tap + to add one.</div>'; }
-  else {
-    var html = head, lastDate = null;
-    sorted.forEach(function(x){
-      if(x.date!==lastDate){ html += '<div class="daygroup">'+parseDate(x.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</div>'; lastDate=x.date; }
-      html += entryRow(x,"expense");
-    });
-    el.innerHTML = html;
-    wireEntryClicks(el);
-  }
+  var html = owedCard + recPeriodBar("expense", "expense");
+  html += recKpis([["Expenses", rupee(tot), "neg", list.length+" entr"+(list.length===1?"y":"ies")], ["Fixed + staff", rupee(fixedAct+staffAct), "", "rent, bills, salary"], ["Variable", rupee(varAct), "", "everything else"]]);
+  var ck = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
+  if(ck.length>1)
+    html += '<div class="card" style="margin-bottom:12px;padding:8px 12px;"><div class="barsub" style="margin:0 0 4px;font-weight:600;">By category · '+esc(r.label)+'</div>'+
+      ck.map(function(k){ return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+esc(k)+'</span><b>'+rupee(byCat[k])+(tot>0?' · '+Math.round(byCat[k]/tot*100)+'%':'')+'</b></div>'; }).join("")+'</div>';
+  html += recGrouped(list, { word:"expenses", one:"expense", date:function(x){ return x.date; }, amt:expAmt, cls:function(){ return "purch"; }, row:function(x){ return entryRow(x,"expense"); } });
+  el.innerHTML = html;
+  wireRecPeriodBar(el);
+  wireEntryClicks(el);
   var orv = el.querySelector("#owed_rev_x"); if(orv) orv.addEventListener("click", function(){ openSettlementReview("owed"); });
   var ov2 = el.querySelector("#owed_view_x");
   if(ov2) ov2.addEventListener("click", openOwedSheet);
@@ -4134,8 +4267,7 @@ function saveBillDraft(){
     appAlert("The bill was saved, but there was no room for the photo, so it wasn't kept. The item details are safe. Free up space in Backup & restore to store photos again.");
   }
   closeForm();
-  selectedDate = d.date;
-  calCursor = parseDate(d.date);
+  setAppDate(d.date);
   renderAll();
 }
 
@@ -7582,7 +7714,7 @@ function renderHandoverView(){
   });
   if(led.length) html += '<button class="btn-save" id="ho_pdf" style="width:100%;margin-top:4px;">Download handover statement PDF · '+esc(monthLabel(hoMonth))+'</button>';
   el.innerHTML = html;
-  function shift(n){ hoMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderHandoverView(); updateRecordsTotal(); }
+  function shift(n){ setAppMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderAll(); }
   document.getElementById("hoPrev").addEventListener("click", function(){ shift(-1); });
   document.getElementById("hoNext").addEventListener("click", function(){ shift(1); });
   var hop = document.getElementById("ho_pdf");
@@ -7695,8 +7827,8 @@ function wireLoanRows(root){
   });
 }
 function openLoansTab(mKey){
-  lnMonth = mKey || fmtDate(new Date()).slice(0,7);
-  showView("records"); switchRecordsSub("loans"); renderLoansView(); window.scrollTo(0,0);
+  setAppMonth(mKey || fmtDate(new Date()).slice(0,7));
+  showView("records"); switchRecordsSub("loans"); renderAll(); window.scrollTo(0,0);
 }
 
 function renderLoansView(){
@@ -7746,8 +7878,7 @@ function renderLoansView(){
   }
   html += '<button class="btn-save" id="ln_pdf" style="width:100%;margin-bottom:72px;">Download loan statement PDF · '+esc(monthLabel(lnMonth))+'</button>';
   el.innerHTML = html;
-  function shift(n){ lnMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7);
-    calCursor = parseDate(lnMonth+"-01"); fcMonth = lnMonth; renderLoansView(); renderCalendar(); updateRecordsTotal(); }
+  function shift(n){ setAppMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderAll(); }
   document.getElementById("lnPrev").addEventListener("click", function(){ shift(-1); });
   document.getElementById("lnNext").addEventListener("click", function(){ shift(1); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-lnadd]"), function(b){ b.addEventListener("click", function(){ openLoanForm(null, { type:b.getAttribute("data-lnadd"), date:billDefaultDate(lnMonth) }); }); });
@@ -7961,7 +8092,7 @@ function renderBankView(){
   html += '<button class="btn-additem" id="bk_rev" style="margin-top:8px;">'+(reviewed ? 'Reviewed on '+fmtD(reviewed)+' · tap to undo' : 'Mark '+esc(monthLabel(bkMonth))+' as reviewed')+'</button>';
   html += '<div class="backupnote" style="margin-top:8px;">Compare the month-end balance with your bank statement. If it differs, add an Adjustment with a note (or the missing entry) so it matches.</div>';
   el.innerHTML = html;
-  function shift(n){ bkMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderBankView(); updateRecordsTotal(); }
+  function shift(n){ setAppMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderAll(); }
   document.getElementById("bkPrev").addEventListener("click", function(){ shift(-1); });
   document.getElementById("bkNext").addEventListener("click", function(){ shift(1); });
   document.getElementById("bk_atm").addEventListener("click", function(){ openBankAdjForm(null, "atm"); });
@@ -8162,7 +8293,7 @@ function renderCashReviewView(){
   el.innerHTML = html;
   wire();
   function wire(){
-    function shift(n){ crMonth = fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7); renderCashReviewView(); updateRecordsTotal(); }
+    function shift(n){ setAppMonth(fmtDate(new Date(first.getFullYear(), first.getMonth()+n, 1)).slice(0,7)); renderAll(); }
     document.getElementById("crPrev").addEventListener("click", function(){ shift(-1); });
     document.getElementById("crNext").addEventListener("click", function(){ shift(1); });
     var b = document.getElementById("cr_pdf"); if(b) b.addEventListener("click", function(){ exportCashReview(crMonth, b); });
@@ -8785,7 +8916,7 @@ function renderCashView(){
   }
   html += '<button class="btn-save" id="cash_close" style="width:100%;margin-top:10px;">'+(todayRec?'Update today\u2019s count':'Record today\u2019s closing cash')+'</button></div>';
 
-  var mKeyNow = today.slice(0,7);
+  var mKeyNow = appMonth();
   var handTot = {};
   cashDays.forEach(function(c){
     if(c.date.slice(0,7)!==mKeyNow) return;
@@ -8794,15 +8925,18 @@ function renderCashView(){
   });
   var hKeys = Object.keys(handTot).sort(function(a,b){ return handTot[b]-handTot[a]; });
   if(hKeys.length){
-    html += '<div class="card" style="margin-bottom:14px;"><h3>Cash handed over <span class="muted">· this month</span></h3>'+
+    html += '<div class="card" style="margin-bottom:14px;"><h3>Cash handed over <span class="muted">· '+esc(monthLabel(mKeyNow))+'</span></h3>'+
       hKeys.map(function(k){ return '<div class="psrow"><span>'+esc(k)+'</span><b>'+rupee(handTot[k])+'</b></div>'; }).join("")+
       '<div class="backupnote" style="margin-top:8px;">Counter cash collected by each person. Record where it went (bank, expenses, back to the counter) in the Handover tab.</div>'+
       '<button class="btn-additem" id="cash_ho" style="margin-top:8px;">See where the handover cash went</button></div>';
   }
 
-  var recent = cashDays.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 20);
+  var recent = cashDays.filter(function(c){ return c.date.slice(0,7)===mKeyNow; }).sort(function(a,b){ return b.date.localeCompare(a.date); });
+  var cntd = recent.filter(function(c){ return c.counted !== null && c.counted !== undefined && c.counted !== ""; }).length;
+  html += '<div class="calhead" style="margin:4px 0 6px;"><button id="cashLogPrev" aria-label="Previous month">‹</button><h2 class="serif" style="font-size:17px;">Counter log · '+esc(monthLabel(mKeyNow))+'</h2><button id="cashLogNext" aria-label="Next month">›</button></div>';
+  html += '<div class="barsub" style="margin:0 0 6px;">'+cntd+' day'+(cntd!==1?'s':'')+' counted · same month as the calendar</div>';
+  if(!recent.length) html += '<div class="empty">No counter counts in '+esc(monthLabel(mKeyNow))+'.</div>';
   if(recent.length){
-    html += '<div class="daygroup">Daily counter log</div>';
     html += recent.map(function(c){
       var e = expectedCash(c.date);
       var has = c.counted !== null && c.counted !== undefined && c.counted !== "";
@@ -8834,15 +8968,17 @@ function renderCashView(){
     });
   });
   document.getElementById("cash_close").addEventListener("click", function(){ openCashDayForm(today); });
+  document.getElementById("cashLogPrev").addEventListener("click", function(){ shiftAppMonth(-1); renderAll(); });
+  document.getElementById("cashLogNext").addEventListener("click", function(){ shiftAppMonth(1); renderAll(); });
   var crb = document.getElementById("cash_cr");
-  if(crb) crb.addEventListener("click", function(){ crMonth = today.slice(0,7); switchRecordsSub("review"); renderCashReviewView(); window.scrollTo(0,0); });
+  if(crb) crb.addEventListener("click", function(){ setAppMonth(appMonth()); switchRecordsSub("review"); renderAll(); window.scrollTo(0,0); });
   var cho = document.getElementById("cash_ho");
-  if(cho) cho.addEventListener("click", function(){ hoMonth = today.slice(0,7); switchRecordsSub("handover"); renderHandoverView(); window.scrollTo(0,0); });
+  if(cho) cho.addEventListener("click", function(){ setAppMonth(appMonth()); switchRecordsSub("handover"); renderAll(); window.scrollTo(0,0); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-cash]"), function(b){
     b.addEventListener("click", function(){
       var dstr = b.getAttribute("data-cash");
-      selectedDate = dstr; calCursor = parseDate(dstr);
-      renderCalendar(); renderDayPanel();
+      setAppDate(dstr);
+      renderAll();
       openCashDayForm(dstr);
     });
   });
@@ -10387,8 +10523,7 @@ function submitForm(type, item){
     saveExpense();
   }
   closeForm();
-  selectedDate = date;
-  calCursor = parseDate(date);
+  setAppDate(date);
   renderAll();
 }
 
@@ -11018,7 +11153,7 @@ document.addEventListener("DOMContentLoaded", function(){
   document.getElementById("fabAdd").addEventListener("click", openAddChooser);
   document.getElementById("sheetBg").addEventListener("click", function(e){ if(e.target===document.getElementById("sheetBg")) closeForm(); });
 
-  function calShift(n){ calCursor = new Date(calCursor.getFullYear(), calCursor.getMonth()+n, 1); fcMonth = fmtDate(calCursor).slice(0,7); lnMonth = fcMonth; renderCalendar(); renderFixedView(); renderLoansView(); }
+  function calShift(n){ shiftAppMonth(n); renderAll(); }
   document.getElementById("calPrev").addEventListener("click", function(){ calShift(-1); });
   document.getElementById("calNext").addEventListener("click", function(){ calShift(1); });
 
