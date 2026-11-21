@@ -229,3 +229,7 @@ raita and egg days, to edit. The number eating comes from attendance (employed, 
 changed (another meal, a guest). The tab shows each day's cost, the month's cost, plates and cost per plate, by meal
 and by person, and warns about items without a rate. The cost is part of purchases already, so it is not charged
 again; it also appears in each person's "what they cost" and the dashboard's fixed cost card.
+Staff meals can also be added from **Master → Quick add**, one per line: "staff dinner chicken biryani 6 people",
+"staff lunch aloo paratha yesterday", "staff ate egg curry on 4 Nov", "no staff meal today". The note picks the
+closest meal type, lunch / dinner (dinner if not said, the whole day for "no meal" or "both"), the date and the head
+count (from attendance if not said). Undoing or editing the note puts the day back as it was.

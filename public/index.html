@@ -572,9 +572,9 @@
       <div class="card" style="margin-bottom:14px;">
         <h3>Quick add</h3>
         <div class="field" style="margin-bottom:8px;">
-          <textarea id="noteInput" rows="4" placeholder="Milk 40 rs today&#10;Walk-in sales 4200 cash today&#10;Rishabh invested 50000 for rent deposit on 10 Aug&#10;Electricity bill 3200 paid 3 Sept&#10;Ramesh salary 15000 paid 1 Sept"></textarea>
+          <textarea id="noteInput" rows="4" placeholder="Milk 40 rs today&#10;Walk-in sales 4200 cash today&#10;Rishabh invested 50000 for rent deposit on 10 Aug&#10;Electricity bill 3200 paid 3 Sept&#10;Ramesh salary 15000 paid 1 Sept&#10;Staff dinner chicken biryani 6 people"></textarea>
         </div>
-        <div class="notehint">One item per line - sale, purchase, partner investment/withdrawal, or expense (salary, rent, electricity, wifi...). Mention price and date. AI figures out what each line is and files it in the right tab.</div>
+        <div class="notehint">One item per line - sale, purchase, partner investment/withdrawal, expense (salary, rent, electricity, wifi...), or staff meal (“staff lunch aloo paratha”, “staff dinner chicken 6 people”, “no staff meal today”). Mention price and date. AI figures out what each line is and files it in the right tab.</div>
         <div class="sheetbtns" style="margin-top:10px;">
           <button class="btn-save" id="noteAddBtn" style="flex:1;">Add note</button>
         </div>
@@ -11436,7 +11436,7 @@ function openNoteSheet(noteId){
   var html = '<h2 class="serif">Note</h2>';
 
   if(n.status==="processed"){
-    var label = {sale:"Sales", purchase:"Purchases", purchaseBill:"Purchases", investment:"Investments", expense:"Expenses"}[n.filedType] || "Records";
+    var label = {sale:"Sales", purchase:"Purchases", purchaseBill:"Purchases", investment:"Investments", expense:"Expenses", staffmeal:"Staff meals"}[n.filedType] || "Records";
     html += '<div class="backupnote">This note created '+(made.length||1)+' entr'+((made.length||1)===1?"y":"ies")+' in '+label+
             '. Editing the note removes those entries and files it again from your new wording.</div>';
   } else if(n.status==="error"){
@@ -11449,6 +11449,10 @@ function openNoteSheet(noteId){
 
   if(made.length){
     html += '<div class="card" style="margin-bottom:12px;"><h3>What it filed</h3>'+made.map(function(m){
+      if(m.store==="mealDays"){
+        var dp = mealDayPlan(m.date);
+        return '<div class="psrow"><span>Staff meals · '+esc(fmtD(m.date))+' · '+esc(dp.slots.map(function(x){ return x.meal ? x.meal.name+" ("+x.people+")" : "no meal"; }).join(" + "))+'</span><b>'+rupeeP(dp.cost)+'</b></div>';
+      }
       var rec = (m.store==="sales"?sales:m.store==="purchases"?purchases:m.store==="investments"?investments:expenses)
                 .find(function(x){ return x.id===m.id; });
       if(!rec) return '<div class="psrow"><span style="opacity:.6">entry already deleted</span><b>—</b></div>';
@@ -11494,6 +11498,7 @@ function openNoteSheet(noteId){
   if(ob) ob.addEventListener("click", function(){
     var first = made[0];
     if(!first){ appAlert("Nothing left to open — the entries were already deleted."); return; }
+    if(first.store==="mealDays"){ closeForm(); staffDate = first.date; showView("staff"); switchStaffSub("meals"); window.scrollTo(0,0); return; }
     if(first.store==="purchases"){
       var p = purchases.find(function(x){ return x.id===first.id; });
       if(p) return openBillForm(p.billId || p.id, p.date);
@@ -11517,7 +11522,7 @@ function renderNotes(){
 
   if(notes.length===0){ el.innerHTML = '<div class="empty">No notes yet. Jot down what you bought, sold, paid or invested above.</div>'; return; }
   var sorted = notes.slice().sort(function(a,b){ return b.addedAt.localeCompare(a.addedAt); });
-  var filedLabel = {sale:"Sales", purchase:"Purchases", investment:"Investments", expense:"Expenses"};
+  var filedLabel = {sale:"Sales", purchase:"Purchases", investment:"Investments", expense:"Expenses", staffmeal:"Staff meals"};
   el.innerHTML = sorted.map(function(n){
     var badge = n.status==="processed" ? '<span class="badge processed">Added to '+(filedLabel[n.filedType]||"Records")+'</span>'
               : n.status==="error" ? '<span class="badge error">'+esc(n.error||"Could not parse")+'</span>'
@@ -11555,15 +11560,16 @@ var ALLOWED_PURCH_MODES = ["Cash","UPI","Card","Bank Transfer","Credit"];
 
 function buildNotesPrompt(batch, todayStr){
   var lines = batch.map(function(n,i){ return (i+1)+". "+n.text; }).join("\n");
-  return "Today's date is "+todayStr+" (YYYY-MM-DD). Below are "+batch.length+" short notes jotted down by the owner of a small cafe run with a business partner. Each note could be about: a sale to a customer, a purchase from a vendor, a partner putting money into or taking money out of the business, or a running business expense (staff salary, rent, electricity, wifi/internet, maintenance, etc).\n\n"+lines+
-  "\n\nFor EACH note, decide which of these 4 types it is and extract a record. Return ONLY a JSON array (no markdown fences, no extra text), with exactly "+batch.length+" objects in the same order as the notes. Each object must have a \"type\" field set to one of \"sale\", \"purchase\", \"investment\", \"expense\", plus these fields depending on type (leave irrelevant fields as empty string or 0):\n"+
+  return "Today's date is "+todayStr+" (YYYY-MM-DD). Below are "+batch.length+" short notes jotted down by the owner of a small cafe run with a business partner. Each note could be about: a sale to a customer, a purchase from a vendor, a partner putting money into or taking money out of the business, a running business expense (staff salary, rent, electricity, wifi/internet, maintenance, etc), or a STAFF MEAL - food the cafe cooked for its own staff (no money changes hands).\n\n"+lines+
+  "\n\nFor EACH note, decide which of these 5 types it is and extract a record. Return ONLY a JSON array (no markdown fences, no extra text), with exactly "+batch.length+" objects in the same order as the notes. Each object must have a \"type\" field set to one of \"sale\", \"purchase\", \"investment\", \"expense\", \"staffmeal\", plus these fields depending on type (leave irrelevant fields as empty string or 0):\n"+
   '{"type":"sale|purchase|investment|expense","date":"YYYY-MM-DD",'+
   '"customer":"string (sale only, default Walk-in)","desc":"string (sale only)","amount":number,"gst":number,"salemode":"one of '+ALLOWED_SALE_MODES.join("/")+' (sale only)",'+
   '"vendor":"string (purchase only, default Unknown vendor)","items":"purchase only - when the note lists SEVERAL items in one bill, an array of {item, qty, unit, rate} where rate is the PER-UNIT price (divide the listed price by the quantity); use this instead of the single item fields","item":"string (purchase only, single-item notes)","category":"one of '+ALLOWED_CATS.join("/")+' (purchase only)","qty":number,"unit":"string like kg/litre/pcs/packet (purchase only)","rate":number,"purchmode":"one of '+ALLOWED_PURCH_MODES.join("/")+' (purchase only)","purchasedby":"who bought it, purchase only - one of these people if the note names them: '+purchaserOptions().map(function(o){return o.name;}).join("/")+', else empty string","paidby":"purchase only - who paid: one of '+payerOptions().map(function(o){return o.value;}).join("/")+'. Use a partner (personal) only if the note says a partner paid from their own money/pocket; if paid by UPI, card or bank from the cafe use Cafe UPI/bank; otherwise Cafe cash",'+
   '"partner":"one of '+PARTNERS.join("/")+' (investment only, guess the closer name match, default '+(PARTNERS[0]||"Owner")+')","invType":"Investment or Withdrawal (investment only)","purpose":"short string (investment only)","investmode":"Cash/UPI/Bank Transfer (investment only)",'+
   '"expcategory":"Staff Salary/Rent/Electricity/Wifi / Internet/Maintenance/Other (expense only)","description":"string (expense only)","expmode":"Cash/UPI/Card/Bank Transfer (expense only)",'+
+  '"meal":"staffmeal only - the id of the closest meal type from: '+(mealTypes().map(function(m){ return m.id+" = "+m.name; }).join("; ")||"(none set up)")+'; empty string for no meal","slot":"staffmeal only - 1 for lunch / first meal, 2 for dinner / second meal, all for the whole day, or empty if not said","people":"staffmeal only - number of people eating if stated, else 0",'+
   '"unclear":boolean,"reason":"string or empty"}\n'+
-  "Rules: resolve relative dates (today/yesterday/date without year) against today's date above. amount is the total rupee value for sale/investment/expense. For purchase, rate is the price PER UNIT (divide a total price by qty if the note gives a total for multiple units) and qty defaults to 1 if not stated. If a payment mode isn't mentioned, use Cash unless the note says credit/udhaar/later, then use Credit (sale/purchase) - investments and expenses default to Cash if unclear. Staff names being paid (e.g. \"Ramesh salary 15000\") are an expense with category Staff Salary, description being the staff name. Set unclear:true with a short reason only if you genuinely cannot tell what the note is about or its amount.";
+  "Rules: resolve relative dates (today/yesterday/date without year) against today's date above. amount is the total rupee value for sale/investment/expense. For purchase, rate is the price PER UNIT (divide a total price by qty if the note gives a total for multiple units) and qty defaults to 1 if not stated. If a payment mode isn't mentioned, use Cash unless the note says credit/udhaar/later, then use Credit (sale/purchase) - investments and expenses default to Cash if unclear. Staff names being paid (e.g. \"Ramesh salary 15000\") are an expense with category Staff Salary, description being the staff name. Staff meals (e.g. \"staff dinner chicken biryani 6 people\", \"no staff meal today\") have no amount - never mark them unclear for a missing amount. Set unclear:true with a short reason only if you genuinely cannot tell what the note is about or its amount.";
 }
 
 // The AI key lives on the server, never in the app. If the server has no key or
@@ -11716,6 +11722,8 @@ function parseNoteLocally(text, todayStr){
   if(/\b(correct it|correct the|mistakenly|by mistake|wrong date|should be in|shift the|move the|change the date|galti se)\b/.test(t)){
     return { ok:false, reason:"This is an instruction, not a record — use Fix dates below" };
   }
+  var sm = parseStaffMealNote(text, todayStr);
+  if(sm) return sm;
   var date = parseNoteDate(text, todayStr);
   var nums = numbersIn(text);
   var amounts = moneyAmounts(text);
@@ -11828,9 +11836,64 @@ function parseNoteLocally(text, todayStr){
     mode: pMode } };
 }
 
+// ---- staff meals from notes ----
+var MEAL_ALIASES = [[/\b(egg|eggs|anda|ande|anday)\b/,"egg"],[/\b(chicken|murga|murgh)\b/,"chicken"],[/\b(biryani|biriyani)\b/,"biryani"],
+                    [/\b(paratha|parantha|parotha)\b/,"paratha"],[/\b(aloo|alu|potato)\b/,"aloo"],[/\b(sabzi|sabji|veg|vegetables?|dal|daal)\b/,"sabzi"],[/\b(raita|curd|dahi)\b/,"raita"]];
+// The meal type a note means, by words in common with each meal's name.
+function matchMealType(text){
+  var t = " "+String(text||"").toLowerCase()+" ", best = null, bestScore = 0;
+  var keys = MEAL_ALIASES.filter(function(a){ return a[0].test(t); }).map(function(a){ return a[1]; });
+  mealTypes().forEach(function(m){
+    var n = m.name.toLowerCase(), score = 0;
+    keys.forEach(function(k){ if(n.indexOf(k)>=0) score += 3; });
+    n.split(/[^a-z]+/).forEach(function(w){ if(w.length>=4 && t.indexOf(w)>=0) score += 1; });
+    // "chicken" alone should not pick biryani, and biryani should beat plain chicken.
+    if(keys.indexOf("biryani")<0 && n.indexOf("biryani")>=0) score -= 2;
+    if(score > bestScore){ bestScore = score; best = m; }
+  });
+  return best;
+}
+function mealSlotFromText(t){
+  if(/\b(no|nahi|nahin)\b.*\b(meal|khana|food)\b/.test(t) || /\b(both|dono|all day|whole day|full day)\b/.test(t)) return "all";
+  if(/\b(lunch|breakfast|morning|subah|dopahar|afternoon|first meal|meal 1)\b/.test(t)) return 0;
+  if(/\b(dinner|night|raat|shaam|evening|second meal|meal 2)\b/.test(t)) return Math.min(1, mealSlots()-1);
+  if(/\b(third meal|meal 3)\b/.test(t)) return Math.min(2, mealSlots()-1);
+  return null;
+}
+function mealPeopleFromText(t){ var m = t.match(/\b(\d{1,2})\s*(people|persons?|log|logon|staff|members?|plates?|jan|bande)\b/); return m ? +m[1] : null; }
+// Put a meal on a day (one meal slot, or all); remembers what was there so it can be undone.
+function applyStaffMeal(date, slot, mealId, people){
+  var md = Object.assign({}, settings.mealDays||{}), prev = md[date] ? JSON.parse(JSON.stringify(md[date])) : null;
+  var cur = prev ? JSON.parse(JSON.stringify(prev)) : { slots:[] };
+  var idxs = slot==="all" ? Array.apply(null, Array(mealSlots())).map(function(_, i){ return i; }) : [slot];
+  idxs.forEach(function(i){
+    var o = { meal: mealId };
+    if(people!==null && people!==undefined && people!=="" && +people>0) o.people = +people;
+    cur.slots[i] = o;
+  });
+  for(var k=0;k<mealSlots();k++) if(!cur.slots[k]) cur.slots[k] = {};
+  md[date] = cur; settings.mealDays = md;
+  return [{ store:"mealDays", date:date, prev:prev }];
+}
+// Reads a staff meal note on the phone. Returns null if the note isn't about staff meals.
+function parseStaffMealNote(text, todayStr){
+  var t = " "+text.toLowerCase()+" ";
+  if(!/\b(staff|employees?|workers?|karmchari)\b/.test(t) || !/\b(meal|meals|khana|food|lunch|dinner|breakfast|ate|eat|khaya|khana|nashta|biryani|paratha|chicken|egg|anda|sabzi|thali)\b/.test(t)) return null;
+  if(/\b(salary|wages|allowance|paid|bought|purchase|kharida)\b/.test(t)) return null;
+  var date = parseNoteDate(text, todayStr);
+  if(!mealTypes().length) return { ok:false, reason:"Set up staff meals first (Staff → Meals)" };
+  var none = /\b(no|nahi|nahin)\b.*\b(meal|khana|food)\b/.test(t) || /\bskip(ped)?\b/.test(t);
+  var slot = mealSlotFromText(t);
+  var m = none ? null : matchMealType(text);
+  if(!none && !m) return { ok:false, reason:"No meal type like this — add it in Staff → Meals, or use its name" };
+  if(slot===null) slot = none ? "all" : mealSlots()-1;
+  return { ok:true, type:"staffmeal", record:{ date:date, slot:slot, meal: m ? m.id : "", people: mealPeopleFromText(t) } };
+}
+
 // Returns what was created, so a note can be undone or re-processed later.
 function fileParsedRecord(res){
   var made = [];
+  if(res.type==="staffmeal"){ return applyStaffMeal(res.record.date, res.record.slot, res.record.meal, res.record.people); }
   if(res.type==="sale"){ sales.push(res.record); made.push({store:"sales", id:res.record.id}); }
   else if(res.type==="purchase"){ purchases.push(res.record); made.push({store:"purchases", id:res.record.id}); }
   else if(res.type==="purchaseBill"){
@@ -11857,12 +11920,14 @@ function undoNoteRecords(n){
     else if(m.store==="purchases"){ purchases = purchases.filter(function(x){ return x.id!==m.id; }); }
     else if(m.store==="investments"){ investments = investments.filter(function(x){ return x.id!==m.id; }); }
     else if(m.store==="expenses"){ expenses = expenses.filter(function(x){ return x.id!==m.id; }); }
+    else if(m.store==="mealDays"){ var md = Object.assign({}, settings.mealDays||{}); if(m.prev) md[m.date] = m.prev; else delete md[m.date]; settings.mealDays = md; }
     touched[m.store] = true;
   });
   if(touched.sales) saveSales();
   if(touched.purchases) savePurch();
   if(touched.investments) saveInvest();
   if(touched.expenses) saveExpense();
+  if(touched.mealDays) saveSettings();
   n.created = [];
   n.status = "pending";
   n.error = null;
@@ -11882,12 +11947,12 @@ function processNotes(){
   var chunks = [];
   for(var i=0;i<pending.length;i+=8){ chunks.push(pending.slice(i,i+8)); }
 
-  var counts = {sale:0, purchase:0, investment:0, expense:0}, needsReview = 0, usedOffline = false;
+  var counts = {sale:0, purchase:0, investment:0, expense:0, staffmeal:0}, needsReview = 0, usedOffline = false;
 
   function runChunk(idx){
     if(idx>=chunks.length){
       processing = false;
-      var okAll = [saveNotes(), savePurch(), saveSales(), saveInvest(), saveExpense()].every(function(x){ return x !== false; });
+      var okAll = [saveNotes(), savePurch(), saveSales(), saveInvest(), saveExpense(), (counts.staffmeal ? saveSettings() : true)].every(function(x){ return x !== false; });
       renderAll();
       if(!okAll){
         appAlert("Could not save — storage is full. The entries you just processed are NOT stored and will be lost when you close the app.\n\nOpen Backup & restore → Free up space, then process the notes again.");
@@ -11956,6 +12021,17 @@ function processNotes(){
           var imode = ["Cash","UPI","Bank Transfer"].indexOf(r.investmode)>=0 ? r.investmode : "Cash";
           investments.push({ id:track("investments", uid()), date:dateVal, partner:partner, invType:invType, purpose:r.purpose||"Other", amount:+r.amount, mode:imode, notes:"" });
           ok = true; counts.investment++;
+        } else if(r && r.type==="staffmeal"){
+          var local = parseStaffMealNote(note.text, todayStr);
+          var mid = mealTypeById(r.meal) ? r.meal : (local && local.ok ? local.record.meal : "");
+          var none = /\b(no|nahi|nahin|skip)\b/i.test(note.text) && !mid;
+          if(!mealTypes().length){ r.reason = "Set up staff meals first (Staff → Meals)"; }
+          else if(mid || none){
+            var sl = r.slot==="all" ? "all" : (+r.slot>=1 ? Math.min(+r.slot, mealSlots())-1 : (local && local.ok ? local.record.slot : mealSlots()-1));
+            var ppl = +r.people>0 ? +r.people : (local && local.ok ? local.record.people : null);
+            made = applyStaffMeal(dateVal, sl, mid, ppl);
+            ok = true; counts.staffmeal = (counts.staffmeal||0) + 1;
+          } else { r.reason = "No meal type like this — add it in Staff → Meals"; }
         } else if(r && !r.unclear && r.type==="expense" && (r.amount>0)){
           var ecat = EXP_CATS.indexOf(r.expcategory)>=0 ? r.expcategory : "Other";
           var emode = ["Cash","UPI","Card","Bank Transfer"].indexOf(r.expmode)>=0 ? r.expmode : "Cash";
@@ -12002,6 +12078,7 @@ function showAiBanner(counts, needsReview, usedOffline){
   if(counts.purchase) parts.push(counts.purchase+" purchase"+(counts.purchase!==1?"s":""));
   if(counts.investment) parts.push(counts.investment+" investment entr"+(counts.investment!==1?"ies":"y"));
   if(counts.expense) parts.push(counts.expense+" expense"+(counts.expense!==1?"s":""));
+  if(counts.staffmeal) parts.push(counts.staffmeal+" staff meal"+(counts.staffmeal!==1?"s":""));
   var msg = parts.length ? "Added: "+parts.join(", ")+"." : "Nothing could be filed automatically.";
   if(needsReview>0){ msg += " " + needsReview + " note" + (needsReview!==1?"s":"") + " need a closer look - edit or delete them below."; }
   if(usedOffline){ msg += " (Read on this phone, without the AI service - check the filed entries are right.)"; }
