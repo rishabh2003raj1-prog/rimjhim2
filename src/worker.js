@@ -20,6 +20,10 @@
 //   GET    /api/photos/:id
 //   POST   /api/ai  { prompt }                   -> { text }
 //   GET    /api/export?outlet=                   -> full JSON download
+//   GET    /api/audit?outlet=&limit=             -> owner / partner: who changed what
+//   GET    /api/backups?outlet=                  -> owner / partner: daily backups (POST: owner backs up now)
+//   GET    /api/backups/:day?outlet=             -> download one day's backup
+// Logins have a role (partner / manager / chef / billing / full); see POLICY for what each may see and change.
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -37,6 +41,9 @@ const SCHEMA = [
   "CREATE TABLE IF NOT EXISTS login_fails (ip TEXT NOT NULL, ts INTEGER NOT NULL)",
   "CREATE TABLE IF NOT EXISTS meta (k TEXT PRIMARY KEY, v TEXT NOT NULL)",
   "CREATE TABLE IF NOT EXISTS users (login TEXT PRIMARY KEY, outlet TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', salt TEXT NOT NULL, hash TEXT NOT NULL, ver INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL DEFAULT 0)",
+  "CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, outlet TEXT NOT NULL, key TEXT NOT NULL, who TEXT NOT NULL, access TEXT NOT NULL, added INTEGER NOT NULL DEFAULT 0, changed INTEGER NOT NULL DEFAULT 0, removed INTEGER NOT NULL DEFAULT 0)",
+  "CREATE INDEX IF NOT EXISTS audit_ts ON audit (outlet, ts)",
+  "CREATE TABLE IF NOT EXISTS backups (outlet TEXT NOT NULL, day TEXT NOT NULL, idx INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (outlet, day, idx))",
   "CREATE INDEX IF NOT EXISTS kv_updated ON kv (outlet, updated_at)",
   "CREATE INDEX IF NOT EXISTS login_fails_ip ON login_fails (ip, ts)"
 ];
@@ -44,10 +51,13 @@ const SCHEMA = [
 let schemaReady = null;
 function ensureSchema(env) {
   if (!schemaReady) {
-    schemaReady = env.DB.batch(SCHEMA.map((s) => env.DB.prepare(s))).catch((e) => {
-      schemaReady = null;
-      throw e;
-    });
+    schemaReady = env.DB.batch(SCHEMA.map((s) => env.DB.prepare(s)))
+      // Older databases: add the role column once (SQLite has no "ADD COLUMN IF NOT EXISTS").
+      .then(() => env.DB.prepare("ALTER TABLE users ADD COLUMN access TEXT NOT NULL DEFAULT 'full'").run().catch(() => null))
+      .catch((e) => {
+        schemaReady = null;
+        throw e;
+      });
   }
   return schemaReady;
 }
@@ -139,13 +149,156 @@ async function whoIs(req, env) {
   if (!m) return null;
   const exp = +m[3];
   if (exp <= now || m[4] !== await sessionGen(env)) return null;
-  const row = await env.DB.prepare("SELECT login, outlet, name, ver FROM users WHERE login = ?").bind(m[1]).first();
+  const row = await env.DB.prepare("SELECT login, outlet, name, ver, access FROM users WHERE login = ?").bind(m[1]).first();
   if (!row || String(row.ver) !== m[2]) return null;
   if (!safeEqual(got, await storeToken(env, row.login, row.ver, exp, m[4]))) return null;
-  return { role: "store", outlet: row.outlet, login: row.login, name: row.name, exp };
+  return { role: "store", outlet: row.outlet, login: row.login, name: row.name, access: row.access || "full", exp };
 }
+
+// ---- roles and what each can see / change ----
+// owner (the PIN) and "partner" and "full" logins see and change everything in their
+// stores. manager, chef and billing logins get only what their job needs, decided
+// HERE on the server - the app's screens only follow along. A restricted login never
+// receives data it may not see, and when it saves a list the server merges: records it
+// cannot see are kept exactly as they are, so a staff phone can never wipe them.
+const ACCESS_LEVELS = ["partner", "manager", "chef", "billing", "full"];
+const FULL_ACCESS = { owner: true, partner: true, full: true };
+// Pay details are hidden from staff logins.
+const PAY_FIELDS = ["salary", "salaryHistory", "salaryMonths", "houseRent", "foodAllowance", "travelAllowance", "foodBasis", "travelBasis", "allowHistory", "allowMonths", "upi"];
+const STAFF_PUBLIC = ["id", "name", "role", "defaultShift", "status", "joinDate", "leftDate"];
+const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
+const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays"];
+const STAFF_PAY_CATS = ["Staff Salary", "Staff House Rent", "Staff Food Allowance", "Staff Travel Allowance", "Staff Bonus"];
+const CASH_MGR_TYPES = ["counter", "atm", "atmheld", "taken", "pass", "bank"];
+const CASH_BILL_TYPES = ["counter", "atm", "taken"];
+// key -> { manager, chef, billing } rule. No rule = not visible.
+const POLICY = {
+  sales_v1:          { manager: "rw", billing: "append2" },
+  purchases_v1:      { manager: "rw", chef: "append" },
+  bills_v1:          { manager: "rw", chef: "append" },
+  notes_v1:          { manager: "own", chef: "own", billing: "own" },
+  expenses_v1:       { manager: "expenses" },
+  vendors_v1:        { manager: "rw", chef: "r" },
+  menu_v1:           { manager: "rw", chef: "rw", billing: "r" },
+  ingredients_v1:    { manager: "rw", chef: "rw", billing: "r" },
+  dishlog_v1:        { manager: "rw", chef: "rw", billing: "append2" },
+  wastage_v1:        { manager: "rw", chef: "rw" },
+  prepbatches_v1:    { manager: "rw", chef: "rw" },
+  stockaudits_v1:    { manager: "rw", chef: "rw" },
+  cafeuse_v1:        { manager: "rw", chef: "rw" },
+  retail_v1:         { manager: "rw", chef: "r", billing: "r" },
+  retailsales_v1:    { manager: "rw", billing: "append2" },
+  customers_v1:      { manager: "rw", billing: "append" },
+  custpayments_v1:   { manager: "rw", billing: "append" },
+  offers_v1:         { manager: "rw", billing: "r" },
+  creditpayments_v1: { manager: "rw", billing: "append" },
+  assets_v1:         { manager: "rw", chef: "r" },
+  cashdays_v1:       { manager: "rw", billing: "append2" },
+  cashmoves_v1:      { manager: "cashmgr", billing: "cashbill" },
+  staff_v1:          { manager: "staff", chef: "staffpub", billing: "staffpub" },
+  roster_v1:         { manager: "rw", chef: "r", billing: "r" },
+  attendance_v1:     { manager: "rw", chef: "r", billing: "r" },
+  tasks_v1:          { manager: "rw", chef: "r", billing: "r" },
+  conduct_v1:        { manager: "rw" },
+  settings_v1:       { manager: "settings", chef: "settingspub", billing: "settingspub" },
+  partners_v1:       { manager: "r", chef: "r", billing: "r" }
+  // investments, loans, payroll and anything new: owner / partner / full only.
+};
+function accessOf(who) { return who.role === "owner" ? "owner" : (who.access || "full"); }
+function isFull(who) { return !!FULL_ACCESS[accessOf(who)]; }
+function ruleFor(who, key) { if (isFull(who)) return "rw"; const p = POLICY[key]; return (p && p[accessOf(who)]) || null; }
+function pick(o, keys) { const r = {}; keys.forEach((k) => { if (o && o[k] !== undefined) r[k] = o[k]; }); return r; }
+function omit(o, keys) { const r = Object.assign({}, o || {}); keys.forEach((k) => { delete r[k]; }); return r; }
+function istDay(offsetDays) { const d = new Date(Date.now() + TZ_OFFSET_MIN * 60000 + (offsetDays || 0) * 86400000); return d.toISOString().slice(0, 10); }
+function arr(v) { return Array.isArray(v) ? v : []; }
+function idMap(list) { const m = new Map(); arr(list).forEach((r) => { if (r && r.id !== undefined) m.set(String(r.id), r); }); return m; }
+function recentOrOwn(r, who) { return (r && r.by === who.login) || !r || !r.date || r.date >= istDay(-1); }
+function redactPay(x) { return { id: x.id, date: x.date, category: x.category, description: "Staff payment", amount: x.amount, mode: x.mode, paidBy: x.paidBy, redacted: true }; }
+
+// What a login may read of one stored value (undefined = not at all).
+function readView(rule, value, who) {
+  if (!rule) return undefined;
+  switch (rule) {
+    case "rw": case "r": case "append": return value;
+    case "append2": return arr(value).filter((r) => recentOrOwn(r, who));
+    case "own": return arr(value).filter((r) => r && r.by === who.login);
+    case "expenses": return arr(value).map((x) => (x && STAFF_PAY_CATS.indexOf(x.category) >= 0) ? redactPay(x) : x);
+    case "staff": return arr(value).map((x) => omit(x, PAY_FIELDS));
+    case "staffpub": return arr(value).map((x) => pick(x, STAFF_PUBLIC));
+    case "settings": return omit(value, SETTINGS_PRIVATE);
+    case "settingspub": return pick(value, SETTINGS_PUBLIC);
+    case "cashmgr": return arr(value).filter((m) => m && CASH_MGR_TYPES.indexOf(m.type) >= 0);
+    case "cashbill": return arr(value).filter((m) => m && CASH_BILL_TYPES.indexOf(m.type) >= 0);
+  }
+  return undefined;
+}
+// The value to store when a restricted login saves `sent` over `cur`.
+// Returns { value } or { error }.
+function mergeWrite(rule, cur, sent, who) {
+  const stamp = (r) => (r && typeof r === "object" && !r.by) ? Object.assign({}, r, { by: who.login }) : r;
+  switch (rule) {
+    case "rw": {
+      // Keep who added each record, and stamp new ones.
+      if (!Array.isArray(sent)) return { value: sent };
+      const old = idMap(cur);
+      return { value: sent.map((r) => { const o = r && old.get(String(r.id)); return o ? (o.by && !r.by ? Object.assign({}, r, { by: o.by }) : r) : stamp(r); }) };
+    }
+    case "append": case "append2": {
+      // Add new records; change or remove only your own (and only recent ones for append2).
+      const old = idMap(cur), seen = new Set(), out = [];
+      const sentMap = idMap(sent);
+      arr(cur).forEach((r) => {
+        const id = r && String(r.id), mine = r && r.by === who.login, visible = rule === "append" || recentOrOwn(r, who);
+        if (mine && visible) { if (sentMap.has(id)) { out.push(Object.assign({}, sentMap.get(id), { by: who.login })); seen.add(id); } }
+        else { out.push(r); seen.add(id); }
+      });
+      arr(sent).forEach((r) => { const id = r && String(r.id); if (r && !seen.has(id) && !old.has(id)) out.push(Object.assign({}, r, { by: who.login })); });
+      return { value: out };
+    }
+    case "own": {
+      const others = arr(cur).filter((r) => !(r && r.by === who.login));
+      return { value: others.concat(arr(sent).map((r) => Object.assign({}, r, { by: who.login }))) };
+    }
+    case "expenses": {
+      // Staff pay records stay exactly as they are; new ones can't be added from here.
+      const keep = arr(cur).filter((x) => x && STAFF_PAY_CATS.indexOf(x.category) >= 0);
+      const old = idMap(cur);
+      const mine = arr(sent).filter((x) => x && !x.redacted && STAFF_PAY_CATS.indexOf(x.category) < 0)
+        .map((r) => { const o = old.get(String(r.id)); return o ? (o.by && !r.by ? Object.assign({}, r, { by: o.by }) : r) : stamp(r); });
+      return { value: keep.concat(mine) };
+    }
+    case "staff": {
+      // Names, roles, shifts and dates can change; pay details come from the stored record.
+      const old = idMap(cur);
+      return { value: arr(sent).map((r) => { const o = old.get(String(r && r.id)); return Object.assign(omit(r, PAY_FIELDS), o ? pick(o, PAY_FIELDS) : {}); }) };
+    }
+    case "settings": return { value: Object.assign(omit(sent, SETTINGS_PRIVATE), pick(cur, SETTINGS_PRIVATE)) };
+    case "cashmgr": {
+      const keep = arr(cur).filter((m) => !(m && CASH_MGR_TYPES.indexOf(m.type) >= 0));
+      return { value: keep.concat(arr(sent).filter((m) => m && CASH_MGR_TYPES.indexOf(m.type) >= 0).map(stamp)) };
+    }
+  }
+  return { error: "This login can't change this." };
+}
+// Counts of records added / changed / removed, for the activity log.
+function diffCounts(cur, next) {
+  if (!Array.isArray(cur) && !Array.isArray(next)) return { added: 0, changed: JSON.stringify(cur) === JSON.stringify(next) ? 0 : 1, removed: 0 };
+  const a = idMap(cur), b = idMap(next); let added = 0, changed = 0, removed = 0;
+  b.forEach((r, id) => { const o = a.get(id); if (!o) added++; else if (JSON.stringify(o) !== JSON.stringify(r)) changed++; });
+  a.forEach((r, id) => { if (!b.has(id)) removed++; });
+  return { added, changed, removed };
+}
+// For the app: which lists this login can see and how it may change them.
+function permsFor(who) {
+  if (isFull(who)) return { "*": "rw" };
+  const out = {};
+  Object.keys(POLICY).forEach((k) => { const r = ruleFor(who, k); if (r) out[k] = r; });
+  return out;
+}
+
 // The store's display name, from the shared outlet list (store logins can't read that list).
 async function outletNameOf(env, id) {
+  if (id === "*") return "All stores";
   try {
     const cur = await readOne(env, "_global", "outlets_v1");
     const o = Array.isArray(cur.value) ? cur.value.find((x) => x && x.id === id) : null;
@@ -154,8 +307,9 @@ async function outletNameOf(env, id) {
   return id === "rimjhim" ? "Rimjhim Cafe" : id;
 }
 // Store logins only reach their own store's data.
+// A partner login can be for every store ("*"); the store list itself stays read-only for it.
 function canUseOutlet(who, outlet) {
-  return who.role === "owner" || outlet === who.outlet;
+  return who.role === "owner" || outlet === who.outlet || (who.outlet === "*" && (outlet !== "_global" || who.access === "partner"));
 }
 
 async function handleLogin(req, env) {
@@ -173,15 +327,16 @@ async function handleLogin(req, env) {
   const exp = sessionExpiry(Date.now()), gen = await sessionGen(env);
   if (!login || login === "owner" || login === "admin") {
     if (safeEqual(await hmacHex("pin-check", password), await hmacHex("pin-check", env.APP_PIN))) {
-      token = await ownerToken(env, exp, gen); who = { role: "owner", exp };
+      token = await ownerToken(env, exp, gen); who = { role: "owner", exp, access: "owner", perms: { "*": "rw" } };
     }
   } else {
-    const row = await env.DB.prepare("SELECT login, outlet, name, salt, hash, ver FROM users WHERE login = ?").bind(login).first();
+    const row = await env.DB.prepare("SELECT login, outlet, name, salt, hash, ver, access FROM users WHERE login = ?").bind(login).first();
     // Hash even when the login doesn't exist, so timing doesn't reveal valid IDs.
     const h = await hashPassword(password, row ? row.salt : "00000000000000000000000000000000");
     if (row && safeEqual(h, row.hash)) {
       token = await storeToken(env, row.login, row.ver, exp, gen);
-      who = { role: "store", outlet: row.outlet, login: row.login, name: row.name, exp, outletName: await outletNameOf(env, row.outlet) };
+      who = { role: "store", outlet: row.outlet, login: row.login, name: row.name, access: row.access || "full", exp, outletName: await outletNameOf(env, row.outlet) };
+      who.perms = permsFor(who);
     }
   }
   if (!token) {
@@ -198,7 +353,7 @@ async function handleLogin(req, env) {
 // ---- store logins (owner only) ----
 async function handleUsers(req, env, path) {
   if (req.method === "GET" && path === "/api/users") {
-    const rows = await env.DB.prepare("SELECT login, outlet, name, created_at FROM users ORDER BY outlet, login").all();
+    const rows = await env.DB.prepare("SELECT login, outlet, name, access, created_at FROM users ORDER BY outlet, login").all();
     return json({ users: rows.results });
   }
   if (req.method === "POST" && path === "/api/users") {
@@ -206,15 +361,17 @@ async function handleUsers(req, env, path) {
     try { body = await req.json(); } catch (e) { return json({ error: "bad json" }, 400); }
     const login = cleanLogin(body.login), outlet = String(body.outlet || "").trim(), name = String(body.name || "").trim().slice(0, 60);
     const password = body.password === undefined || body.password === null ? "" : String(body.password);
+    const access = ACCESS_LEVELS.indexOf(body.access) >= 0 ? body.access : null;
     if (!validLogin(login)) return json({ error: "Login ID: 3-32 letters, numbers, dot, dash or underscore (not 'owner' or 'admin')." }, 400);
-    if (!/^[a-z0-9_-]{1,40}$/i.test(outlet) || outlet === "_global") return json({ error: "Pick a store." }, 400);
-    const cur = await env.DB.prepare("SELECT login FROM users WHERE login = ?").bind(login).first();
+    if (!(/^[a-z0-9_-]{1,40}$/i.test(outlet) || outlet === "*") || outlet === "_global") return json({ error: "Pick a store." }, 400);
+    if (outlet === "*" && access !== "partner") return json({ error: "Only a partner login can be for all stores." }, 400);
+    const cur = await env.DB.prepare("SELECT login, access FROM users WHERE login = ?").bind(login).first();
     if (!cur && password.length < 6) return json({ error: "Password must be at least 6 characters." }, 400);
     if (password && password.length < 6) return json({ error: "Password must be at least 6 characters." }, 400);
     if (!cur) {
       const salt = newSalt();
-      await env.DB.prepare("INSERT INTO users (login, outlet, name, salt, hash, ver, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)")
-        .bind(login, outlet, name, salt, await hashPassword(password, salt), Date.now()).run();
+      await env.DB.prepare("INSERT INTO users (login, outlet, name, salt, hash, ver, created_at, access) VALUES (?, ?, ?, ?, ?, 1, ?, ?)")
+        .bind(login, outlet, name, salt, await hashPassword(password, salt), Date.now(), access || "manager").run();
     } else if (password) {
       const salt = newSalt();
       await env.DB.prepare("UPDATE users SET outlet = ?, name = ?, salt = ?, hash = ?, ver = ver + 1 WHERE login = ?")
@@ -223,6 +380,10 @@ async function handleUsers(req, env, path) {
       // Moving a login to another store signs it out; a rename alone doesn't.
       await env.DB.prepare("UPDATE users SET name = ?, ver = CASE WHEN outlet = ? THEN ver ELSE ver + 1 END, outlet = ? WHERE login = ?")
         .bind(name, outlet, outlet, login).run();
+    }
+    // A new role signs that login out, so it starts again with the new access.
+    if (cur && access && access !== (cur.access || "full")) {
+      await env.DB.prepare("UPDATE users SET access = ?, ver = ver + 1 WHERE login = ?").bind(access, login).run();
     }
     return json({ ok: true, created: !cur });
   }
@@ -321,7 +482,14 @@ async function handleData(req, env, url, path, who) {
   if (req.method === "GET" && path === "/api/data") {
     const serverTime = Date.now();
     const since = parseInt(url.searchParams.get("since") || "0", 10) || 0;
-    return json({ items: await readAll(env, outlet, since), serverTime });
+    const items = await readAll(env, outlet, since);
+    if (!isFull(who)) {
+      for (const k of Object.keys(items)) {
+        const v = readView(ruleFor(who, k), items[k].value, who);
+        if (v === undefined) delete items[k]; else items[k].value = v;
+      }
+    }
+    return json({ items, serverTime });
   }
 
   const m = path.match(/^\/api\/data\/([^/]+)$/);
@@ -331,13 +499,33 @@ async function handleData(req, env, url, path, who) {
     let body;
     try { body = await req.json(); } catch (e) { return json({ error: "bad json" }, 400); }
     const baseRev = Number.isInteger(body.baseRev) ? body.baseRev : 0;
-    const r = await writeOne(env, outlet, key, body.value === undefined ? null : body.value, baseRev);
+    const sent = body.value === undefined ? null : body.value;
+    const rule = ruleFor(who, key);
+    if (!rule || rule === "r" || rule === "staffpub" || rule === "settingspub" || rule === "cashbill") return json({ error: "This login can't change this.", readOnly: true }, 403);
+    if (outlet === "_global" && who.role !== "owner") return json({ error: "Only the owner can change the store list.", readOnly: true }, 403);
+    const cur = await readOne(env, outlet, key);
+    if (cur.rev !== baseRev) return json({ conflict: true, rev: cur.rev, value: isFull(who) ? cur.value : readView(rule, cur.value, who) }, 409);
+    let value = sent;
+    if (!isFull(who)) {
+      const mw = mergeWrite(rule, cur.value, sent, who);
+      if (mw.error) return json({ error: mw.error, readOnly: true }, 403);
+      value = mw.value;
+    }
+    const r = await writeOne(env, outlet, key, value, baseRev);
     if (r.tooBig) return json({ error: "too big" }, 413);
     if (r.conflict) {
-      const cur = await readOne(env, outlet, key);
-      return json({ conflict: true, rev: cur.rev, value: cur.value }, 409);
+      const now = await readOne(env, outlet, key);
+      return json({ conflict: true, rev: now.rev, value: isFull(who) ? now.value : readView(rule, now.value, who) }, 409);
     }
-    return json({ rev: r.rev });
+    // Who changed what, for the owner's activity log (owner PIN saves are logged without counts).
+    try {
+      const d = who.role === "owner" ? { added: -1, changed: -1, removed: -1 } : diffCounts(cur.value, value);
+      if (d.added || d.changed || d.removed) {
+        await env.DB.prepare("INSERT INTO audit (ts, outlet, key, who, access, added, changed, removed) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+          .bind(Date.now(), outlet, key, who.role === "owner" ? "owner" : who.login, accessOf(who), d.added, d.changed, d.removed).run();
+      }
+    } catch (e) { /* the log never blocks a save */ }
+    return isFull(who) ? json({ rev: r.rev }) : json({ rev: r.rev, value: readView(rule, value, who) });
   }
   return json({ error: "not found" }, 404);
 }
@@ -345,7 +533,7 @@ async function handleData(req, env, url, path, who) {
 async function handleExport(env, url, who) {
   const outlet = outletOf(url);
   if (!outlet) return json({ error: "bad outlet" }, 400);
-  if (!canUseOutlet(who, outlet)) return json({ error: "not allowed" }, 403);
+  if (!canUseOutlet(who, outlet) || !isFull(who)) return json({ error: "not allowed" }, 403);
   const items = await readAll(env, outlet, -1);
   const out = { exportedAt: new Date().toISOString(), outlet };
   for (const k of Object.keys(items)) out[k] = items[k].value;
@@ -491,7 +679,50 @@ async function handleLegacyPush(req, env, url) {
   return json({ ok: true, imported: counts }, 200, LEGACY_CORS);
 }
 
+// ---- daily backups ----
+// Once a day every store's data is copied into the backups table and kept for 14 days,
+// so a bad day (a wrong delete, a lost phone syncing old data) can be undone.
+const BACKUP_DAYS = 14;
+async function dailyBackup(env) {
+  await ensureSchema(env);
+  const day = istDay(0);
+  const outs = await env.DB.prepare("SELECT DISTINCT outlet FROM kv").all();
+  for (const r of outs.results) {
+    const items = await readAll(env, r.outlet, -1);
+    const data = { backupDay: day, outlet: r.outlet };
+    for (const k of Object.keys(items)) data[k] = items[k].value;
+    const text = JSON.stringify(data);
+    const stmts = [env.DB.prepare("DELETE FROM backups WHERE outlet = ? AND day = ?").bind(r.outlet, day)];
+    for (let i = 0, idx = 0; i < text.length; i += CHUNK_CHARS, idx++) {
+      stmts.push(env.DB.prepare("INSERT INTO backups (outlet, day, idx, data) VALUES (?, ?, ?, ?)").bind(r.outlet, day, idx, text.slice(i, i + CHUNK_CHARS)));
+    }
+    await env.DB.batch(stmts);
+  }
+  await env.DB.prepare("DELETE FROM backups WHERE day < ?").bind(istDay(-BACKUP_DAYS)).run();
+  await env.DB.prepare("DELETE FROM audit WHERE ts < ?").bind(Date.now() - 180 * 86400000).run();
+}
+async function handleBackups(req, env, url, path, who) {
+  const outlet = outletOf(url);
+  if (!outlet || !canUseOutlet(who, outlet) || !isFull(who) || accessOf(who) === "full") return json({ error: "Only the owner or a partner can open server backups." }, 403);
+  if (path === "/api/backups") {
+    if (req.method === "POST" && who.role === "owner") { await dailyBackup(env); }
+    const rows = await env.DB.prepare("SELECT day, SUM(LENGTH(data)) AS size FROM backups WHERE outlet = ? GROUP BY day ORDER BY day DESC").bind(outlet).all();
+    return json({ backups: rows.results });
+  }
+  const m = path.match(/^\/api\/backups\/(\d{4}-\d{2}-\d{2})$/);
+  if (m) {
+    const rows = await env.DB.prepare("SELECT data FROM backups WHERE outlet = ? AND day = ? ORDER BY idx").bind(outlet, m[1]).all();
+    if (!rows.results.length) return json({ error: "No backup for that day." }, 404);
+    return new Response(rows.results.map((x) => x.data).join(""), { headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store",
+      "Content-Disposition": `attachment; filename="${outlet}_backup_${m[1]}.json"` } });
+  }
+  return json({ error: "not found" }, 404);
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(dailyBackup(env));
+  },
   async fetch(req, env) {
     const url = new URL(req.url);
     const path = url.pathname;
@@ -500,7 +731,9 @@ export default {
     if (!env.APP_PIN) {
       return json({ error: "The server has no APP_PIN set. Run: npx wrangler secret put APP_PIN" }, 500);
     }
-    const legacy = path === "/api/data" && (req.headers.has("x-api-key") || req.method === "OPTIONS");
+    // The old PIN-header import route reads everything from any website, so it is off
+    // unless the server is deliberately configured with ALLOW_LEGACY_PUSH = "1".
+    const legacy = env.ALLOW_LEGACY_PUSH === "1" && path === "/api/data" && (req.headers.has("x-api-key") || req.method === "OPTIONS");
     if (legacy && req.method === "OPTIONS") return new Response(null, { status: 204, headers: LEGACY_CORS });
     if (legacy) {
       try { await ensureSchema(env); return await handleLegacyPush(req, env, url); }
@@ -518,7 +751,17 @@ export default {
         return json({ ok: true }, 200, { "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
       }
       const who = await whoIs(req, env);
+      if (path === "/api/backups" || path.startsWith("/api/backups/")) return await handleBackups(req, env, url, path, who);
+      if (path === "/api/audit" && req.method === "GET") {
+        if (!isFull(who) || accessOf(who) === "full") return json({ error: "Only the owner or a partner can see the activity log." }, 403);
+        const o = outletOf(url);
+        if (!o || !canUseOutlet(who, o)) return json({ error: "not allowed" }, 403);
+        const lim = Math.min(500, Math.max(1, parseInt(url.searchParams.get("limit") || "200", 10) || 200));
+        const rows = await env.DB.prepare("SELECT ts, key, who, access, added, changed, removed FROM audit WHERE outlet = ? ORDER BY ts DESC LIMIT ?").bind(o, lim).all();
+        return json({ entries: rows.results });
+      }
       if (path === "/api/session") {
+        if (who) { who.access = accessOf(who); who.perms = permsFor(who); }
         if (who && who.role === "store") who.outletName = await outletNameOf(env, who.outlet);
         return json(Object.assign({ ok: !!who, ai: aiAvailable(env) }, who || {}), who ? 200 : 401);
       }

@@ -367,6 +367,7 @@
   .billhist .cur{background:#F2EFE3;} .billhist tr.tot td{border-top:1px solid var(--ink);}
   .notechips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
   .notechip{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:5px 10px;font:inherit;font-size:12px;color:var(--ink);}
+  .roletag{font-size:11px;color:var(--ink-soft);}
   .rpdayhead{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:4px;}
   .recper{margin-bottom:8px;}
 
@@ -423,7 +424,7 @@
       <div class="clock"><b id="clockTime">--:--</b><span id="clockDate">--</span></div>
     </div>
     <div class="row2">
-      <span id="saveStatus">—</span>
+      <span id="saveStatus">—</span> <span id="roleTag" class="roletag"></span>
       <span class="topbtns"><button id="refreshBtn" aria-label="Refresh data">↻ Refresh</button><button id="backupBtn">Backup &amp; restore</button></span>
     </div>
   </div>
@@ -940,6 +941,7 @@ function lsSet(key, val){
     try{ localStorage.setItem(storeKey(key), JSON.stringify(val)); return true; }catch(e){ return false; }
   }
   cloud.values[key] = val;
+  if(!canWriteKey(key)){ markStale(); return true; }   // view-only for this login: kept on screen, never uploaded
   cloud.dirty[key] = true;
   markStale();
   cacheWrite(key);
@@ -1074,10 +1076,25 @@ function pushKey(key, attempt){
       if(r.status===401){ var e = new Error("login"); e.login = true; throw e; }
       if(r.ok && r.data){
         cloud.rev[key] = r.data.rev;
-        cloud.base[key] = snapshot;
-        if(JSON.stringify(cloud.values[key]===undefined ? null : cloud.values[key])===snapshot) delete cloud.dirty[key];
+        var unchanged = JSON.stringify(cloud.values[key]===undefined ? null : cloud.values[key])===snapshot;
+        if(r.data.value!==undefined){
+          // A restricted login: the server merged and returns what this login may see.
+          cloud.base[key] = JSON.stringify(r.data.value);
+          if(unchanged){ setKeyValue(key, r.data.value); delete cloud.dirty[key]; }
+        } else {
+          cloud.base[key] = snapshot;
+          if(unchanged) delete cloud.dirty[key];
+        }
         cacheWrite(key);
         return false;
+      }
+      if(r.status===403 && r.data && r.data.readOnly){
+        // Not allowed for this login: put the server's copy back and stop trying.
+        delete cloud.dirty[key];
+        var back = null; try{ back = cloud.base[key]!==undefined ? JSON.parse(cloud.base[key]) : null; }catch(e){}
+        setKeyValue(key, back===null ? (key===SETTINGS_KEY ? {} : []) : back);
+        cacheWrite(key);
+        return true;
       }
       if(r.status===409 && r.data && attempt < 4){
         var base = null; try{ base = cloud.base[key]!==undefined ? JSON.parse(cloud.base[key]) : null; }catch(e){}
@@ -1261,11 +1278,32 @@ function purgeOutletCaches(keepId){
 }
 // Who is signed in decides which store this phone may open. Returns true when the
 // app is reloading to open the login's own store.
+var DATA_OWNER = "data_owner_v1";
 function applyWho(w){
   if(!w) return false;
   cloud.who = w;
   try{
-    if(w.role==="store"){
+    // A different person signing in on this phone: clear the previous login's offline copy,
+    // so nobody sees data left behind by someone with more access.
+    var me = w.role==="store" ? "u:"+w.login : "owner", prevOwner = localStorage.getItem(DATA_OWNER);
+    if(prevOwner && prevOwner!==me){
+      purgeOutletCaches(null);
+      localStorage.setItem(DATA_OWNER, me);
+      location.reload(); return true;
+    }
+    localStorage.setItem(DATA_OWNER, me);
+    // Lists this login may not see never stay on the phone.
+    SYNC_KEYS.forEach(function(k){
+      if(!canReadKey(k) && (cloud.values[k]!==undefined || cloud.dirty[k])){
+        delete cloud.values[k]; delete cloud.dirty[k]; delete cloud.base[k]; delete cloud.rev[k];
+        try{ localStorage.removeItem(storeKey(k)); localStorage.removeItem(storeKey("__base_"+k)); }catch(e){}
+        setKeyValue(k, k===SETTINGS_KEY ? {} : []);
+      }
+    });
+    if(w.role==="store" && w.outlet==="*"){
+      // A partner for every store opens stores like the owner.
+      localStorage.removeItem(STORE_LOGIN);
+    } else if(w.role==="store"){
       var prev = storeLogin();
       localStorage.setItem(STORE_LOGIN, JSON.stringify({ id:w.outlet, name:w.outletName || w.outlet }));
       if(!prev || prev.id!==w.outlet) purgeOutletCaches(w.outlet);
@@ -1281,6 +1319,47 @@ function applyWho(w){
   return false;
 }
 function isOwner(){ return !cloud.who || cloud.who.role!=="store"; }
+// ---- what this login may see and change (the server enforces it; screens follow) ----
+// owner (PIN), partner and full logins: everything. manager, chef, billing: their job only.
+var RO_RULES = ["r","staffpub","settingspub","cashbill"];
+function myAccess(){ var w = cloud.who; if(!w) return "owner"; return w.role==="store" ? (w.access || "full") : "owner"; }
+function isFullAccess(){ var a = myAccess(); return a==="owner" || a==="partner" || a==="full"; }
+function keyRule(key){ var p = (cloud.who && cloud.who.perms) || { "*":"rw" }; return p["*"] ? "rw" : (p[key] || null); }
+function canReadKey(key){ return !!keyRule(key); }
+function canWriteKey(key){ var r = keyRule(key); return !!r && RO_RULES.indexOf(r) < 0; }
+function canSwitchStores(){ return isOwner() || (cloud.who && cloud.who.outlet==="*"); }
+var ACCESS_LABEL = { owner:"Owner", partner:"Partner", full:"Full access", manager:"Manager", chef:"Chef / kitchen", billing:"Billing / counter" };
+// Each role's screens. Anything not listed is hidden.
+var ROLE_SCREENS = {
+  manager: { nav:["dashboard","calendar","notes","staff","records"], rec:["sales","purchases","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
+  chef:    { nav:["notes","staff","records"], rec:["purchases","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
+  billing: { nav:["notes","staff","records"], rec:["sales","customers","cash"], staff:["roster","attendance","tasks"] }
+};
+function roleScreens(){ return isFullAccess() ? null : (ROLE_SCREENS[myAccess()] || ROLE_SCREENS.billing); }
+// Lists each kind of note writes to, so a note this login can't file is refused clearly.
+var NOTE_TYPE_KEY = { sale:SALES_KEY, purchase:PURCH_KEY, purchaseBill:PURCH_KEY, investment:INVEST_KEY, expense:EXPENSE_KEY, staffmeal:SETTINGS_KEY,
+                      attendance:ATTEND_KEY, udhaarpay:CREDPAY_KEY, loan:LOANS_KEY, billentry:SETTINGS_KEY, advance:EXPENSE_KEY, bill:SETTINGS_KEY };
+function canFileNoteType(t){ var k = NOTE_TYPE_KEY[t]; return !k || canWriteKey(k); }
+function applyRoleUI(){
+  var rs = roleScreens(), full = !rs;
+  function toggle(sel, attr, allowed){
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function(b){ b.style.display = (!allowed || allowed.indexOf(b.getAttribute(attr))>=0) ? "" : "none"; });
+  }
+  toggle("nav.tabs button", "data-v", rs && rs.nav);
+  toggle("#recCtl button", "data-r", rs && rs.rec);
+  toggle("#staffCtl button", "data-s", rs && rs.staff);
+  ["backupBtn","reportsBtn"].forEach(function(id){ var e = document.getElementById(id); if(e) e.style.display = (full || (id==="reportsBtn" && myAccess()==="manager")) ? "" : "none"; });
+  ["moneyPos","investSummary"].forEach(function(id){ var e = document.getElementById(id); if(e && e.parentNode) e.parentNode.style.display = full ? "" : "none"; });
+  // Land on an allowed screen.
+  if(rs){
+    var activeNav = document.querySelector("nav.tabs button.on");
+    if(activeNav && rs.nav.indexOf(activeNav.getAttribute("data-v"))<0) showView(rs.nav[0]);
+    if(rs.rec.indexOf(recSub)<0) switchRecordsSub(rs.rec[0]);
+    if(rs.staff.indexOf(staffSub)<0) switchStaffSub(rs.staff[0]);
+  }
+  var tag = document.getElementById("roleTag");
+  if(tag) tag.textContent = (cloud.who && cloud.who.role==="store") ? (cloud.who.name || cloud.who.login || "")+" · "+(ACCESS_LABEL[myAccess()]||"") : "";
+}
 
 // ---- daily sign-in ----
 // A phone signs in once a day and stays signed in until 4 AM (the server enforces
@@ -1365,7 +1444,7 @@ function signOut(){
   askConfirm("Sign out on this phone? Your data stays safe on the server.", function(){
     api("POST", "/api/logout").then(function(){
       purgeOutletCaches(null);   // every store's offline copy, not just this one
-      try{ localStorage.removeItem(STORE_LOGIN); localStorage.removeItem(OFFLINE_UNLOCK); localStorage.removeItem(SESSION_EXP); }catch(e){}
+      try{ localStorage.removeItem(STORE_LOGIN); localStorage.removeItem(OFFLINE_UNLOCK); localStorage.removeItem(SESSION_EXP); localStorage.removeItem(DATA_OWNER); }catch(e){}
       location.reload();
     }).catch(function(){ appAlert("You need internet to sign out."); });
   });
@@ -1396,7 +1475,7 @@ function syncFromServer(done){
         }
         cloud.rev[key] = it.rev;
         cloud.base[key] = JSON.stringify(it.value);
-      } else if(cloud.values[key]!==undefined && !cloud.dirty[key] && (cloud.rev[key]||0) > 0){
+      } else if(canReadKey(key) && cloud.values[key]!==undefined && !cloud.dirty[key] && (cloud.rev[key]||0) > 0){
         // The server lost something this phone still has - put it back.
         cloud.dirty[key] = true; cloud.rev[key] = 0;
       }
@@ -1518,7 +1597,7 @@ function monthTotalsFor(items){
 }
 
 function openOutletSheet(){
-  if(!isOwner()){ openStoreAccountSheet(); return; }
+  if(!canSwitchStores()){ openStoreAccountSheet(); return; }
   var sheet = document.getElementById("sheet");
   var monthName = new Date().toLocaleDateString("en-IN",{month:"long"});
   var html = '<h2 class="serif">Outlets</h2>';
@@ -1529,14 +1608,24 @@ function openOutletSheet(){
       '<div class="amt sale" id="onet_'+esc(o.id)+'"></div></div>';
   }).join("");
   html += '<div class="card" id="oall" style="margin:4px 0 12px;display:none;"></div>';
+  if(isOwner()){
   html += '<div class="addrow"><button class="sale" id="out_add">+ Add outlet</button><button class="expense" id="out_rename">Rename this outlet</button></div>';
-  html += '<button class="btn-additem" id="out_logins" style="margin-top:8px;">Store logins (separate ID & password for each store)</button>';
+  html += '<button class="btn-additem" id="out_logins" style="margin-top:8px;">Logins &amp; roles (partners, manager, chef, billing)</button>';
+  html += '<button class="btn-additem" id="out_activity" style="margin-top:8px;">Activity — who changed what</button>';
   html += '<button class="btn-additem" id="out_logoutall" style="margin-top:8px;">Sign out all phones now</button>';
   html += '<div class="backupnote" style="margin-top:8px;">Signed in as <b>owner</b> - can open every store. Each phone stays signed in until 4 AM; use “Sign out all phones” if a phone is lost or someone leaves.</div>';
+  } else {
+  html += '<button class="btn-additem" id="out_activity" style="margin-top:8px;">Activity — who changed what</button>';
+  html += '<button class="btn-additem" id="out_account" style="margin-top:8px;">My account (password, sign out)</button>';
+  html += '<div class="backupnote" style="margin-top:8px;">Signed in as <b>'+esc(cloud.who.name || cloud.who.login)+'</b> (partner) - can open every store.</div>';
+  }
   html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="out_close" style="flex:1;">Close</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("out_close").addEventListener("click", closeForm);
+  document.getElementById("out_activity").addEventListener("click", openActivitySheet);
+  if(!isOwner()){ document.getElementById("out_account").addEventListener("click", openStoreAccountSheet); }
+  if(isOwner()){
   document.getElementById("out_add").addEventListener("click", function(){ openOutletForm(null); });
   document.getElementById("out_rename").addEventListener("click", function(){ openOutletForm(OUTLET.id); });
   document.getElementById("out_logins").addEventListener("click", openLoginsSheet);
@@ -1550,6 +1639,7 @@ function openOutletSheet(){
       if(pendingCount() && cloud.state==="ok"){ flushNow(); setTimeout(go, 1500); } else go();
     });
   });
+  }
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-outlet]"), function(r){
     r.addEventListener("click", function(){ switchOutlet(r.getAttribute("data-outlet")); });
   });
@@ -1583,7 +1673,7 @@ function openStoreAccountSheet(){
   var w = cloud.who || {};
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">'+esc(OUTLET.name)+'</h2>';
-  html += '<div class="backupnote">Signed in as <b>'+esc(w.name || w.login || "")+'</b>'+(w.name && w.login ? ' ('+esc(w.login)+')' : '')+' - this login opens only this store. This phone stays signed in until 4 AM.</div>';
+  html += '<div class="backupnote">Signed in as <b>'+esc(w.name || w.login || "")+'</b>'+(w.name && w.login ? ' ('+esc(w.login)+')' : '')+' · '+esc(ACCESS_LABEL[myAccess()]||"")+(w.outlet==="*" ? ' - opens every store.' : ' - this login opens only this store.')+' This phone stays signed in until 4 AM.</div>';
   html += '<button class="btn-additem" id="sa_pw">Change my password</button>';
   html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="sa_close">Close</button><button class="btn-del" id="sa_out">Sign out</button></div>';
   sheet.innerHTML = html;
@@ -1614,27 +1704,39 @@ function openOwnPasswordForm(){
   });
 }
 
-// Owner: a separate login ID & password for each store.
+// Owner: a login for every person, each with a role.
+var ACCESS_HELP = {
+  partner: "Everything, like the owner, for the chosen store or all stores. Can’t manage logins.",
+  manager: "Runs the store: sales, purchases, expenses (not salaries), bills, stock, menu, staff rota and cash count. No partner money, loans, bank or salaries.",
+  chef: "Kitchen: menu & recipes, stock, purchases from the market, assets, rota and staff meals.",
+  billing: "Counter: adds sales, udhaar and customers, counts the cash (without seeing the expected amount). Sees only the last two days.",
+  full: "Older login with full access to its store. Pick a role to limit it."
+};
 function openLoginsSheet(){
   var sheet = document.getElementById("sheet");
-  sheet.innerHTML = '<h2 class="serif">Store logins</h2><div class="backupnote">Loading…</div>';
+  sheet.innerHTML = '<h2 class="serif">Logins &amp; roles</h2><div class="backupnote">Loading…</div>';
   document.getElementById("sheetBg").classList.add("on");
   api("GET", "/api/users").then(function(r){
-    if(!r.ok){ sheet.innerHTML = '<h2 class="serif">Store logins</h2><div class="err" style="display:block;">'+esc((r.data && r.data.error) || "Couldn't load logins.")+'</div><div class="sheetbtns"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
+    if(!r.ok){ sheet.innerHTML = '<h2 class="serif">Logins &amp; roles</h2><div class="err" style="display:block;">'+esc((r.data && r.data.error) || "Couldn't load logins.")+'</div><div class="sheetbtns"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
       document.getElementById("lg_back").addEventListener("click", openOutletSheet); return; }
     var users = r.data.users || [];
-    var html = '<h2 class="serif">Store logins</h2>';
-    html += '<div class="backupnote">Each login opens only its own store, with its own sales, stock, staff and cash. The owner PIN still opens every store. Give each store manager their own login.</div>';
+    function row(u){ var a = u.access || "full";
+      return '<div class="psrow" data-lgedit="'+esc(u.login)+'" style="cursor:pointer;"><span><b>'+esc(u.login)+'</b>'+(u.name?' · '+esc(u.name):'')+'<br><span class="pill'+(a==="full"?' bad':'')+'">'+esc(ACCESS_LABEL[a]||a)+'</span></span><b class="muted" style="font-weight:500;">Edit ›</b></div>'; }
+    var html = '<h2 class="serif">Logins &amp; roles</h2>';
+    html += '<div class="backupnote">Give every person their own login, so you can see who did what and remove anyone’s access in one tap. The server only sends each login what its role allows — staff phones never receive partner money, loans, bank or salaries.</div>';
+    var olds = users.filter(function(u){ return (u.access||"full")==="full"; });
+    if(olds.length) html += '<div class="attmwarn">'+olds.length+' older login'+(olds.length!==1?'s have':' has')+' full access to '+(olds.length!==1?'their store':'its store')+'. Tap '+(olds.length!==1?'each':'it')+' and pick a role (manager, chef or billing) to limit what it sees.</div>';
+    var partners = users.filter(function(u){ return u.outlet==="*"; });
+    html += '<div class="card" style="margin-bottom:10px;"><h3>Partners · all stores</h3>'+(partners.length ? partners.map(row).join("") : '<div class="backupnote" style="margin:0;">No partner logins yet. Partners can stop sharing the owner PIN and get their own.</div>')+
+            '<button class="btn-additem" data-lgadd="*" style="margin-top:8px;">+ Add a partner login</button></div>';
     outletList.forEach(function(o){
       var mine = users.filter(function(u){ return u.outlet===o.id; });
       html += '<div class="card" style="margin-bottom:10px;"><h3>'+esc(o.name)+'</h3>'+
-        (mine.length ? mine.map(function(u){
-          return '<div class="psrow" data-lgedit="'+esc(u.login)+'" style="cursor:pointer;"><span><b>'+esc(u.login)+'</b>'+(u.name?' · '+esc(u.name):'')+'</span><b class="muted" style="font-weight:500;">Edit ›</b></div>';
-        }).join("") : '<div class="backupnote" style="margin:0;">No login yet - only the owner can open this store.</div>')+
+        (mine.length ? mine.map(row).join("") : '<div class="backupnote" style="margin:0;">No login yet - only the owner can open this store.</div>')+
         '<button class="btn-additem" data-lgadd="'+esc(o.id)+'" style="margin-top:8px;">+ Add login for '+esc(o.name)+'</button></div>';
     });
-    var orphan = users.filter(function(u){ return !outletList.some(function(o){ return o.id===u.outlet; }); });
-    if(orphan.length) html += '<div class="card"><h3>Store no longer listed</h3>'+orphan.map(function(u){ return '<div class="psrow" data-lgedit="'+esc(u.login)+'" style="cursor:pointer;"><span>'+esc(u.login)+'</span><b class="muted">Edit ›</b></div>'; }).join("")+'</div>';
+    var orphan = users.filter(function(u){ return u.outlet!=="*" && !outletList.some(function(o){ return o.id===u.outlet; }); });
+    if(orphan.length) html += '<div class="card"><h3>Store no longer listed</h3>'+orphan.map(row).join("")+'</div>';
     html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
     sheet.innerHTML = html;
     document.getElementById("lg_back").addEventListener("click", openOutletSheet);
@@ -1643,20 +1745,29 @@ function openLoginsSheet(){
       b.addEventListener("click", function(){ openLoginForm(users.find(function(u){ return u.login===b.getAttribute("data-lgedit"); })); });
     });
   }).catch(function(){
-    sheet.innerHTML = '<h2 class="serif">Store logins</h2><div class="err" style="display:block;">You need internet to manage logins.</div><div class="sheetbtns"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
+    sheet.innerHTML = '<h2 class="serif">Logins &amp; roles</h2><div class="err" style="display:block;">You need internet to manage logins.</div><div class="sheetbtns"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
     document.getElementById("lg_back").addEventListener("click", openOutletSheet);
   });
 }
 function openLoginForm(u, outletId){
   var sheet = document.getElementById("sheet");
-  var html = '<h2 class="serif">'+(u ? "Edit login" : "New store login")+'</h2>';
-  html += '<div class="field"><label>Login ID</label><input type="text" id="lf_id" autocapitalize="none" spellcheck="false" value="'+esc(u?u.login:"")+'" '+(u?'readonly style="opacity:.7;"':'placeholder="e.g. station-road"')+'></div>';
-  html += '<div class="field"><label>Name (who uses it)</label><input type="text" id="lf_name" value="'+esc(u?u.name:"")+'" placeholder="e.g. Manager - Ravi"></div>';
-  html += '<div class="field"><label>Store</label><select id="lf_outlet">'+outletList.map(function(o){ return '<option value="'+esc(o.id)+'"'+((u?u.outlet:outletId)===o.id?" selected":"")+'>'+esc(o.name)+'</option>'; }).join("")+'</select></div>';
+  var curAccess = u ? (u.access || "full") : (outletId==="*" ? "partner" : "manager");
+  var curOutlet = u ? u.outlet : outletId;
+  var html = '<h2 class="serif">'+(u ? "Edit login" : "New login")+'</h2>';
+  html += '<div class="field"><label>Login ID</label><input type="text" id="lf_id" autocapitalize="none" spellcheck="false" value="'+esc(u?u.login:"")+'" '+(u?'readonly style="opacity:.7;"':'placeholder="e.g. ravi-manager"')+'></div>';
+  html += '<div class="field"><label>Name (who uses it)</label><input type="text" id="lf_name" value="'+esc(u?u.name:"")+'" placeholder="e.g. Ravi"></div>';
+  html += '<div class="field"><label>Role</label><select id="lf_access">'+["partner","manager","chef","billing"].concat(curAccess==="full"?["full"]:[]).map(function(a){
+            return '<option value="'+a+'"'+(a===curAccess?" selected":"")+'>'+esc(ACCESS_LABEL[a])+'</option>'; }).join("")+'</select></div>';
+  html += '<div class="backupnote" id="lf_help" style="margin-top:-4px;"></div>';
+  html += '<div class="field"><label>Store</label><select id="lf_outlet">'+'<option value="*"'+(curOutlet==="*"?" selected":"")+'>All stores (partners only)</option>'+
+          outletList.map(function(o){ return '<option value="'+esc(o.id)+'"'+(curOutlet===o.id?" selected":"")+'>'+esc(o.name)+'</option>'; }).join("")+'</select></div>';
   html += '<div class="field"><label>'+(u ? "New password (leave blank to keep the current one)" : "Password (6+ characters)")+'</label><input type="text" id="lf_pw" autocomplete="new-password" autocapitalize="none" spellcheck="false"></div>';
-  html += '<div class="backupnote">Login IDs use small letters, numbers, dot, dash or underscore. A new password or store signs this login out on every phone.</div>';
+  html += '<div class="backupnote">Login IDs use small letters, numbers, dot, dash or underscore. A new password, role or store signs this login out on every phone.</div>';
   html += '<div class="err" id="lf_err"></div><div class="sheetbtns"><button class="btn-cancel" id="lf_back">Back</button>'+(u?'<button class="btn-del" id="lf_del">Delete</button>':'')+'<button class="btn-save" id="lf_save">Save</button></div>';
   sheet.innerHTML = html;
+  function help(){ var a = document.getElementById("lf_access").value; document.getElementById("lf_help").textContent = ACCESS_HELP[a] || "";
+    var os = document.getElementById("lf_outlet"); if(a!=="partner" && os.value==="*") os.value = (outletList[0]||{}).id || "rimjhim"; }
+  document.getElementById("lf_access").addEventListener("change", help); help();
   document.getElementById("lf_back").addEventListener("click", openLoginsSheet);
   if(u) document.getElementById("lf_del").addEventListener("click", function(){
     askConfirm("Delete the login "+u.login+"? Phones using it are signed out straight away.", function(){
@@ -1666,16 +1777,50 @@ function openLoginForm(u, outletId){
   document.getElementById("lf_save").addEventListener("click", function(){
     var err = document.getElementById("lf_err"); err.style.display = "none";
     var id = document.getElementById("lf_id").value.trim().toLowerCase(), pw = document.getElementById("lf_pw").value;
+    var access = document.getElementById("lf_access").value, outlet = document.getElementById("lf_outlet").value;
     if(!/^[a-z0-9._-]{3,32}$/.test(id) || id==="owner" || id==="admin"){ err.textContent = "Login ID: 3-32 small letters, numbers, dot, dash or underscore (not owner/admin)."; err.style.display = "block"; return; }
     if((!u || pw) && pw.length < 6){ err.textContent = "Password must be at least 6 characters."; err.style.display = "block"; return; }
+    if(outlet==="*" && access!=="partner"){ err.textContent = "Only a partner login can be for all stores."; err.style.display = "block"; return; }
     var btn = document.getElementById("lf_save"); btn.disabled = true;
-    api("POST", "/api/users", { login:id, name:document.getElementById("lf_name").value.trim(), outlet:document.getElementById("lf_outlet").value, password: pw || null }).then(function(r){
+    api("POST", "/api/users", { login:id, name:document.getElementById("lf_name").value.trim(), outlet:outlet, access:access, password: pw || null }).then(function(r){
       btn.disabled = false;
       if(!r.ok){ err.textContent = (r.data && r.data.error) || "Couldn't save."; err.style.display = "block"; return; }
-      if(!u && r.data && r.data.created===false){ /* an existing ID was updated */ }
       openLoginsSheet();
-      if(!u || pw) appAlert("Saved. Login ID: "+id+(pw ? "\nPassword: "+pw+"\n\nShare these with the store manager." : ""));
+      if(!u || pw) appAlert("Saved. Login ID: "+id+(pw ? "\nPassword: "+pw+"\nRole: "+(ACCESS_LABEL[access]||access)+"\n\nShare these only with that person." : ""));
     }).catch(function(){ btn.disabled = false; err.textContent = "You need internet to save logins."; err.style.display = "block"; });
+  });
+}
+
+// Owner / partner: who changed what, and when.
+var AUDIT_KEY_LABEL = { sales_v1:"Sales", purchases_v1:"Purchases", expenses_v1:"Expenses", investments_v1:"Partner money", loans_v1:"Loans", payroll_v1:"Salary settlements",
+  cashdays_v1:"Cash count", cashmoves_v1:"Cash / bank moves", staff_v1:"Staff", attendance_v1:"Attendance", roster_v1:"Roster", menu_v1:"Menu", ingredients_v1:"Stock items",
+  customers_v1:"Customers", creditpayments_v1:"Udhaar payments", settings_v1:"Settings", notes_v1:"Notes", bills_v1:"Bill photos", dishlog_v1:"Dishes / meals", vendors_v1:"Vendors",
+  assets_v1:"Assets", tasks_v1:"Tasks", wastage_v1:"Wastage", partners_v1:"Partners" };
+function openActivitySheet(){
+  var sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<h2 class="serif">Activity</h2><div class="backupnote">Loading…</div>';
+  document.getElementById("sheetBg").classList.add("on");
+  api("GET", "/api/audit"+API_Q+"&limit=300").then(function(r){
+    var html = '<h2 class="serif">Activity · '+esc(OUTLET.name)+'</h2>';
+    if(!r.ok){ html += '<div class="err" style="display:block;">'+esc((r.data && r.data.error) || "Couldn't load the activity log.")+'</div>'; }
+    else {
+      var rows = r.data.entries || [];
+      html += '<div class="backupnote">Every save, newest first: who, what, and how many entries were added, changed or removed. Owner PIN saves show without counts.</div>';
+      if(!rows.length) html += '<div class="empty">Nothing yet.</div>';
+      var lastDay = null;
+      rows.forEach(function(e){
+        var d = new Date(e.ts), day = fmtDate(d);
+        if(day!==lastDay){ html += '<div class="daygroup">'+esc(d.toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"}))+'</div>'; lastDay = day; }
+        var bits = e.added<0 ? "saved" : [e.added?e.added+" added":"", e.changed?e.changed+" changed":"", e.removed?'<span class="bad">'+e.removed+" removed</span>":""].filter(Boolean).join(" · ");
+        html += '<div class="psrow"><span><b>'+esc(e.who)+'</b> <span class="muted">('+esc(ACCESS_LABEL[e.access]||e.access)+')</span> · '+esc(AUDIT_KEY_LABEL[e.key]||e.key)+'<br><span class="muted" style="font-size:11.5px;">'+d.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})+'</span></span><b style="font-weight:500;font-size:12.5px;text-align:right;">'+bits+'</b></div>';
+      });
+    }
+    html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="ac_back" style="flex:1;">Back</button></div>';
+    sheet.innerHTML = html;
+    document.getElementById("ac_back").addEventListener("click", openOutletSheet);
+  }).catch(function(){
+    sheet.innerHTML = '<h2 class="serif">Activity</h2><div class="err" style="display:block;">You need internet to see the activity log.</div><div class="sheetbtns"><button class="btn-cancel" id="ac_back" style="flex:1;">Back</button></div>';
+    document.getElementById("ac_back").addEventListener("click", openOutletSheet);
   });
 }
 
@@ -1930,6 +2075,7 @@ function markStale(){
 
 function renderAll(){
   viewsStale = false;
+  try{ applyRoleUI(); }catch(e){}
   lastRenderDay = fmtDate(new Date());
   refreshCats();
   renderDashboard();
@@ -2541,6 +2687,7 @@ function renderFixedView(){
   html += '</div>';
   html += '<button class="btn-additem" id="fc_setup" style="margin:-4px 0 12px;">Manage bills (add, remove, fixed or variable, due dates)</button>';
 
+  if(isFullAccess()){
   html += '<div class="card" style="margin-bottom:12px;"><h3>Staff salary &amp; allowances</h3>';
   if(!sm.staffRows.length) html += '<div class="backupnote" style="margin:0;">'+(staff.length ? 'Nobody was employed this month (going by joining dates in the Staff tab).' : 'No staff added yet (Staff tab).')+'</div>';
   sm.staffRows.forEach(function(r){
@@ -2555,6 +2702,7 @@ function renderFixedView(){
             '<button class="btn-additem" data-bsalview="'+r.st.id+'">Salary details</button></div></div>';
   });
   html += '</div>';
+  }
 
   // Break-even for the month
   var mDates = datesBetween(fcMonth+"-01", fmtDate(new Date(first.getFullYear(), first.getMonth()+1, 0)));
@@ -3942,6 +4090,18 @@ function openDataCheck(){
   });
 }
 
+// The server copies every store once a day (kept 14 days). Download any day as a file.
+function loadServerBackups(box){
+  api("GET", "/api/backups"+API_Q).then(function(r){
+    var list = (r.ok && r.data && r.data.backups) || [];
+    box.innerHTML = '<h3>Daily server backups</h3><div class="backupnote" style="margin:0 0 6px;">The server copies all of '+esc(OUTLET.name)+'’s data every night and keeps 14 days. Download a day to keep it or to restore from it.</div>'+
+      (list.length ? list.map(function(b){ return '<div class="psrow"><span>'+esc(fmtDP(b.day))+' <span class="muted">· '+Math.max(1, Math.round((b.size||0)/1024))+' KB</span></span><b><a href="/api/backups/'+esc(b.day)+API_Q+'" download>Download</a></b></div>'; }).join("")
+                   : '<div class="backupnote" style="margin:0;">No backup yet — the first one is made tonight.</div>')+
+      (isOwner() ? '<button class="btn-additem" id="bk_now" style="margin-top:8px;">Back up now</button>' : '');
+    var bn = document.getElementById("bk_now");
+    if(bn) bn.addEventListener("click", function(){ bn.disabled = true; bn.textContent = "Backing up…"; api("POST", "/api/backups"+API_Q).then(function(){ loadServerBackups(box); }).catch(function(){ bn.disabled = false; bn.textContent = "Back up now"; }); });
+  }).catch(function(){ box.innerHTML = '<h3>Daily server backups</h3><div class="backupnote" style="margin:0;">You need internet to see server backups.</div>'; });
+}
 function openBackupSheet(){
   var sheet = document.getElementById("sheet");
   var totalEntries = sales.length+purchases.length+investments.length+expenses.length;
@@ -3955,6 +4115,7 @@ function openBackupSheet(){
     '<div class="psrow"><span>Entries</span><b>'+totalEntries+' records · '+notes.length+' notes</b></div>'+
     '</div>';
   html += '<div class="sheetbtns" style="margin-bottom:10px;"><button class="btn-cancel" id="bk_check" style="flex:1;">Check data — what the server has</button></div>';
+  if(isFullAccess() && myAccess()!=="full") html += '<div class="card" style="margin-bottom:14px;" id="bk_server"><h3>Daily server backups</h3><div class="backupnote" style="margin:0;">Loading…</div></div>';
   html += '<div class="backupnote">A backup file is still worth keeping now and then (monthly is plenty) — Google Drive, email or WhatsApp to yourself.</div>';
   html += '<div class="sheetbtns" style="margin-top:4px;"><button class="btn-save" id="bk_export" style="flex:1;">Download backup (.json)</button></div>';
   html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="bk_import" style="flex:1;">Restore from backup file</button></div>';
@@ -3967,6 +4128,8 @@ function openBackupSheet(){
   document.getElementById("bk_export").addEventListener("click", exportBackup);
   document.getElementById("bk_import").addEventListener("click", function(){ document.getElementById("restoreFile").click(); });
   document.getElementById("bk_paste").addEventListener("click", openPasteRestore);
+  var bks = document.getElementById("bk_server");
+  if(bks) loadServerBackups(bks);
   document.getElementById("bk_check").addEventListener("click", openDataCheck);
   document.getElementById("bk_signout").addEventListener("click", signOut);
 }
@@ -6640,7 +6803,7 @@ function openReportsSheet(){
 
   html += '<label class="billlabel">Include</label>';
   html += '<div class="addrow"><button class="sale" id="rpAll">Select all</button><button class="expense" id="rpNone">Clear</button></div>';
-  html += REPORT_SECTIONS.map(function(sct){
+  html += REPORT_SECTIONS.filter(function(sct){ return isFullAccess() || ["invest","funding","staff"].indexOf(sct.id)<0; }).map(function(sct){
     var on = !!reportState.sections[sct.id];
     return '<button class="rptoggle'+(on?" on":"")+'" data-sec="'+sct.id+'"><span class="rpbox">'+(on?"✓":"")+'</span>'+esc(sct.label)+'</button>';
   }).join("");
@@ -9264,7 +9427,11 @@ function openCashDayForm(dateStr){
   var html = '<h2 class="serif">Counter cash</h2>';
   html += '<div class="backupnote">'+parseDate(dateStr).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})+'</div>';
 
-  html += '<div class="card" style="margin-bottom:12px;">';
+  // Billing counts "blind": the expected amount isn't shown, so the count is honest; the
+  // manager and owner see the difference.
+  var blind = myAccess()==="billing";
+  if(blind) html += '<div class="backupnote">Count all the cash in the counter and enter it below. The manager checks it against the sales.</div>';
+  html += '<div class="card" style="margin-bottom:12px;'+(blind?'display:none;':'')+'">';
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(dateStr))+'</b></div>';
   html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn)+'</b></div>';
   if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
@@ -9344,6 +9511,7 @@ function openCashDayForm(dateStr){
     saveCashDays();
     var diff = counted - expectedCash(dateStr);
     closeForm(); renderAll();
+    if(myAccess()==="billing"){ appAlert("Saved. Thank you."); return; }
     if(Math.abs(diff) >= 1){
       appAlert("Recorded. The counter is " + rupee(Math.abs(diff)) + (diff<0 ? " short" : " over") + " against what was expected — worth checking with " + incharge + " while it's fresh.");
     }
@@ -10562,8 +10730,8 @@ function renderTeamView(){
       var left = s.status==="Left";
       return '<div class="entry staffcard'+(left?" gone":"")+'" data-staff="'+s.id+'">'+
         '<div><div class="who">'+esc(s.name)+(left?' <span class="billclip">(left)</span>':'')+'</div>'+
-        '<div class="meta">'+esc(s.role)+' · '+esc(/shift/i.test(s.defaultShift||"") ? s.defaultShift : (s.defaultShift||"—")+" shift")+' · '+rupee(s.salary||0)+'/mo'+
-        (allowanceLabel(s) ? ' + '+esc(allowanceLabel(s)) : '')+'</div>'+
+        '<div class="meta">'+esc(s.role)+' · '+esc(/shift/i.test(s.defaultShift||"") ? s.defaultShift : (s.defaultShift||"—")+" shift")+(isFullAccess() ? ' · '+rupee(s.salary||0)+'/mo'+
+        (allowanceLabel(s) ? ' + '+esc(allowanceLabel(s)) : '') : '')+'</div>'+
         (perf.warns>0?'<div class="meta warnline">'+perf.warns+' warning'+(perf.warns!==1?'s':'')+' this month</div>':'')+
         '</div>'+
         '<div class="scorebox '+band.cls+'"><b>'+(perf.score===null?"—":perf.score)+'</b><span>'+band.label+'</span></div>'+
@@ -11046,14 +11214,16 @@ function openStaffForm(staffId){
   html += '<div class="field"><label>Name</label><input type="text" id="s_name" placeholder="Full name" value="'+esc(s?s.name:"")+'"></div>';
   html += '<div class="field two"><div><label>Role</label><select id="s_role">'+STAFF_ROLES.map(function(r){ return '<option '+(s&&s.role===r?"selected":"")+'>'+r+'</option>'; }).join("")+'</select></div>';
   html += '<div><label>Usual shift</label><select id="s_shift">'+shiftList().map(function(sh){ return sh.name; }).concat(shiftList().length>1 ? ["Both shifts"] : []).concat(["Flexible"]).map(function(n){ return '<option '+(s&&s.defaultShift===n?"selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div></div>';
-  html += '<div class="field two"><div><label>Monthly salary (₹)</label><input type="number" inputmode="decimal" id="s_salary" value="'+(s?s.salary:"")+'"></div>';
+  html += '<div class="field two"><div'+(isFullAccess()?'':' style="display:none;"')+'><label>Monthly salary (₹)</label><input type="number" inputmode="decimal" id="s_salary" value="'+(s?s.salary:"")+'"></div>';
   html += '<div><label>Phone</label><input type="text" inputmode="tel" id="s_phone" value="'+esc(s?s.phone:"")+'"></div></div>';
   var acNow = s ? allowConfig(s, fmtDate(new Date()).slice(0,7)) : { houseRent:0, foodAllowance:0, travelAllowance:0, foodBasis:"month", travelBasis:"month" };
   function basisSel(id, v){ return '<select id="'+id+'"><option value="month"'+(v!=="day"?" selected":"")+'>per month</option><option value="day"'+(v==="day"?" selected":"")+'>per day worked</option></select>'; }
+  html += '<div'+(isFullAccess()?'':' style="display:none;"')+'>';
   html += '<div class="field"><label>House rent allowance (₹ per month)</label><input type="number" inputmode="decimal" id="s_rent" value="'+(acNow.houseRent||"")+'"></div>';
   html += '<div class="field two"><div><label>Food allowance (₹)</label><input type="number" inputmode="decimal" id="s_food" value="'+(acNow.foodAllowance||"")+'"></div><div><label>Food is paid</label>'+basisSel("s_foodb", acNow.foodBasis)+'</div></div>';
   html += '<div class="field two"><div><label>Travel allowance (₹)</label><input type="number" inputmode="decimal" id="s_travel" value="'+(acNow.travelAllowance||"")+'"></div><div><label>Travel is paid</label>'+basisSel("s_travelb", acNow.travelBasis)+'</div></div>';
   html += '<div class="backupnote" style="margin-top:-4px;">Cash allowances paid on top of salary. “Per day worked” pays the amount for every day not marked absent or on leave. Changes here apply from this month on; to change one month only, use Staff → Salary → Edit month. Meals cooked in the cafe are tracked separately under Staff meals.</div>';
+  html += '</div>';
   html += '<div class="field two"><div><label>Joined on</label><input type="date" id="s_join" value="'+(s&&s.joinDate?s.joinDate:fmtDate(new Date()))+'"></div>';
   html += '<div><label>Status</label><select id="s_status"><option '+(s&&s.status==="Active"?"selected":"")+'>Active</option><option '+(s&&s.status==="Left"?"selected":"")+'>Left</option></select></div></div>';
   html += '<div class="field" id="s_leftwrap" style="display:'+(s&&s.status==="Left"?"block":"none")+';"><label>Left on</label><input type="date" id="s_left" value="'+(s&&s.leftDate?s.leftDate:fmtDate(new Date()))+'"></div>';
@@ -11088,6 +11258,7 @@ function openStaffForm(staffId){
     var name = document.getElementById("s_name").value.trim();
     if(!name){ errEl.textContent = "Enter a name."; errEl.style.display="block"; return; }
     var sal = parseFloat(document.getElementById("s_salary").value);
+    if(!isFullAccess()) sal = s ? (+s.salary||0) : 0;   // pay is set by the owner; the server keeps it anyway
     if(isNaN(sal) || sal<0){ errEl.textContent = "Enter the monthly salary."; errEl.style.display="block"; return; }
     var rec = { id: s?s.id:uid(), name:name, role:document.getElementById("s_role").value,
                 defaultShift:document.getElementById("s_shift").value, salary:sal,
@@ -11112,7 +11283,7 @@ function openStaffForm(staffId){
       var merged = Object.assign({}, s, rec), thisM = fmtDate(new Date()).slice(0,7);
       if(sal !== (+s.salary||0)){ merged.salary = s.salary; setSalaryFrom(merged, thisM, sal); }
       // New allowances apply from this month; earlier months keep theirs.
-      var oldAc = allowConfig(s, thisM), changed = ALLOW_KEYS.some(function(k){ return String(oldAc[k]) !== String(rec[k]); });
+      var oldAc = allowConfig(s, thisM), changed = isFullAccess() && ALLOW_KEYS.some(function(k){ return String(oldAc[k]) !== String(rec[k]); });
       ALLOW_KEYS.forEach(function(k){ merged[k] = s[k]; });
       if(changed){ var nv = {}; ALLOW_KEYS.forEach(function(k){ nv[k] = rec[k]; }); setAllowFrom(merged, thisM, nv); }
       staff[staff.findIndex(function(x){return x.id===s.id;})] = merged;
@@ -11137,7 +11308,7 @@ function openStaffProfile(staffId){
 
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">'+esc(s.name)+'</h2>';
-  html += '<div class="backupnote">'+esc(s.role)+' · '+esc(/shift/i.test(s.defaultShift||"") ? s.defaultShift : (s.defaultShift||"—")+" shift")+' · '+rupee(s.salary||0)+'/month'+(s.phone?' · '+esc(s.phone):'')+'</div>';
+  html += '<div class="backupnote">'+esc(s.role)+' · '+esc(/shift/i.test(s.defaultShift||"") ? s.defaultShift : (s.defaultShift||"—")+" shift")+(isFullAccess() ? ' · '+rupee(s.salary||0)+'/month' : '')+(s.phone?' · '+esc(s.phone):'')+'</div>';
 
   html += '<div class="profscore '+band.cls+'"><div><b>'+(perf.score===null?"—":perf.score+"/100")+'</b><span>'+band.label+' · '+monthName+'</span></div></div>';
 
@@ -11149,6 +11320,7 @@ function openStaffProfile(staffId){
   html += '</div>';
 
   var cb = staffCostBreakdown(s, mKey);
+  if(isFullAccess()){
   html += '<div class="card" style="margin-bottom:12px;"><h3>What they cost <span class="muted">· '+monthName+'</span></h3>';
   html += '<div class="psrow"><span>Salary earned</span><b>'+rupee(cb.salary)+'</b></div>';
   if(cb.rent>0) html += '<div class="psrow"><span>House rent allowance</span><b>'+rupee(cb.rent)+'</b></div>';
@@ -11165,6 +11337,7 @@ function openStaffProfile(staffId){
     (sm.pays.length ? '<div class="salpays">'+sm.pays.map(function(x){ return '<span>'+fmtD(x.date)+' · '+rupeeP(x.amount)+(x.advance||/advance/i.test(x.description||"")?' · advance':'')+'</span>'; }).join("")+'</div>' : '')+
     '<div class="psrow"><span>Balance for the month</span><b class="'+(sm.balance>0?"bad":"ok")+'">'+rupeeP(Math.max(0, sm.balance))+'</b></div></div>';
   html += '<div class="sheetbtns" style="margin-bottom:12px;"><button class="btn-cancel" id="p_adv" style="flex:1;">Salary advance</button><button class="btn-save" id="p_pay" style="flex:1;">Pay salary</button></div>';
+  }
 
   html += '<h3 style="margin:18px 0 8px;font-size:14px;">Conduct record</h3>';
   html += '<div class="sheetbtns" style="margin-bottom:10px;"><button class="btn-cancel" id="p_warn" style="flex:1;">Log warning</button><button class="btn-cancel" id="p_appr" style="flex:1;">Log appreciation</button></div>';
@@ -11185,8 +11358,10 @@ function openStaffProfile(staffId){
   document.getElementById("p_edit").addEventListener("click", function(){ openStaffForm(s.id); });
   document.getElementById("p_warn").addEventListener("click", function(){ openConductForm(s.id, "Warning"); });
   document.getElementById("p_appr").addEventListener("click", function(){ openConductForm(s.id, "Appreciation"); });
+  if(isFullAccess()){
   document.getElementById("p_pay").addEventListener("click", function(){ openSalaryPay(s, mKey); });
   document.getElementById("p_adv").addEventListener("click", function(){ openAdvanceForm(s, mKey, function(){ openStaffProfile(s.id); }); });
+  }
 }
 
 function openConductForm(staffId, type){
@@ -12289,6 +12464,7 @@ function processNotes(){
         var ok = false;
         var made = [];
         function track(store, id){ made.push({store:store, id:id}); return id; }
+        if(r && r.type && !canFileNoteType(r.type)){ r = { type:"__blocked", reason:"Your login can’t add this kind of entry — ask the manager or owner" }; }
         // Purchases: use the names you already use, and fill a missing rate / vendor from memory.
         if(r && r.type==="purchase"){
           var lines0 = Array.isArray(r.items) && r.items.length ? r.items : [r];
@@ -12384,6 +12560,7 @@ function processNotes(){
           var res;
           try{ res = parseNoteLocally(note.text, todayStr); }
           catch(e){ res = { ok:false, reason:"Could not read this note" }; }
+          if(res && res.ok && !canFileNoteType(res.type)) res = { ok:false, reason:"Your login can’t add this kind of entry — ask the manager or owner" };
           if(res && res.ok){
             var made = fileParsedRecord(res);
             var kind = (res.type==="purchaseBill") ? "purchase" : res.type;
@@ -12442,6 +12619,8 @@ function openAddChooser(){
     {t:"investment", label:"Partner investment", cls:"invest"},
     {t:"expense", label:"Expense", cls:"expense"}
   ];
+  var tkey = { sale:SALES_KEY, purchase:PURCH_KEY, investment:INVEST_KEY, expense:EXPENSE_KEY, tally:SALES_KEY };
+  opts = opts.filter(function(o){ return o.t==="report" ? (isFullAccess() || myAccess()==="manager") : (!tkey[o.t] || canWriteKey(tkey[o.t])); });
   var html = '<h2 class="serif">Add entry</h2><div class="chooserow">'+opts.map(function(o){
     return '<button class="chooseopt '+o.cls+'" data-t="'+o.t+'">'+o.label+'</button>';
   }).join("")+'</div><div class="sheetbtns" style="margin-top:14px;"><button class="btn-cancel" id="ch_cancel" style="flex:1;">Cancel</button></div>';

@@ -248,3 +248,28 @@ count (from attendance if not said). Undoing or editing the note puts the day ba
   loan to Uncle 5000", "gave loan to Ramesh 1000", a partner's loan goes to partner money), and bill amounts
   arriving ("electricity bill 4100 412 units due 15 Nov"). All can be undone or edited like other notes.
 - Fixed: in the purchase bill form the first tap on Save after editing a field was lost; it now saves at once.
+
+### Logins, roles and data security (Step 1)
+Every person can have their own login with a **role** (Outlets → Logins & roles; owner only):
+
+| Role | Sees and changes |
+|---|---|
+| Owner (PIN) | Everything, every store, logins, backups |
+| Partner | Everything, for one store or **all stores**; activity log and backups; can't manage logins |
+| Manager | Sales, purchases, expenses (salary payments shown without names), bills, customers, stock, menu, assets, vendors, cash count & handover, staff (no pay), roster, attendance, tasks, meals |
+| Chef / kitchen | Menu & recipes, stock, purchases (adds), assets, vendors (view), staff names, roster, attendance, tasks, staff meals |
+| Billing / counter | Adds sales, customers, udhaar payments; last two days only; **blind cash count** (expected amount not shown) |
+| Full access | Older store logins, as before; pick a role to limit them |
+
+How it is enforced (server, `src/worker.js`, `POLICY`): each list has a rule per role. The server only sends a
+login what its rule allows (whole lists hidden, records filtered, pay fields and bank balance removed, salary
+payments redacted). When a restricted login saves, the server merges: anything it can't see is kept exactly as it
+is, billing can only add and correct its own entries, and pay details always come from the stored record — so a
+staff phone can't read or wipe owner data even if someone tampers with the app. A role change, new password or
+store change signs that login out everywhere. A phone used by a different login is cleared first, and lists a
+login may not see are removed from the phone.
+
+Also: **Activity** (owner / partner) lists who changed what and how many entries were added, changed or removed;
+**daily server backups** of every store at 2:30 AM, kept 14 days, downloadable from Backup & restore (owner can
+also "Back up now"); the old PIN-header import route is switched off (set `ALLOW_LEGACY_PUSH = "1"` to re-enable);
+bill photos open only for their own store.

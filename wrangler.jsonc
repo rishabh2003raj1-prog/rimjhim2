@@ -18,5 +18,7 @@
   ],
   // Free AI for reading notes (used when no ANTHROPIC_API_KEY is set).
   "ai": { "binding": "AI" },
+  // Daily server backup of every store at 2:30 AM India time (21:00 UTC).
+  "triggers": { "crons": ["0 21 * * *"] },
   "observability": { "enabled": true }
 }
