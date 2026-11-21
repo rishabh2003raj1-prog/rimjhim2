@@ -2920,6 +2920,7 @@ function renderDayPanel(){
     }
     if(dayPurch.length){
       html += '<div class="daygroup">Purchases · '+rupee(pTot)+'</div>';
+      html += purchasePaySummary(dayPurch, "Paid how");
       dayPurch.forEach(function(p){ html += entryRow(p,"purchase"); });
     }
     if(dayInvest.length){
@@ -2957,7 +2958,9 @@ function entryRow(item, type){
   if(type==="sale"){
     return '<div class="entry" data-type="sale" data-id="'+item.id+'"><div><div class="who">'+esc(item.customer)+'</div><div class="meta">'+esc(item.desc||"")+' · '+item.mode+'</div></div><div class="amt sale">'+rupee(saleTotal(item))+'</div></div>';
   } else if(type==="purchase"){
-    return '<div class="entry" data-type="purchase" data-id="'+item.id+'"><div><div class="who">'+esc(item.item)+'</div><div class="meta">'+esc(item.vendor)+' · '+item.qty+' '+item.unit+'</div></div><div class="amt purch">'+rupee(purchTotal(item))+'</div></div>';
+    var pp = purchasePay(item);
+    return '<div class="entry" data-type="purchase" data-id="'+item.id+'"><div><div class="who">'+esc(item.item)+'</div><div class="meta">'+esc(item.vendor)+' · '+item.qty+' '+item.unit+'</div>'+
+      '<div class="meta"><span class="'+(pp.cls||"")+'">'+esc(pp.label)+'</span>'+(pp.partner ? (billSettled(item.billId||item.id) ? ' <span class="pill ok">repaid</span>' : ' <span class="pill bad">owed</span>') : '')+'</div></div><div class="amt purch">'+rupee(purchTotal(item))+'</div></div>';
   } else if(type==="investment"){
     var neg = !invIsIn(item), kk = invKind(item);
     var kl = {capital:"Capital", loan:"Loan to cafe", repay:"Loan repaid", withdraw:"Withdrawal"}[kk];
@@ -3334,14 +3337,47 @@ function purchaserSummary(){
   return '<div class="card" style="margin-bottom:14px;"><h3>Spend by purchaser <span class="muted">· this month</span></h3>'+rows+'</div>';
 }
 
+// How a purchase was paid: cash from the counter, UPI / card / bank, vendor credit
+// (udhaar), a partner's own money (the cafe owes them) or someone's handover cash.
+function purchasePay(p){
+  var m = p.mode || "Cash";
+  if(m==="Credit") return { key:"credit", label:"Udhaar (vendor credit, not paid yet)", cls:"warnamt" };
+  if(payerIsPersonal(p.paidBy)){ var n = payerPartner(p.paidBy); return { key:"partner:"+n, label:n+"’s own money (cafe owes "+n+")", cls:"bad", partner:n }; }
+  if(payerHeldBy(p.paidBy)){ var h = payerHeldBy(p.paidBy); return { key:"held:"+h, label:h+"’s handover cash" }; }
+  if(paidFromTill(p)) return { key:"cash", label:"Cash from the counter" };
+  return { key:"bank:"+m, label:(m==="Card" ? "Card" : m==="UPI" ? "UPI" : m==="Bank Transfer" ? "Bank transfer" : m)+" (cafe account)" };
+}
+var PAY_ORDER = ["cash","bank:UPI","bank:Card","bank:Bank Transfer","credit"];
+function purchasePaySummary(lines, title){
+  var by = {}, labels = {}, cls = {}, settledNote = {};
+  lines.forEach(function(p){
+    var pp = purchasePay(p);
+    by[pp.key] = (by[pp.key]||0) + purchTotal(p); labels[pp.key] = pp.label; cls[pp.key] = pp.cls || "";
+  });
+  var keys = Object.keys(by).sort(function(a,b){
+    var ia = PAY_ORDER.indexOf(a), ib = PAY_ORDER.indexOf(b);
+    return (ia<0?50:ia) - (ib<0?50:ib) || by[b]-by[a];
+  });
+  if(!keys.length) return "";
+  return '<div class="card purchpay" style="margin:2px 0 8px;padding:8px 12px;">'+(title?'<div class="barsub" style="margin:0 0 4px;font-weight:600;">'+title+'</div>':'')+
+    keys.map(function(k){ return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+esc(labels[k])+'</span><b class="'+cls[k]+'">'+rupee(by[k])+'</b></div>'; }).join("")+'</div>';
+}
+
 function renderPurchList(){
   var el = document.getElementById("purchList");
   var groups = billGroups().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
   if(groups.length===0){ el.innerHTML = owedSummary() + '<div class="empty">No purchases logged yet. Tap + to add a bill.</div>'; }
   else {
-    var html = owedSummary() + purchaserSummary(), lastDate = null;
+    var mNow = fmtDate(new Date()).slice(0,7);
+    var monthLines = purchases.filter(function(p){ return (p.date||"").slice(0,7)===mNow; });
+    var html = owedSummary() + purchaserSummary() + (monthLines.length ? purchasePaySummary(monthLines, "Paid how · "+monthLabel(mNow)) : ""), lastDate = null;
     groups.forEach(function(g){
-      if(g.date!==lastDate){ html += '<div class="daygroup">'+parseDate(g.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</div>'; lastDate=g.date; }
+      if(g.date!==lastDate){
+        var dayLines = purchases.filter(function(p){ return p.date===g.date; });
+        html += '<div class="daygroup">'+parseDate(g.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+' · '+rupee(dayLines.reduce(function(a,p){ return a+purchTotal(p); },0))+'</div>';
+        html += purchasePaySummary(dayLines);
+        lastDate=g.date;
+      }
       var tot = g.lines.reduce(function(a,p){ return a+purchTotal(p); },0);
       var itemLines = g.lines.filter(function(p){ return !p.isDelivery; });
       var delLines = g.lines.filter(function(p){ return p.isDelivery; });
@@ -3353,7 +3389,7 @@ function renderPurchList(){
               '<div class="meta">'+itemLines.length+' item'+(itemLines.length!==1?'s':'')+' · '+esc(names)+
               (delTot>0?' · +'+rupee(delTot)+' delivery':'')+'</div>'+
               '<div class="meta byline">'+(g.purchasedBy? 'Bought by '+esc(g.purchasedBy) : '<span class="warnline">Purchaser not recorded</span>')+
-              ' · paid by '+esc(g.paidBy||"Cafe cash")+
+              ' · '+esc(purchasePay(g.lines[0]).label)+
               (payerIsPersonal(g.paidBy) && !billSettled(g.id) ? ' <span class="pill bad">owed</span>' : '')+'</div></div>'+
               '<div class="amt purch">'+rupee(tot)+'</div></div>';
     });
