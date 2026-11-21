@@ -1021,7 +1021,7 @@ function flushNow(){
     updateSaveIndicator();
   }).catch(function(err){
     cloud.flushing = false;
-    if(err && err.login){ showLogin(); return; }
+    if(err && err.login){ loginLost(); return; }
     cloud.state = "offline";
     updateSaveIndicator();
     scheduleFlush(cloud.retryMs);
@@ -1176,7 +1176,7 @@ function checkAppUpdate(cb){
 function pollRemote(){
   if(cloud.state==="login" || cloud.flushing || document.hidden) return;
   api("GET", "/api/data"+API_Q+"&since="+Math.max(0, cloud.since-5000)).then(function(r){
-    if(r.status===401){ showLogin(); return; }
+    if(r.status===401){ loginLost(); return; }
     if(!r.ok || !r.data) throw new Error("poll");
     var wasOffline = cloud.state!=="ok";
     cloud.state = "ok";
@@ -1190,6 +1190,16 @@ function pollRemote(){
 
 // ---- sign in ----
 var loginDone = null;
+// A background request was refused. It may have carried an older sign-in that was
+// replaced a moment ago (e.g. right after changing the password), so check the
+// session before asking for the password.
+function loginLost(){
+  if(cloud.state==="login") return;
+  api("GET", "/api/session").then(function(r){
+    if(r.ok){ if(typeof scheduleFlush==="function" && pendingCount()) scheduleFlush(0); return; }
+    showLogin();
+  }).catch(function(){});
+}
 function showLogin(){
   cloud.state = "login";
   updateSaveIndicator();
@@ -7357,12 +7367,13 @@ function handoverRows(holder){
   });
   investments.forEach(function(v){
     if(!v.date || invCashTarget(v)!==holder) return;
-    if(!invIsIn(v)) rows.push({ date:v.date, kind:"invout", amt:-(+v.amount||0), text:(invKind(v)==="repay"?"Loan repaid to ":"Withdrawal · ")+v.partner, ref:"inv:"+v.id });
+    if(!invIsIn(v)) rows.push({ date:v.date, kind: invKind(v)==="repay" ? "loanpay" : "invout", amt:-(+v.amount||0), text:(invKind(v)==="repay"?"Loan repaid to ":"Withdrawal · ")+v.partner, ref:"inv:"+v.id });
     else rows.push({ date:v.date, kind:"investin", amt:+v.amount||0, text:(invKind(v)==="loan"?"Loan to the cafe · ":"Capital · ")+v.partner, ref:"inv:"+v.id });
   });
   loans.forEach(function(l){
     if(!l.date || l.via!=="held:"+holder) return;
-    rows.push({ date:l.date, kind: loanIsIn(l) ? "investin" : "invout", amt: loanIsIn(l) ? +l.amount||0 : -(+l.amount||0), text:loanTypeLabel(l)+" · "+l.party, ref:"loan:"+l.id });
+    rows.push({ date:l.date, kind: loanIsIn(l) ? "investin" : (l.type==="repay" ? "loanpay" : "loangive"), amt: loanIsIn(l) ? +l.amount||0 : -(+l.amount||0),
+                text:(l.type==="repay" ? "Loan repaid to " : l.type==="give" ? "Loan given to " : loanTypeLabel(l)+" · ")+l.party, ref:"loan:"+l.id });
   });
   partnerRepayments().forEach(function(r){
     if(r.mode==="held" && r.from===holder) rows.push({ date:r.date, kind:"repay", amt:-r.amount, text:"Repaid "+r.partner+" · "+r.what, ref:"" });
@@ -7380,7 +7391,7 @@ function handoverRows(holder){
 }
 function handoverLedger(mKey){
   return cashHolders().map(function(h){
-    var rows = handoverRows(h), r = { holder:h, opening:0, fromCounter:0, fromOthers:0, taken:0, expenses:0, purchases:0, bank:0, counter:0, pass:0, withdraw:0, repay:0, invOut:0, rows:[] };
+    var rows = handoverRows(h), r = { holder:h, opening:0, fromCounter:0, fromOthers:0, taken:0, expenses:0, purchases:0, bank:0, counter:0, pass:0, withdraw:0, repay:0, invOut:0, loanPay:0, loanGive:0, rows:[] };
     rows.forEach(function(x){
       var m = x.date.slice(0,7);
       if(m < mKey){ r.opening += x.amt; return; }
@@ -7392,6 +7403,8 @@ function handoverLedger(mKey){
       else if(x.kind==="frombank") r.fromBank = (r.fromBank||0) + x.amt;
       else if(x.kind==="investin") r.investIn = (r.investIn||0) + x.amt;
       else if(x.kind==="invout") r.invOut = (r.invOut||0) - x.amt;
+      else if(x.kind==="loanpay") r.loanPay = (r.loanPay||0) - x.amt;
+      else if(x.kind==="loangive") r.loanGive = (r.loanGive||0) - x.amt;
       else if(x.kind==="expense") r.expenses -= x.amt;
       else if(x.kind==="purchase") r.purchases -= x.amt;
       else r[x.kind] = (r[x.kind]||0) - x.amt;
@@ -7399,8 +7412,8 @@ function handoverLedger(mKey){
     r.opening = r2(r.opening);
     r.fromBank = r2(r.fromBank||0); r.investIn = r2(r.investIn||0);
     r.received = r2(r.fromCounter + r.fromOthers + r.taken + r.fromBank + r.investIn);
-    r.invOut = r2(r.invOut||0);
-    r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw + r.repay + r.invOut);
+    r.invOut = r2(r.invOut||0); r.loanPay = r2(r.loanPay||0); r.loanGive = r2(r.loanGive||0);
+    r.used = r2(r.expenses + r.purchases + r.bank + r.counter + r.pass + r.withdraw + r.repay + r.invOut + r.loanPay + r.loanGive);
     r.closing = r2(r.opening + r.received - r.used);
     return r;
   }).filter(function(r){ return r.opening || r.received || r.used || PARTNERS.indexOf(r.holder)>=0; });
@@ -7427,7 +7440,7 @@ function renderHandoverView(){
       '<div class="psrow"><span>With them at the start of the month</span><b>'+rupeeP(r.opening)+'</b></div>'+
       line("+ Received from the counter", r.fromCounter)+line("+ Taken from the counter", r.taken)+line("+ Withdrawn from the bank", r.fromBank)+line("+ Partner / loan money in (cash)", r.investIn)+line("+ Received from others", r.fromOthers)+
       line("− Spent on expenses", r.expenses)+line("− Spent on purchases", r.purchases)+line("− Deposited in bank", r.bank)+
-      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+line("− Partner withdrawal / loan money out", r.invOut)+
+      line("− Put back in the counter", r.counter)+line("− Given to others", r.pass)+line("− Kept as withdrawal", r.withdraw)+line("− Repaid to partners", r.repay)+line("− Partner withdrawals", r.invOut)+line("− Loans repaid from this cash", r.loanPay)+line("− Loans given from this cash", r.loanGive)+
       '<div class="psrow"><span><b>Still with '+esc(r.holder)+'</b></span><b class="'+(r.closing<0?"bad":r.closing>0?"warnamt":"ok")+'">'+rupeeP(r.closing)+'</b></div>';
     if(r.closing < -0.5) html += '<div class="attmwarn" style="margin-top:8px;">More was spent than was handed over. Either a handover is missing, or '+esc(r.holder)+' added their own money (then change those entries to “own money” so the cafe owes it back).</div>';
     if(r.rows.length){
@@ -7438,7 +7451,8 @@ function renderHandoverView(){
     html += '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" data-hobank="'+esc(r.holder)+'">Deposit in bank</button>'+
             '<button class="btn-additem" data-homove="'+esc(r.holder)+'">Other use / return</button></div>'+
             '<div class="billbtns" style="margin-top:8px;"><button class="btn-additem" data-hoexp="'+esc(r.holder)+'">+ Expense paid from this cash</button>'+
-            '<button class="btn-additem" data-hopdf="'+esc(r.holder)+'">Statement PDF</button></div></div>';
+            '<button class="btn-additem" data-holoan="'+esc(r.holder)+'">Repay a loan from this cash</button></div>'+
+            '<button class="btn-additem" data-hopdf="'+esc(r.holder)+'" style="margin-top:8px;">Statement PDF</button></div>';
   });
   if(led.length) html += '<button class="btn-save" id="ho_pdf" style="width:100%;margin-top:4px;">Download handover statement PDF · '+esc(monthLabel(hoMonth))+'</button>';
   el.innerHTML = html;
@@ -7452,6 +7466,7 @@ function renderHandoverView(){
   });
   Array.prototype.forEach.call(el.querySelectorAll("[data-hobank]"), function(b){ b.addEventListener("click", function(){ openCashMoveForm(null, b.getAttribute("data-hobank"), "bank"); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-homove]"), function(b){ b.addEventListener("click", function(){ openCashMoveForm(null, b.getAttribute("data-homove"), "counter"); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-holoan]"), function(b){ b.addEventListener("click", function(){ openHeldLoanRepay(b.getAttribute("data-holoan")); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-hoexp]"), function(b){
     b.addEventListener("click", function(){ openForm("expense", null, billDefaultDate(hoMonth), { paidBy: b.getAttribute("data-hoexp")+" (cafe cash held)", mode:"Cash" }); });
   });
@@ -7654,7 +7669,7 @@ function openLoanForm(rec, preset){
     var opts = (t==="take" ? [["direct","Paid directly by the lender (e.g. to a supplier) - not through cafe cash or bank"]] : [])
       .concat([["bank", inn ? "Into the cafe bank account" : "From the cafe bank account"], ["counter", inn ? "Into the cafe cash counter" : "From the cafe cash counter"]])
       .concat(cashHolders().map(function(h){ return ["held:"+h, (inn ? "Cash kept by " : "From cafe cash held by ")+h]; }));
-    var want = first && rec ? rec.via : (opts.some(function(o){ return o[0]===fV.value; }) && !first ? fV.value : "bank");
+    var want = first ? (rec ? rec.via : (preset.via || "bank")) : (opts.some(function(o){ return o[0]===fV.value; }) ? fV.value : "bank");
     if(!opts.some(function(o){ return o[0]===want; })) want = opts[0][0] === "direct" ? "bank" : opts[0][0];
     fV.innerHTML = opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===want?" selected":"")+'>'+esc(o[1])+'</option>'; }).join("");
     var party = fP.value.trim(), dir = (t==="take"||t==="repay") ? "owe" : "lent";
@@ -8217,7 +8232,7 @@ function exportHandoverStatement(mKey, holder, btn){
       var sum = [["With them at the start ("+pdfDate(mKey+"-01")+")", pdfMoneyP(r.opening)]];
       [["+ Received from the counter", r.fromCounter], ["+ Taken from the counter", r.taken], ["+ Withdrawn from the bank", r.fromBank], ["+ Partner / loan money in (cash)", r.investIn], ["+ Received from others", r.fromOthers],
        ["- Spent on expenses", r.expenses], ["- Spent on purchases", r.purchases], ["- Deposited in bank", r.bank], ["- Put back in the counter", r.counter],
-       ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay], ["- Partner withdrawal / loan money out", r.invOut]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
+       ["- Given to others", r.pass], ["- Kept as withdrawal", r.withdraw], ["- Repaid to partners", r.repay], ["- Partner withdrawals", r.invOut], ["- Loans repaid from this cash", r.loanPay], ["- Loans given from this cash", r.loanGive]].forEach(function(x){ if(x[1]) sum.push([x[0], pdfMoneyP(x[1])]); });
       sum.push(["Still with "+pdfClean(r.holder)+" ("+pdfDate(last)+")", pdfMoneyP(r.closing)]);
       doc.autoTable({ startY:y, margin:{left:M,right:M}, theme:"plain", styles:{ fontSize:9.5, cellPadding:3.5 }, body: sum,
         columnStyles:{ 1:{ halign:"right" } },
@@ -8384,6 +8399,33 @@ function openInterestForm(rec){
               note: document.getElementById("in_note").value.trim() };
     if(rec) cashMoves[cashMoves.findIndex(function(m){ return m.id===rec.id; })] = r; else cashMoves.push(r);
     saveCashMoves(); closeForm(); renderAll();
+  });
+}
+
+// Repay a loan (partner's or anyone else's) out of the cash a person holds.
+function openHeldLoanRepay(holder){
+  var today = fmtDate(new Date());
+  var held = (handoverLedger(today.slice(0,7)).find(function(r){ return r.holder===holder; }) || {}).closing || 0;
+  var owed = loanParties(today).filter(function(p){ return p.dir==="owe" && p.balance > 0.005; });
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Repay a loan from '+esc(holder)+'’s cash</h2>';
+  html += '<div class="backupnote">'+esc(holder)+' holds <b>'+rupeeP(held)+'</b> of handover cash. Pick the loan being repaid; the amount comes out of this cash (Handover tab) and off the loan (Loans tab).</div>';
+  if(!owed.length) html += '<div class="empty">No loans are owed right now.</div>';
+  owed.forEach(function(p){
+    html += '<button class="bpedit" style="margin:6px 0;width:100%;" data-hlparty="'+esc(p.party)+'" data-hlptype="'+esc(p.partyType)+'"><b>'+esc(p.party)+'</b> <i class="muted">('+esc(p.partyType)+')</i> · owed '+rupeeP(p.balance)+'<span class="bphint">Repay</span></button>';
+  });
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="hl_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("hl_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-hlparty]"), function(b){
+    b.addEventListener("click", function(){
+      var party = b.getAttribute("data-hlparty"), ptype = b.getAttribute("data-hlptype");
+      var bal = ptype==="Partner" ? partnerMoney(party).outstanding : loanOutstanding(party, "owe");
+      var amt = Math.min(bal, Math.max(0, held)) || bal;
+      if(ptype==="Partner") openForm("investment", null, today, { partner:party, invType:"Loan repayment", amount:r2(amt), via:"held:"+holder, mode:"Cash" });
+      else openLoanForm(null, { type:"repay", party:party, partyType:ptype, amount:r2(amt), date:today, via:"held:"+holder });
+    });
   });
 }
 
