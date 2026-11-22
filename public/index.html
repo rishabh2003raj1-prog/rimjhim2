@@ -182,6 +182,15 @@
   .ppay button{border:none;border-radius:16px;padding:14px 4px;font:inherit;font-size:17px;font-weight:700;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;}
   .ppay button span{font-size:34px;line-height:1;}
   .ppay .cash{background:#2E7D4F;} .ppay .upi{background:#3B5BA9;} .ppay .udh{background:#B5651D;}
+  .pdisc{display:flex;width:100%;justify-content:space-between;align-items:center;margin-top:12px;padding:12px 14px;border-radius:12px;border:1.5px dashed #C9A66B;background:var(--panel);font:inherit;font-size:15px;color:var(--ink);}
+  .pdisc.on{border-style:solid;background:#FFF4E0;} .pdisc b{color:#B5651D;}
+  .psub{display:flex;justify-content:space-between;padding:8px 14px 0;color:var(--ink-soft);font-size:14px;}
+  .dgroup{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--ink-soft);margin:12px 0 6px;}
+  .dbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .dbtns.quick{grid-template-columns:repeat(4,1fr);}
+  .dbtns button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 6px;font:inherit;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .dbtns button b{font-size:16px;} .dbtns button span{font-size:12px;color:var(--ink-soft);}
+  body.simple .pdisc{font-size:18px;padding:15px;} body.simple .dbtns button b{font-size:20px;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -8078,7 +8087,7 @@ function openFixDates(){
 // plates go straight into the dish counts, so stock and forecasts need no tally.
 // "Big & simple" (per phone) makes everything larger with fewer choices.
 var SIMPLE_KEY = "simple_mode_v1", VOICE_KEY = "counter_voice_v1";
-var counterOrder = {}, counterCat = "__top";
+var counterOrder = {}, counterCat = "__top", counterDisc = null;   // counterDisc: { label, kind:"pct"|"amt", value, offer }
 function simpleMode(){ try{ return localStorage.getItem(SIMPLE_KEY)==="1"; }catch(e){ return false; } }
 function setSimpleMode(on){ try{ localStorage.setItem(SIMPLE_KEY, on?"1":"0"); }catch(e){} applySimpleMode(); renderCounter(); }
 function applySimpleMode(){ document.body.classList.toggle("simple", simpleMode()); }
@@ -8111,6 +8120,23 @@ function orderLines(){
   });
 }
 function orderTotal(){ return orderLines().reduce(function(a,l){ return a+l.amt; },0); }
+// Discount on the bill: a saved offer (owner / manager set these) or a quick one. Billing logins
+// can give at most settings.maxDiscountPct (default 10%) unless it is a saved offer.
+function discountAmt(sub){
+  if(!counterDisc || !(sub>0)) return 0;
+  var d = counterDisc.kind==="pct" ? Math.round(sub*(+counterDisc.value||0)/100) : Math.round(+counterDisc.value||0);
+  return Math.max(0, Math.min(sub, d));
+}
+function billNet(){ var sub = orderTotal(); return sub - discountAmt(sub); }
+function maxDiscPct(){ var v = settings.maxDiscountPct; return (v===0 || +v>0) ? +v : 10; }
+function discLimited(){ return myAccess()==="billing"; }
+function activeOffers(){ return offers.filter(function(o){ return o && o.active!==false && +o.value>0; }); }
+function offerLabel(o){ return o.name+" ("+(o.kind==="pct" ? o.value+"%" : "₹"+o.value)+" off)"; }
+function discWithinLimit(kind, value, sub){
+  if(!discLimited()) return true;
+  var d = kind==="pct" ? sub*value/100 : value;
+  return d <= sub*maxDiscPct()/100 + 0.5;
+}
 function orderCount(){ return orderLines().reduce(function(a,l){ return a+l.qty; },0); }
 function counterBills(dateStr){ return sales.filter(function(s){ return s.order && s.date===dateStr; }).sort(function(a,b){ return (b.order.no||0)-(a.order.no||0); }); }
 function billedPlates(dateStr){ return dishLog.filter(function(d){ return d.orderId && d.date===dateStr; }).reduce(function(a,d){ return a+(+d.qty||0); },0); }
@@ -8136,7 +8162,7 @@ function renderCounter(){
     '<button id="ct_bills">🧾 Today’s bills</button>'+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
     '<button id="ct_voice" class="'+(voiceOn()?"on":"")+'">'+(voiceOn()?"🔊":"🔇")+'</button>'+
-    ((isFullAccess() || myAccess()==="manager") && !simple ? '<button id="ct_upi">⚙️ UPI</button>' : '')+'</div>';
+    ((isFullAccess() || myAccess()==="manager") && !simple ? '<button id="ct_upi">⚙️ UPI & discounts</button>' : '')+'</div>';
   if(!canBill) html += '<div class="backupnote">This login can look but cannot make bills.</div>';
   var items = counterItems();
   if(!items.length){
@@ -8149,7 +8175,7 @@ function renderCounter(){
     return '<button data-cat="'+esc(c[0])+'" class="'+(counterCat===c[0]?"on":"")+'">'+esc(c[1])+'</button>'; }).join("")+'</div>';
   var show = counterCat==="__top" ? counterTop(simple ? 8 : 12) : counterCat==="__all" ? items : items.filter(function(m){ return (m.category||"Other")===counterCat; });
   html += '<div class="cgrid">'+show.map(tileHtml).join("")+'</div>';
-  var n = orderCount(), t = orderTotal();
+  var n = orderCount(), t = billNet();
   html += '<div class="cbar'+(n?" on":"")+'">'+(n ?
     '<button class="cclear" id="ct_clear" aria-label="clear">✕</button><div class="ctot"><b>'+rupee(t)+'</b><span>'+n+' item'+(n!==1?'s':'')+'</span></div><button class="cgo" id="ct_go">Bill ➜</button>' :
     '<div class="chint">Tap a picture to add it</div>')+'</div>';
@@ -8165,7 +8191,7 @@ function renderCounter(){
     });
   });
   var go = document.getElementById("ct_go"); if(go) go.addEventListener("click", function(){ if(!canBill){ appAlert("This login cannot make bills."); return; } openCounterPay(); });
-  var cl = document.getElementById("ct_clear"); if(cl) cl.addEventListener("click", function(){ askConfirm("Clear this order?", function(){ counterOrder = {}; renderCounter(); }); });
+  var cl = document.getElementById("ct_clear"); if(cl) cl.addEventListener("click", function(){ askConfirm("Clear this order?", function(){ counterOrder = {}; counterDisc = null; renderCounter(); }); });
 }
 function wireCounterTools(el){
   var b = document.getElementById("ct_bills"); if(b) b.addEventListener("click", function(){ openCounterBills(fmtDate(new Date())); });
@@ -8174,18 +8200,45 @@ function wireCounterTools(el){
   var u = document.getElementById("ct_upi"); if(u) u.addEventListener("click", openUpiSettings);
 }
 function openUpiSettings(){
-  var sheet = document.getElementById("sheet");
-  var html = '<h2 class="serif">UPI for the counter</h2><div class="backupnote">The Counter shows a QR code with the bill amount filled in, so the customer just scans and pays.</div>'+
-    '<div class="field"><label>UPI ID</label><input id="up_id" placeholder="e.g. rimjhimcafe@okaxis" value="'+esc(settings.upiId||"")+'"></div>'+
-    '<div class="field"><label>Name shown to the customer</label><input id="up_name" placeholder="RimJhim Cafe" value="'+esc(settings.upiName||"")+'"></div>'+
-    '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
-  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
-  document.getElementById("up_cancel").addEventListener("click", closeForm);
-  document.getElementById("up_save").addEventListener("click", function(){
-    var id = document.getElementById("up_id").value.trim(), nm = document.getElementById("up_name").value.trim();
-    if(id && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(id)){ var e = document.getElementById("up_err"); e.textContent = "That doesn’t look like a UPI ID (name@bank)."; e.style.display = "block"; return; }
-    settings.upiId = id; settings.upiName = nm; saveSettings(); closeForm(); renderCounter();
-  });
+  var sheet = document.getElementById("sheet"), offs = offers.slice(), canOffers = canWriteKey(OFFERS_KEY);
+  function draw(){
+    var html = '<h2 class="serif">Counter settings</h2>'+
+      '<div class="dgroup">UPI</div><div class="backupnote">The Counter shows a QR code with the bill amount filled in, so the customer just scans and pays.</div>'+
+      '<div class="field"><label>UPI ID</label><input id="up_id" placeholder="e.g. rimjhimcafe@okaxis" value="'+esc(settings.upiId||"")+'"></div>'+
+      '<div class="field"><label>Name shown to the customer</label><input id="up_name" placeholder="RimJhim Cafe" value="'+esc(settings.upiName||"")+'"></div>'+
+      '<div class="dgroup">Discounts</div>'+
+      '<div class="field"><label>Most a billing login can give by itself (% of the bill)</label><input type="number" inputmode="decimal" id="up_max" value="'+esc(maxDiscPct())+'"></div>';
+    if(canOffers){
+      html += '<div class="backupnote">Saved offers show as buttons on the bill and have no limit. Examples: Hospital staff 10%, Student 5%, Combo ₹20 off.</div>';
+      html += offs.map(function(o, i){ return '<div class="psrow"><span>'+esc(offerLabel(o))+'</span><button class="btn-additem" style="width:auto;padding:6px 12px;" data-rmoffer="'+i+'">Remove</button></div>'; }).join("");
+      html += '<div class="field two" style="margin-top:8px;"><div><input id="of_name" placeholder="Offer name"></div><div class="two" style="display:flex;gap:6px;"><input type="number" inputmode="decimal" id="of_val" placeholder="Value" style="flex:1;min-width:0;"><select id="of_kind" style="flex:1;min-width:0;"><option value="pct">%</option><option value="amt">₹</option></select></div></div>'+
+        '<button class="btn-additem" id="of_add">+ Add offer</button>';
+    }
+    html += '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
+    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    Object.keys(keep).forEach(function(k){ var e = document.getElementById(k); if(e) e.value = keep[k]; });
+    function err(m){ var e = document.getElementById("up_err"); e.textContent = m; e.style.display = "block"; }
+    document.getElementById("up_cancel").addEventListener("click", closeForm);
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-rmoffer]"), function(b){ b.addEventListener("click", function(){ offs.splice(+b.getAttribute("data-rmoffer"), 1); draw(); }); });
+    var ad = document.getElementById("of_add");
+    if(ad) ad.addEventListener("click", function(){
+      var n = document.getElementById("of_name").value.trim(), v = parseFloat(document.getElementById("of_val").value), k = document.getElementById("of_kind").value;
+      if(!n || !(v>0)) return err("Give the offer a name and a value.");
+      if(k==="pct" && v>100) return err("A discount can\u2019t be more than 100%.");
+      offs.push({ id:uid(), name:n, kind:k, value:v, active:true });
+      document.getElementById("of_name").value = ""; document.getElementById("of_val").value = ""; draw();
+    });
+    document.getElementById("up_save").addEventListener("click", function(){
+      var id = document.getElementById("up_id").value.trim(), nm = document.getElementById("up_name").value.trim(), mx = parseFloat(document.getElementById("up_max").value);
+      if(id && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(id)) return err("That doesn\u2019t look like a UPI ID (name@bank).");
+      if(!(mx>=0 && mx<=100)) return err("The limit must be between 0 and 100%.");
+      settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx; saveSettings();
+      if(canOffers){ offers = offs; saveOffers(); }
+      closeForm(); renderCounter();
+    });
+  }
+  draw();
 }
 function upiLink(amount, note){
   return "upi://pay?pa="+encodeURIComponent(settings.upiId)+"&pn="+encodeURIComponent(settings.upiName||OUTLET.name||"Cafe")+
@@ -8201,8 +8254,8 @@ var payStep = "order", payGiven = 0;
 function openCounterPay(){ payStep = "order"; payGiven = 0; renderCounterPay(true); }
 var NOTES = [[10,"#C9A66B"],[20,"#E7C55B"],[50,"#62B6C9"],[100,"#9C8ACB"],[200,"#F2A541"],[500,"#9AA59A"]];
 function renderCounterPay(speak){
-  var lines = orderLines(), total = orderTotal();
-  if(!lines.length){ closeForm(); renderCounter(); return; }
+  var lines = orderLines(), sub = orderTotal(), disc = discountAmt(sub), total = sub - disc;
+  if(!lines.length){ counterDisc = null; closeForm(); renderCounter(); return; }
   var sheet = document.getElementById("sheet"), html = "";
   if(payStep==="order"){
     html += '<h2 class="serif">Bill</h2>';
@@ -8211,9 +8264,22 @@ function renderCounterPay(speak){
         '<button class="pbtn" data-less="'+esc(l.m.id)+'">−</button><b class="pq">'+l.qty+'</b><button class="pbtn" data-more="'+esc(l.m.id)+'">+</button>'+
         '<span class="pamt">'+rupee(l.amt)+'</span></div>';
     }).join("");
+    html += '<button class="pdisc'+(disc?" on":"")+'" id="pp_disc"><span>🏷️ '+(disc ? esc(counterDisc.label) : "Discount")+'</span><b>'+(disc ? "− "+rupee(disc) : "Add")+'</b></button>';
+    if(disc) html += '<div class="psub"><span>Before discount</span><s>'+rupee(sub)+'</s></div>';
     html += '<div class="ptotal"><span>Total</span><b>'+rupee(total)+'</b><button class="psay" id="pp_say" aria-label="say the total">🔊</button></div>';
     html += '<div class="ppay"><button class="cash" data-pay="cash"><span>💵</span>Cash</button><button class="upi" data-pay="upi"><span>📱</span>UPI</button><button class="udh" data-pay="udhaar"><span>📒</span>Udhaar</button></div>';
     html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back" style="flex:1;">← Add more</button></div>';
+  } else if(payStep==="discount"){
+    html += '<h2 class="serif">🏷️ Discount</h2><div class="backupnote">Bill '+rupee(sub)+'.'+(discLimited() ? ' You can give up to '+maxDiscPct()+'% yourself; saved offers have no limit.' : '')+'</div>';
+    var offs = activeOffers();
+    if(offs.length) html += '<div class="dgroup">Saved offers</div><div class="dbtns">'+offs.map(function(o){
+      return '<button data-offer="'+esc(o.id)+'"><b>'+esc(o.name)+'</b><span>'+(o.kind==="pct" ? o.value+"% off" : "₹"+o.value+" off")+' · − '+rupee(o.kind==="pct" ? Math.round(sub*o.value/100) : Math.min(sub,o.value))+'</span></button>'; }).join("")+'</div>';
+    var quick = [["pct",5],["pct",10],["amt",10],["amt",20]].filter(function(q){ return discWithinLimit(q[0], q[1], sub) && (q[0]==="pct" || q[1] < sub); });
+    html += '<div class="dgroup">Quick</div><div class="dbtns quick">'+quick.map(function(q){
+      return '<button data-qd="'+q[0]+':'+q[1]+'"><b>'+(q[0]==="pct" ? q[1]+"%" : "₹"+q[1])+'</b><span>− '+rupee(q[0]==="pct" ? Math.round(sub*q[1]/100) : q[1])+'</span></button>'; }).join("")+'</div>';
+    html += '<div class="dgroup">Other</div><div class="field two"><div><input type="number" inputmode="decimal" id="pd_val" placeholder="Amount"></div><div><select id="pd_kind"><option value="amt">₹ off</option><option value="pct">% off</option></select></div></div>'+
+      '<div class="field"><input id="pd_why" placeholder="Reason (e.g. regular customer, late order)"></div><div class="err" id="pd_err"></div>';
+    html += '<div class="sheetbtns">'+(counterDisc ? '<button class="btn-del" id="pd_none">No discount</button>' : '<button class="btn-cancel" id="pp_back">← Back</button>')+'<button class="btn-save" id="pd_apply">Apply</button></div>';
   } else if(payStep==="cash"){
     var back = payGiven - total;
     html += '<h2 class="serif">💵 Cash · '+rupee(total)+'</h2>';
@@ -8248,6 +8314,22 @@ function renderCounterPay(speak){
   on("[data-pay]", function(b){ payStep = b.getAttribute("data-pay"); payGiven = 0; renderCounterPay(); });
   on("[data-note]", function(b){ payGiven += +b.getAttribute("data-note"); renderCounterPay(); var bk = payGiven - total; if(bk>=0) sayHindi(bk>0 ? Math.round(bk)+" रुपये वापस दें" : "पूरे पैसे मिल गए"); });
   on("[data-cust]", function(b){ finishCounterBill("Credit", b.getAttribute("data-cust")); });
+  on("#pp_disc", function(){ payStep = "discount"; renderCounterPay(); });
+  on("[data-offer]", function(b){ var o = offers.find(function(x){ return x.id===b.getAttribute("data-offer"); }); if(!o) return;
+    counterDisc = { label:o.name, kind:o.kind==="pct"?"pct":"amt", value:+o.value, offer:o.id }; payStep = "order"; renderCounter(); renderCounterPay(); });
+  on("[data-qd]", function(b){ var q = b.getAttribute("data-qd").split(":");
+    counterDisc = { label:(q[0]==="pct" ? q[1]+"% off" : "₹"+q[1]+" off"), kind:q[0], value:+q[1] }; payStep = "order"; renderCounter(); renderCounterPay(); });
+  on("#pd_none", function(){ counterDisc = null; payStep = "order"; renderCounter(); renderCounterPay(); });
+  on("#pd_apply", function(){
+    var v = parseFloat(document.getElementById("pd_val").value), k = document.getElementById("pd_kind").value, why = document.getElementById("pd_why").value.trim(), e = document.getElementById("pd_err");
+    function bad(m){ e.textContent = m; e.style.display = "block"; }
+    if(!(v>0)) return bad("Type the discount, or tap one above.");
+    if(k==="pct" && v>100) return bad("A discount can’t be more than 100%.");
+    if(k==="amt" && v>=sub) return bad("The discount must be less than the bill ("+rupee(sub)+").");
+    if(!discWithinLimit(k, v, sub)) return bad("You can give up to "+maxDiscPct()+"% ("+rupee(Math.floor(sub*maxDiscPct()/100))+") on this bill. Ask the manager for more.");
+    counterDisc = { label:(k==="pct" ? v+"% off" : "₹"+v+" off")+(why ? " · "+why : ""), kind:k, value:v };
+    payStep = "order"; renderCounter(); renderCounterPay();
+  });
   on("#pp_say", function(){ sayHindi("कुल "+Math.round(total)+" रुपये"); });
   on("#pp_back", function(){ if(payStep==="order"){ closeForm(); } else { payStep = "order"; renderCounterPay(); } });
   on("#pp_reset", function(){ payGiven = 0; renderCounterPay(); });
@@ -8269,14 +8351,15 @@ function finishCounterBill(mode, customer, given){
   var lines = orderLines(); if(!lines.length) return;
   var day = fmtDate(new Date()), now = new Date(), id = uid(), no = nextBillNo(day);
   var items = lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:+l.m.price||0 }; });
-  var total = orderTotal();
+  var sub = orderTotal(), disc = discountAmt(sub), total = sub - disc;
   var rec = { id:id, date:day, customer: customer || "Counter", desc:"", amount:total, gst:0, mode:mode,
               order:{ no:no, time:("0"+now.getHours()).slice(-2)+":"+("0"+now.getMinutes()).slice(-2), items:items, given: given||0 } };
-  rec.desc = "Bill "+no+": "+billText(rec);
+  if(disc){ rec.order.subtotal = sub; rec.order.discount = disc; rec.order.discountLabel = counterDisc.label; if(counterDisc.offer) rec.order.offerId = counterDisc.offer; }
+  rec.desc = "Bill "+no+": "+billText(rec)+(disc ? " · discount "+rupee(disc) : "");
   sales.push(rec);
   items.forEach(function(i){ dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:id }); });
   saveSales(); saveDishLog();
-  counterOrder = {};
+  counterOrder = {}; counterDisc = null;
   closeForm(); renderAll();
   var sheet = document.getElementById("sheet");
   sheet.innerHTML = '<div class="pdone"><div class="tick">✔</div><b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+
@@ -8289,14 +8372,17 @@ function finishCounterBill(mode, customer, given){
 function openCounterBills(dateStr){
   var list = counterBills(dateStr), sheet = document.getElementById("sheet");
   var modes = {}; list.forEach(function(s){ var m = s.mode==="Credit" ? "Udhaar" : s.mode; modes[m] = (modes[m]||0) + saleTotal(s); });
+  var discTot = list.reduce(function(a,s){ return a+(+s.order.discount||0); },0), discN = list.filter(function(s){ return s.order.discount; }).length;
   var html = '<h2 class="serif">Counter bills · '+parseDate(dateStr).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</h2>';
   html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>'+list.length+' bill'+(list.length!==1?'s':'')+'</span><b>'+rupee(list.reduce(function(a,s){ return a+saleTotal(s); },0))+'</b></div>'+
-    Object.keys(modes).map(function(k){ return '<div class="psrow"><span>'+({Cash:"💵 ",UPI:"📱 ",Udhaar:"📒 "}[k]||"")+esc(k)+'</span><b>'+rupee(modes[k])+'</b></div>'; }).join("")+'</div>';
+    Object.keys(modes).map(function(k){ return '<div class="psrow"><span>'+({Cash:"💵 ",UPI:"📱 ",Udhaar:"📒 "}[k]||"")+esc(k)+'</span><b>'+rupee(modes[k])+'</b></div>'; }).join("")+
+    (discTot ? '<div class="psrow"><span>🏷️ Discounts given ('+discN+' bill'+(discN!==1?'s':'')+')</span><b class="warnamt">− '+rupee(discTot)+'</b></div>' : '')+'</div>';
   if(!list.length) html += '<div class="empty">No bills yet.</div>';
   var canCancel = canWriteKey(SALES_KEY);
   html += list.map(function(s){
     return '<div class="entry"><div><div class="who">#'+s.order.no+' · '+esc(s.order.time||"")+' · '+(s.mode==="Credit"?"Udhaar ("+esc(s.customer)+")":esc(s.mode))+'</div>'+
       '<div class="meta">'+esc(billText(s))+'</div>'+
+      (s.order.discount ? '<div class="meta warnamt">🏷️ − '+rupee(s.order.discount)+' · '+esc(s.order.discountLabel||"discount")+' (bill was '+rupee(s.order.subtotal)+')</div>' : '')+
       '<div class="meta"><a href="#" data-share="'+esc(s.id)+'">Share</a>'+(canCancel?' · <a href="#" data-void="'+esc(s.id)+'" class="bad">Cancel bill</a>':'')+'</div></div>'+
       '<div class="amt sale">'+rupee(saleTotal(s))+'</div></div>';
   }).join("");
@@ -8306,7 +8392,7 @@ function openCounterBills(dateStr){
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-share]"), function(a){ a.addEventListener("click", function(ev){
     ev.preventDefault(); var s = sales.find(function(x){ return x.id===a.getAttribute("data-share"); }); if(!s) return;
     var txt = (OUTLET.name||"RimJhim Cafe")+"\nBill "+s.order.no+" · "+parseDate(s.date).toLocaleDateString("en-IN")+" "+(s.order.time||"")+"\n"+
-      (s.order.items||[]).map(function(i){ return i.qty+" x "+i.name+"  "+rupee(i.qty*i.price); }).join("\n")+"\nTotal "+rupee(saleTotal(s))+" ("+(s.mode==="Credit"?"Udhaar":s.mode)+")\nThank you!";
+      (s.order.items||[]).map(function(i){ return i.qty+" x "+i.name+"  "+rupee(i.qty*i.price); }).join("\n")+(s.order.discount ? "\nDiscount ("+(s.order.discountLabel||"")+")  -"+rupee(s.order.discount) : "")+"\nTotal "+rupee(saleTotal(s))+" ("+(s.mode==="Credit"?"Udhaar":s.mode)+")\nThank you!";
     window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank");
   }); });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-void]"), function(a){ a.addEventListener("click", function(ev){

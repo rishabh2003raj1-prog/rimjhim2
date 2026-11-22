@@ -312,7 +312,11 @@ The **Counter** tab (first in the bottom bar; the billing login opens on it) is 
 - Each bill is saved as one sale with its items and bill number, and its plates go straight into the dish counts,
   so stock and the forecast need no separate tally. Quick tally and typed counts now only add plates sold
   without a bill.
+- **🏷️ Discount** on the bill: saved offers (e.g. "Hospital staff 15%"), quick 5% / 10% / ₹10 / ₹20, or any
+  amount / % with a reason. The sale is saved at the discounted amount, with the original bill, the discount and
+  its reason kept on it. A billing login can give at most the limit set under **⚙️ UPI & discounts** (default 10%)
+  by itself; saved offers, which only owner / manager can create, have no limit.
 - **Today's bills**: every bill with time, items and payment, totals by Cash / UPI / Udhaar, share on WhatsApp, and
-  **Cancel bill** (also removes its plates). In Sales lists, a day's counter bills show as one row; tap it to see them.
+  **Cancel bill** (also removes its plates), and the total discount given that day. In Sales lists, a day's counter bills show as one row; tap it to see them.
 - **🔠 Big & simple** (per phone, for older staff): larger text and buttons everywhere, two big tiles per row,
   only the Hindi name when there is one, fewer buttons.
