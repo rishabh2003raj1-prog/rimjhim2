@@ -29,7 +29,8 @@ for f in $files; do
   count=$((count+1))
   start_server || { fails=$((fails+1)); continue; }
   out=$(S="$OUT" timeout 600 node "$f" 2>&1); code=$?
-  bad=$(echo "$out" | grep -E "^FAIL|Error:|TimeoutError" | head -6)
+  # A suite fails on a FAIL line, a crash (non-zero exit / timeout), or page errors it reports (ERRORS [...] not empty).
+  bad=$(echo "$out" | grep -E '^FAIL|TimeoutError|triggerUncaughtException|^ERRORS \[.+\]' | head -6)
   if [ -n "$bad" ] || [ $code -ne 0 ]; then fails=$((fails+1)); echo "== $f"; echo "${bad:-exit code $code}"; echo "$out" | tail -5; fi
 done
 ps -eo pid,args | grep -E "workerd|wrangler dev" | grep -v grep | awk '{print $1}' | xargs -r kill 2>/dev/null

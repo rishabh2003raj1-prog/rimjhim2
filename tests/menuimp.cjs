@@ -1,7 +1,7 @@
 const fs = require('fs');
 const { chromium } = require(process.env.PW_MODULE || 'playwright');
 
-const HTML = fs.readFileSync('/home/user/rimjhim2/public/index.html','utf8').replace('\n})();\n</script>', '\nwindow.__ev=function(c){return eval(c);};\n})();\n</script>');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'public', 'index.html'),'utf8').replace('\n})();\n</script>', '\nwindow.__ev=function(c){return eval(c);};\n})();\n</script>');
 const E = (p, c) => p.evaluate(x => window.__ev(x), c);
 const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode = 1; } else console.log('ok: ' + m); };
 if(!require('fs').existsSync((process.env.S||'.') + '/RimJhim_Revised_Menu_Import.txt')){ console.log('skip: needs the cafe menu file in $S (kept out of the repo)'); process.exit(0); }
