@@ -13963,7 +13963,7 @@ function buildNotesPrompt(batch, todayStr){
   '"customer2":"udhaarpay only - customer name (use the CUSTOMERS spelling if it is one of them)","loantype":"loan only - take/repay/give/collect","party":"loan only - who the loan is with","paymode":"advance / udhaarpay / loan - Cash/UPI/Bank Transfer",'+
   '"billcat":"bill only - one of '+FIXED_CATS.join("/")+'","billmonth":"bill only - YYYY-MM the bill is for","due":"bill only - YYYY-MM-DD or empty",'+
   '"unclear":boolean,"reason":"string or empty"}\n'+
-  "Rules: resolve relative dates (today/yesterday/date without year) against today's date above. amount is the total rupee value for sale/investment/expense. For purchase, rate is the price PER UNIT (divide a total price by qty if the note gives a total for multiple units) and qty defaults to 1 if not stated. If a payment mode isn't mentioned, use Cash unless the note says credit/udhaar/later, then use Credit (sale/purchase) - investments and expenses default to Cash if unclear. Staff names being paid (e.g. \"Ramesh salary 15000\") are an expense with category Staff Salary, description being the staff name. Staff meals (e.g. \"staff dinner chicken biryani 6 people\", \"no staff meal today\") and attendance have no amount - never mark them unclear for a missing amount. Use the exact names from ITEMS, VENDORS, STAFF and CUSTOMERS when a note means one of them (including Hindi words like doodh = milk, cheeni = sugar, and WORDS THE OWNER USES). If a purchase gives a quantity but no price, set rate to 0 - the app fills the last rate. If no vendor is written, leave vendor empty - the app uses the usual vendor. A loan with a partner (one of '+PARTNERS.join("/")+') is type investment with invType Loan (or Loan repayment). \"Electricity bill 4100 due 15 Nov\" (no payment yet) is type bill; \"paid electricity 4100\" is an expense. Set unclear:true with a short reason only if you genuinely cannot tell what the note is about or its amount.";
+  "Rules: resolve relative dates (today/yesterday/date without year) against today's date above. amount is the total rupee value for sale/investment/expense. For purchase, rate is the price PER UNIT (divide a total price by qty if the note gives a total for multiple units) and qty defaults to 1 if not stated. If a payment mode isn't mentioned, use Cash unless the note says credit/udhaar/later, then use Credit (sale/purchase) - investments and expenses default to Cash if unclear. Staff names being paid (e.g. \"Ramesh salary 15000\") are an expense with category Staff Salary, description being the staff name. Staff meals (e.g. \"staff dinner chicken biryani 6 people\", \"no staff meal today\") and attendance have no amount - never mark them unclear for a missing amount. Use the exact names from ITEMS, VENDORS, STAFF and CUSTOMERS when a note means one of them (including Hindi words like doodh = milk, cheeni = sugar, and WORDS THE OWNER USES). If a purchase gives a quantity but no price, set rate to 0 - the app fills the last rate. In a list of several items, never mark the note unclear because some items have no price - give those items rate 0. If no vendor is written, leave vendor empty - the app uses the usual vendor. A loan with a partner (one of '+PARTNERS.join("/")+') is type investment with invType Loan (or Loan repayment). \"Electricity bill 4100 due 15 Nov\" (no payment yet) is type bill; \"paid electricity 4100\" is an expense. Set unclear:true with a short reason only if you genuinely cannot tell what the note is about or its amount.";
 }
 
 // The AI key lives on the server, never in the app. If the server has no key or
@@ -14058,11 +14058,16 @@ function parsePurchaseLines(text){
     if(priceCount > 1){ parts = parts.concat(p.split(startRe)); }
     else parts.push(p);
   });
-  var out = [];
+  var out = [], missing = [];
   parts.forEach(function(seg){
     if(!seg || !seg.trim()) return;
     var priceM = seg.match(/(?:₹|rs\.?|inr|rupees?)\s*(\d+(?:\.\d+)?)/i) || seg.match(/(\d+(?:\.\d+)?)\s*(?:rs|rupees?|\/-)/i);
-    if(!priceM) return;
+    if(!priceM){
+      // An item listed without a price ("1 bottle Chocolate Syrup"): remembered, not dropped.
+      var mq = seg.match(new RegExp("^\\s*(\\d+(?:\\.\\d+)?)\\s*("+LINE_UNITS+")\\s+([A-Za-z][^.]{1,40})$","i"));
+      if(mq && !/\b(purchased|bought|from|money|paid)\b/i.test(seg)) missing.push({ text:seg.trim(), item:mq[3].trim().split(" ").slice(0,4).join(" "), qty:parseFloat(mq[1]), unit:mq[2].toLowerCase() });
+      return;
+    }
     var price = parseFloat(priceM[1]);
     if(!(price>0)) return;
     var before = seg.slice(0, priceM.index);
@@ -14083,12 +14088,15 @@ function parsePurchaseLines(text){
     name = name.split(" ").slice(0,4).join(" ");
     out.push({ item:name, qty:qty, unit:unit, rate: qty>0 ? +(price/qty).toFixed(4) : price, gst:0, category:"Other" });
   });
+  out.missing = missing;
   return out;
 }
 
 function vendorFromText(text){
   var vm = text.match(/\bfrom\s+((?!own\b)[A-Za-z][A-Za-z\s&.']{1,30})/i);
-  return vm ? vm[1].trim().replace(/\s+(on|today|yesterday|via|by|for)$/i,"") : "Unknown vendor";
+  if(!vm) return "Unknown vendor";
+  var v = vm[1].split(/\s+(?:by|on|and|via|for|with|today|yesterday|paid|using|in|at)\b/i)[0].trim();
+  return v || "Unknown vendor";
 }
 function buyerFromText(text){
   var names = PARTNERS.concat(activeStaff().map(function(s){ return s.name; }));
@@ -14173,9 +14181,14 @@ function parseNoteLocally(text, todayStr){
 
   // A single note often lists a whole bill: "250g mirch - Rs 65, 1kg arhar dal - Rs 130, ...".
   // Split it into proper line items so each one prices and stocks correctly.
-  var multi = parsePurchaseLines(text).map(function(l){ l.item = canonicalItem(l.item); return fillFromMemory(l); });
+  var multiRaw = parsePurchaseLines(text), missingLines = [];
+  var multi = multiRaw.map(function(l){ l.item = canonicalItem(l.item); return fillFromMemory(l); });
+  (multiRaw.missing||[]).forEach(function(m){
+    var l = fillFromMemory({ item:canonicalItem(m.item), qty:m.qty, unit:m.unit==="pc"?"pcs":m.unit, rate:0, gst:0, category:"Other" });
+    if(+l.rate>0) multi.push(l); else missingLines.push(m);
+  });
   if(multi.length >= 2){
-    return { ok:true, type:"purchaseBill", record:{
+    return { ok:true, type:"purchaseBill", missing:missingLines, record:{
       billId: uid(), date: date, vendor: vendorFromText(text), purchasedBy: buyerFromText(text),
       paidBy: payerFor(t, text), mode: purchaseModeFromText(t), lines: multi } };
   }
@@ -14560,11 +14573,25 @@ function processNotes(){
   renderNotes();
 
   var todayStr = fmtDate(new Date());
-  var chunks = [];
-  for(var i=0;i<pending.length;i+=8){ chunks.push(pending.slice(i,i+8)); }
-
   var counts = {sale:0, purchase:0, investment:0, expense:0, staffmeal:0, attendance:0, udhaarpay:0, loan:0, billentry:0}, needsReview = 0, usedOffline = false;
   NOTE_MEM = null;   // read the latest records
+  // A note listing several priced items from one shop is read on the phone: it splits them
+  // reliably, keeps each price, and an item written without a price becomes its own note.
+  pending = pending.filter(function(note){
+    var res = null;
+    try{ res = parseNoteLocally(note.text, todayStr); }catch(e){ res = null; }
+    if(!(res && res.ok && res.type==="purchaseBill" && res.record.lines.length>=2 && canFileNoteType("purchaseBill"))) return true;
+    note.created = fileParsedRecord(res); note.status = "processed"; note.error = null; note.filedType = "purchase";
+    counts.purchase += res.record.lines.length;
+    (res.missing||[]).forEach(function(m){
+      notes.push({ id:uid(), text:m.text+" Rs ? from "+res.record.vendor+" on "+parseDate(res.record.date).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})+(payerIsPersonal(res.record.paidBy)?" paid by "+payerPartner(res.record.paidBy)+" own money":""),
+                   addedAt:new Date().toISOString(), status:"error", error:"Price missing — replace ? with the price and process again", fromNote:note.id });
+      needsReview++;
+    });
+    return false;
+  });
+  var chunks = [];
+  for(var i=0;i<pending.length;i+=8){ chunks.push(pending.slice(i,i+8)); }
 
   function runChunk(idx){
     if(idx>=chunks.length){
@@ -14623,6 +14650,11 @@ function processNotes(){
           var added = 0;
           r.items.forEach(function(it){
             var q = +it.qty || 0, rt = +it.rate || 0;
+            if(it.item && !(rt>0)){
+              notes.push({ id:uid(), text:(q>0?fmtQty(q)+" "+(it.unit||"")+" ":"")+it.item+" Rs ? from "+(r.vendor||"Unknown vendor")+" on "+parseDate(dateVal).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}),
+                           addedAt:new Date().toISOString(), status:"error", error:"Price missing — replace ? with the price and process again", fromNote:note.id });
+              needsReview++; return;
+            }
             if(!it.item || !(q>0) || !(rt>0)) return;
             purchases.push({ id:track("purchases", uid()), billId:bid2, date:dateVal, vendor:r.vendor||"Unknown vendor",
                              purchasedBy:pbyB, paidBy:ppayB, item:it.item,

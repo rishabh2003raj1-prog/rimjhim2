@@ -19,6 +19,13 @@ All data is stored on the cafe's own Cloudflare server (a D1 database), not in t
 
 You need a free Cloudflare account. No card is needed: D1 and Workers are on the free plan.
 
+
+**Lists of items in one note** ("Purchased 1 bottle Orange Mojito Rs 250, 1 jar Mix achaar Rs 180, … from Rihan Shop by
+Dashrath bhaiya, his own money, on 11 September 2026") are read on the phone first: each item with its own price, the
+shop, who bought it, who paid and the date. An item written without a price ("1 bottle Chocolate Syrup") is not
+dropped: it gets its own note — "1 bottle Chocolate Syrup Rs ? from Rihan Shop on 11 Sept 2026 …" — to fill in the
+price and process again (a price the app already remembers for that item is used automatically).
+
 ### Option A: from GitHub (recommended)
 
 1. In Cloudflare, go to **My Profile → API Tokens → Create Token** and use the **Edit Cloudflare Workers** template. Add **Account → D1 → Edit** to the permissions. Copy the token.
