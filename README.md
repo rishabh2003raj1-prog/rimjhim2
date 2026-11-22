@@ -292,3 +292,9 @@ optional photo, reorderable.
   suggested price. The menu warns when dishes cost more than target + 5%.
 - Chefs edit dishes but don't see costs or margins; billing can only view.
 - Fixed: typing in the dish form no longer redraws it (which lost the next field being typed into).
+- **Paste a list of dishes** (add or update many at once): one dish per line as
+  `Category | Name | Price | veg/egg/nonveg | Hindi name` (only Name and Price are required). A preview shows new
+  dishes and price changes before importing. A dish whose name already exists gets the new price, category and mark
+  but keeps its recipe, SOP and photo. Optionally hide every dish not in the list.
+- **On the menu** switch per dish: hidden dishes move to an "Off the menu" group, keep their recipe and history,
+  and stop appearing in quick tally and the dish count form.

@@ -5062,6 +5062,7 @@ function renderMenuView(){
     html += '<div class="addrow"><button class="sale" id="menu_log">Type counts</button><button class="expense" id="menu_est">Estimate from takings</button></div>';
   }
   html += '<div class="addrow">'+(canWriteKey(MENU_KEY)?'<button class="purch" id="menu_add">+ Dish</button>':'')+'<button class="invest" id="menu_prep">Today’s prep list</button></div>';
+  if(canWriteKey(MENU_KEY)) html += '<button class="btn-additem" id="menu_import" style="margin-bottom:8px;">Paste a list of dishes (add or update many at once)</button>';
   html += '<div class="addrow"><button class="sale" id="menu_book">📖 Recipe &amp; SOP book (PDF)</button>'+(costs?'<button class="expense" id="menu_eng">Menu analysis</button>':'')+'</div>';
   if(menuItems.length){
     html += '<div class="card" style="margin-bottom:10px;padding:10px 12px;"><div class="psrow" style="padding:2px 0;"><span><b>'+ready+' of '+menuItems.length+' dishes ready</b><br><span class="muted" style="font-size:11.5px;">ready = photo, price, recipe and SOP all set</span></span>'+
@@ -5071,9 +5072,10 @@ function renderMenuView(){
       if(over.length) html += '<div class="attmwarn" data-menueng="1" style="cursor:pointer;">'+over.length+' dish'+(over.length!==1?'es cost':' costs')+' more than '+(targetFoodCost()+5)+'% of the price to make — tap to see suggested prices.</div>';
     }
   }
-  var cats = {};
-  menuItems.forEach(function(m){ (cats[m.category||"Other"] = cats[m.category||"Other"] || []).push(m); });
-  menuCats().concat(Object.keys(cats)).filter(function(c, i, a){ return a.indexOf(c)===i && cats[c]; }).forEach(function(cat){
+  var cats = {}, offMenu = menuItems.filter(function(m){ return m.active===false; });
+  menuItems.forEach(function(m){ if(m.active!==false) (cats[m.category||"Other"] = cats[m.category||"Other"] || []).push(m); });
+  if(offMenu.length) cats["Off the menu"] = offMenu;
+  menuCats().concat(Object.keys(cats).filter(function(c){ return c!=="Off the menu"; })).concat(offMenu.length?["Off the menu"]:[]).filter(function(c, i, a){ return a.indexOf(c)===i && cats[c]; }).forEach(function(cat){
     html += '<div class="daygroup">'+esc(cat)+' <span class="muted">· '+cats[cat].length+'</span></div><div class="dishgrid">';
     html += cats[cat].map(function(m){
       var d = dishCost(m), gaps = dishGaps(m);
@@ -5094,12 +5096,72 @@ function renderMenuView(){
   on("menu_est", function(){ openEstimateSheet(fmtDate(new Date())); });
   on("menu_prep", function(){ openPrepList(fmtDate(new Date())); });
   on("menu_book", openRecipeBookSheet);
+  on("menu_import", openMenuImport);
   on("menu_eng", openMenuAnalysis);
   var w = el.querySelector("[data-menueng]"); if(w) w.addEventListener("click", openMenuAnalysis);
   Array.prototype.forEach.call(el.querySelectorAll("[data-menu]"), function(b){
     b.addEventListener("click", function(){ openRecipeCard(b.getAttribute("data-menu")); });
   });
   if(recSub==="menu") updateRecordsTotal();
+}
+
+// Add or update many dishes at once from pasted lines:
+//   Category | Dish name | Price | veg / egg / nonveg | local name (optional)
+// A dish with the same name gets the new category, price and type; its recipe, SOP and
+// photo stay. Lines starting with # are ignored.
+function parseMenuLines(text){
+  var out = [], bad = [];
+  String(text||"").split(/\r?\n/).forEach(function(line, i){
+    var l = line.trim(); if(!l || l.charAt(0)==="#") return;
+    var parts = l.split(/\s*[|\t]\s*/);
+    if(parts.length < 3){ bad.push(i+1); return; }
+    var price = parseFloat(String(parts[2]).replace(/[^0-9.]/g,""));
+    var t = (parts[3]||"veg").toLowerCase().replace(/[^a-z]/g,"");
+    var veg = /non|chicken|mutton|fish/.test(t) ? "nonveg" : /egg/.test(t) ? "egg" : "veg";
+    if(!parts[1] || !(price>0)){ bad.push(i+1); return; }
+    out.push({ category:parts[0] || "Other", name:parts[1], price:price, veg:veg, localName:(parts[4]||"").trim() });
+  });
+  return { rows:out, bad:bad };
+}
+function openMenuImport(){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Paste a list of dishes</h2>';
+  html += '<div class="backupnote">One dish per line: <b>Category | Dish name | Price | veg / egg / nonveg</b> (a Hindi name can be added as a fifth part). A dish that already exists gets the new price, category and type — its recipe, SOP and photo are kept. Lines starting with # are skipped.</div>';
+  html += '<div class="field"><textarea id="mi_text" rows="10" placeholder="Chinese | Hakka Noodles (Half) | 79 | veg&#10;Chinese | Hakka Noodles (Full) | 129 | veg&#10;Biryani | Chicken Biryani (Full) | 179 | nonveg"></textarea></div>';
+  html += '<label class="setlopt"><input type="checkbox" id="mi_hide"> <span>Also hide dishes that are not in this list (they stay saved, just off the menu)</span></label>';
+  html += '<div id="mi_prev" class="card" style="margin:10px 0;display:none;"></div><div class="err" id="mi_err"></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="mi_cancel">Cancel</button><button class="btn-cancel" id="mi_check">Check</button><button class="btn-save" id="mi_go">Import</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  function plan(){
+    var r = parseMenuLines(document.getElementById("mi_text").value), add = 0, upd = 0;
+    r.rows.forEach(function(x){ if(menuItems.some(function(m){ return normItem(m.name)===normItem(x.name); })) upd++; else add++; });
+    return { r:r, add:add, upd:upd };
+  }
+  function preview(){
+    var p = plan(), box = document.getElementById("mi_prev");
+    box.style.display = "block";
+    box.innerHTML = '<div class="psrow"><span>New dishes</span><b>'+p.add+'</b></div><div class="psrow"><span>Price / category updates</span><b>'+p.upd+'</b></div>'+
+      (p.r.bad.length ? '<div class="barsub warnline">Lines not understood: '+p.r.bad.slice(0,12).join(", ")+(p.r.bad.length>12?"…":"")+' (need Category | Name | Price)</div>' : '');
+    return p;
+  }
+  document.getElementById("mi_check").addEventListener("click", preview);
+  document.getElementById("mi_cancel").addEventListener("click", closeForm);
+  document.getElementById("mi_go").addEventListener("click", function(){
+    var p = preview(), err = document.getElementById("mi_err");
+    if(!p.r.rows.length){ err.textContent = "Nothing to import — paste lines like: Chinese | Hakka Noodles (Full) | 129 | veg"; err.style.display = "block"; return; }
+    var names = {};
+    p.r.rows.forEach(function(x){
+      names[normItem(x.name)] = true;
+      var m = menuItems.find(function(d){ return normItem(d.name)===normItem(x.name); });
+      if(m){ m.category = x.category; m.price = x.price; m.veg = x.veg; if(x.localName) m.localName = x.localName; m.active = true; }
+      else menuItems.push({ id:uid(), name:x.name, localName:x.localName, category:x.category, price:x.price, veg:x.veg, active:true, photo:null, recipe:[], sop:[], portion:"", prepTime:"", holding:"", notes:"" });
+    });
+    var hidden = 0;
+    if(document.getElementById("mi_hide").checked) menuItems.forEach(function(m){ if(!names[normItem(m.name)] && m.active!==false){ m.active = false; hidden++; } });
+    saveMenu(); closeForm(); renderAll();
+    appAlert("Imported: "+p.add+" new dish"+(p.add!==1?"es":"")+", "+p.upd+" updated"+(hidden?", "+hidden+" hidden":"")+". Add photos, recipes and SOPs from each dish.");
+  });
 }
 
 // The recipe card: what the kitchen follows. Scale the recipe for any number of plates.
@@ -5164,6 +5226,7 @@ function renderMenuFormSheet(draft, isEdit){
   html += '<div><label>Selling price (₹)</label><input type="number" inputmode="decimal" id="m_price" value="'+esc(draft.price)+'"></div></div>';
   html += '<datalist id="m_cats">'+menuCats().map(function(c){ return '<option value="'+esc(c)+'">'; }).join("")+'</datalist>';
   html += '<div class="field"><label>Type</label><div class="segctl" id="m_veg" style="margin:0;">'+["veg","egg","nonveg"].map(function(v){ return '<button data-veg="'+v+'" class="'+(draft.veg===v?"on":"")+'">'+VEG_MARK[v].label+'</button>'; }).join("")+'</div></div>';
+  html += '<label class="setlopt"><input type="checkbox" id="m_active"'+(draft.active===false?'':' checked')+'> <span>On the menu (untick to hide it for now — season over, item unavailable)</span></label>';
   html += '<div class="field two"><div><label>Portion (optional)</label><input type="text" id="m_portion" value="'+esc(draft.portion||"")+'" placeholder="e.g. 150 ml cup / 1 plate"></div>';
   html += '<div><label>Prep time, minutes (optional)</label><input type="number" inputmode="numeric" id="m_time" value="'+esc(draft.prepTime||"")+'"></div></div>';
   html += '<div class="field"><label>Holding / shelf life (optional)</label><input type="text" id="m_hold" value="'+esc(draft.holding||"")+'" placeholder="e.g. serve within 10 min · gravy keeps 1 day in fridge"></div>';
@@ -5208,6 +5271,7 @@ function renderMenuFormSheet(draft, isEdit){
     draft.prepTime = document.getElementById("m_time").value;
     draft.holding = document.getElementById("m_hold").value;
     draft.notes = document.getElementById("m_notes").value;
+    draft.active = document.getElementById("m_active").checked;
     Array.prototype.forEach.call(sheet.querySelectorAll(".ri"), function(inp){ draft.recipe[+inp.getAttribute("data-i")][inp.getAttribute("data-f")] = inp.value; });
     Array.prototype.forEach.call(sheet.querySelectorAll(".sopt"), function(t){ draft.sop[+t.getAttribute("data-i")].text = t.value; });
   }
@@ -5272,7 +5336,7 @@ function renderMenuFormSheet(draft, isEdit){
     if(isNaN(pr) || pr<=0){ errEl.textContent = "Enter the selling price."; errEl.style.display="block"; return; }
     var old = menuById(draft.id) || {};
     var rec = Object.assign({}, old, { id:draft.id, name:draft.name.trim(), localName:(draft.localName||"").trim(), category:(draft.category||"").trim() || "Other", price:pr,
-                active: old.active===false ? false : true, veg:draft.veg||"veg", photo:draft.photo||null,
+                active: draft.active!==false, veg:draft.veg||"veg", photo:draft.photo||null,
                 portion:(draft.portion||"").trim(), prepTime: parseFloat(draft.prepTime)||"", holding:(draft.holding||"").trim(), notes:(draft.notes||"").trim(),
                 recipe:(draft.recipe||[]).map(function(r){ return { ingredientId:r.ingredientId, qty:parseFloat(r.qty)||0 }; }).filter(function(r){ return r.qty>0; }),
                 sop:(draft.sop||[]).filter(function(x){ return x && ((x.text||"").trim() || x.photo); }).map(function(x){ return { text:(x.text||"").trim(), photo:x.photo||null }; }) });
@@ -8075,7 +8139,7 @@ function openDishLogForm(dateStr){
   html += '<div class="backupnote">'+parseDate(dateStr).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})+
           ' - enter how many of each went out. This is what drives ingredient stock and the daily forecast.</div>';
   if(menuItems.length===0){ html += '<div class="empty">Add menu items first.</div>'; }
-  html += menuItems.map(function(m){
+  html += menuItems.filter(function(m){ return m.active!==false || existing[m.id]; }).map(function(m){
     return '<div class="dishrow"><div><b>'+esc(m.name)+'</b><span>'+rupee(m.price)+'</span></div>'+
            '<input type="number" inputmode="numeric" class="dq" data-m="'+m.id+'" value="'+(existing[m.id]||"")+'" placeholder="0"></div>';
   }).join("");
