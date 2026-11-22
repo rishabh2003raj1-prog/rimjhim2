@@ -299,12 +299,20 @@ optional photo, reorderable.
   suggested price. The menu warns when dishes cost more than target + 5%.
 - Chefs edit dishes but don't see costs or margins; billing can only view.
 - Fixed: typing in the dish form no longer redraws it (which lost the next field being typed into).
-- **🖨️ Printable menu (PDF)**: a ready-to-print menu of the dishes on the menu — title, a line for address /
-  timings, phone for orders, a note at the bottom; **A4** (2 columns, wall / counter) or **A5** (table card); three
-  looks (classic cream, dark & gold, clean white); Hindi names and veg / egg / non-veg marks optional; pick which
-  sections; optional UPI QR. Half / Full portions share one line ("Hakka Noodles … ₹79 / 129"), and a section that
-  runs onto the next column or page is labelled "(contd.)". Pages are drawn on the phone so Hindi prints correctly.
-  Preview first, then Make PDF to share or save. Choices are remembered on that phone.
+- **🖨️ Printable menu (PDF)**: a ready-to-print menu of the dishes on the menu.
+  - **Layouts**: 🖼️ *with food pictures* (cards: picture, veg mark, name, Hindi name, price — 4 per row on A4, 3 on A5)
+    or 📃 *classic list* (dotted price lines, 2 columns on A4). Pictures are the cafe's own dish photos (Menu → dish →
+    📷); dishes without one get an illustrated picture. The footer says "Images are for illustration only; actual food
+    may vary".
+  - **Looks**: Royal maroon & gold, Emerald & cream, Charcoal & copper, Terracotta (with ornamental borders), Classic
+    cream, Dark & gold, Clean white. **Sizes**: A4 (wall / counter) or A5 (table card).
+  - **Legal note** at the end (on by default, editable, "reset to the standard note"): images are illustrative and food
+    may vary; prices in ₹ inclusive of GST; FSSAI veg / non-veg symbols (egg dishes are marked non-vegetarian on the
+    print, as FSSAI requires); allergens handled in the kitchen; no service charge; plus a Hindi line. Legend with
+    the green / brown symbols. Edit it if, for example, prices exclude GST.
+  - Title, address / timings line, phone, footer note, Hindi names, veg marks, which sections, optional UPI QR. Half /
+    Full share one line or card; sections running onto the next page are labelled "(contd.)". Drawn on the phone so
+    Hindi prints correctly. Preview, then Make PDF. Choices are remembered on that phone.
 - **Paste a list of dishes** (add or update many at once): one dish per line as
   `Category | Name | Price | veg/egg/nonveg | Hindi name` (only Name and Price are required). A preview shows new
   dishes and price changes before importing. A dish whose name already exists gets the new price, category and mark

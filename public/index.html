@@ -5648,13 +5648,25 @@ function loadPdfImage(url){
 // one line ("Hakka Noodles ..... 79 / 129").
 var MENU_PDF_KEY = "menu_pdf_v1";
 var MENU_THEMES = {
-  classic:{ name:"Classic cream", bg:"#FBF6EA", ink:"#2A1D14", accent:"#1F5C52", muted:"#7A6A58", line:"#D9CDB4" },
-  dark:{ name:"Dark & gold", bg:"#1D2924", ink:"#F4ECDA", accent:"#E0B354", muted:"#B7AE99", line:"#3C4A44" },
-  bright:{ name:"Clean white", bg:"#FFFFFF", ink:"#1E1E1E", accent:"#C2412D", muted:"#6B6B6B", line:"#E3E3E3" }
+  royal:{ name:"Royal maroon & gold", bg:"#3E0E16", card:"#4D1620", ink:"#F6EAD7", accent:"#D9B25F", muted:"#CDB89A", line:"#7A3A43", orn:true },
+  emerald:{ name:"Emerald & cream", bg:"#0F3B31", card:"#16483D", ink:"#F3EEDF", accent:"#E7C77A", muted:"#B9C7BC", line:"#2F5E52", orn:true },
+  charcoal:{ name:"Charcoal & copper", bg:"#1E1E1F", card:"#2A2A2C", ink:"#F1ECE4", accent:"#D08A5A", muted:"#ADA59B", line:"#3D3D40", orn:true },
+  terracotta:{ name:"Terracotta", bg:"#F7EEE3", card:"#FFFFFF", ink:"#2E1E16", accent:"#B4532F", muted:"#7E6656", line:"#E3CDB8", orn:true },
+  classic:{ name:"Classic cream", bg:"#FBF6EA", card:"#FFFFFF", ink:"#2A1D14", accent:"#1F5C52", muted:"#7A6A58", line:"#D9CDB4" },
+  dark:{ name:"Dark & gold", bg:"#1D2924", card:"#25332D", ink:"#F4ECDA", accent:"#E0B354", muted:"#B7AE99", line:"#3C4A44" },
+  bright:{ name:"Clean white", bg:"#FFFFFF", card:"#F7F7F7", ink:"#1E1E1E", accent:"#C2412D", muted:"#6B6B6B", line:"#E3E3E3" }
 };
+// The small print for the menu. Written to common Indian norms; the owner can edit it.
+var MENU_LEGAL_DEFAULT = "Images are for illustrative purposes only; actual food may vary in appearance, portion size and presentation. " +
+  "All prices are in Indian Rupees (₹) and inclusive of applicable GST. " +
+  "Vegetarian and non-vegetarian dishes are marked with the FSSAI symbols; dishes containing egg are marked non-vegetarian. " +
+  "Our kitchen also handles milk, wheat (gluten), nuts, soy, egg, mustard and sesame — please tell our staff about any food allergy or dietary need before ordering. " +
+  "No service charge is levied. Preparation time may vary at busy hours.";
+var MENU_LEGAL_HI = "चित्र केवल प्रस्तुति के लिए हैं; वास्तविक भोजन दिखने में भिन्न हो सकता है। एलर्जी हो तो ऑर्डर से पहले स्टाफ को बताएँ।";
 function menuPdfOpts(){
   var o = {}; try{ o = JSON.parse(localStorage.getItem(MENU_PDF_KEY) || "{}") || {}; }catch(e){}
-  return Object.assign({ title: OUTLET.name || "RimJhim Cafe", tagline:"", phone:"", note:"All prices in ₹ · inclusive of taxes", size:"A4", theme:"classic", hindi:true, veg:true, qr:false, skip:[] }, o);
+  return Object.assign({ title: OUTLET.name || "RimJhim Cafe", tagline:"", phone:"", note:"All prices in ₹ · inclusive of taxes", size:"A4", theme:"royal", layout:"photos",
+    hindi:true, veg:true, qr:false, skip:[], legal:true, legalText:MENU_LEGAL_DEFAULT }, o);
 }
 function saveMenuPdfOpts(o){ try{ localStorage.setItem(MENU_PDF_KEY, JSON.stringify(o)); }catch(e){} }
 // Menu sections with rows; Half / Full merged.
@@ -5665,10 +5677,10 @@ function menuPdfSections(o){
     var sec = by[c], mm = /^(.*?)\s*\((half|full)\)\s*$/i.exec(m.name||"");
     if(mm){
       var k = normItem(mm[1]), row = sec.keys[k];
-      if(!row){ row = sec.keys[k] = { name:mm[1].trim(), local:(m.localName||"").replace(/\s*\((हाफ़?|फ़ुल|फुल|हाफ|half|full)\)\s*$/i,""), veg:m.veg, half:null, full:null }; sec.rows.push(row); }
+      if(!row){ row = sec.keys[k] = { name:mm[1].trim(), local:(m.localName||"").replace(/\s*\((हाफ़?|फ़ुल|फुल|हाफ|half|full)\)\s*$/i,""), veg:m.veg, half:null, full:null, photo:m.photo||"", m:m }; sec.rows.push(row); }
       row[mm[2].toLowerCase()] = +m.price; sec.sizes = true;
-      if(!row.veg) row.veg = m.veg;
-    } else sec.rows.push({ name:m.name, local:m.localName||"", veg:m.veg, price:+m.price });
+      if(!row.veg) row.veg = m.veg; if(!row.photo && m.photo) row.photo = m.photo;
+    } else sec.rows.push({ name:m.name, local:m.localName||"", veg:m.veg, price:+m.price, photo:m.photo||"", m:m });
   });
   order.sort(function(a,b){ var ia = cats.indexOf(a), ib = cats.indexOf(b); return (ia<0?999:ia)-(ib<0?999:ib); });
   return order.map(function(c){ return by[c]; });
@@ -5682,81 +5694,168 @@ function ensureMenuFonts(){
   if(!(document.fonts && document.fonts.load)) return Promise.resolve();
   return Promise.all(["600 20px Fraunces","400 14px 'Work Sans'","600 14px 'Work Sans'"].map(function(f){ return document.fonts.load(f).catch(function(){}); })).catch(function(){});
 }
+// Load the dish photos the cafe has added (same site, so they can be drawn into the PDF).
+function loadMenuPhotos(o){
+  var urls = {}; menuPdfSections(o).forEach(function(s){ s.rows.forEach(function(r){ if(r.photo) urls[r.photo] = 1; }); });
+  var out = {};
+  return Promise.all(Object.keys(urls).map(function(u){ return new Promise(function(res){
+    var im = new Image(), done = false; function fin(ok){ if(done) return; done = true; out[u] = ok ? im : null; res(); }
+    im.onload = function(){ fin(true); }; im.onerror = function(){ fin(false); }; setTimeout(function(){ fin(false); }, 8000); im.src = u; }); })).then(function(){ return out; });
+}
 // Lays the menu out into pages and draws them. Returns an array of canvases.
-function drawMenuPages(o, qrImg){
+function drawMenuPages(o, qrImg, photos){
+  photos = photos || {};
   var sizePt = o.size==="A5" ? [420, 595] : [595, 842];
   var DPI = 200/72, W = Math.round(sizePt[0]*DPI), H = Math.round(sizePt[1]*DPI), S = DPI;  // 1pt = S px
-  var th = MENU_THEMES[o.theme] || MENU_THEMES.classic, cols = o.size==="A5" ? 1 : 2;
-  var M = 34*S, G = 24*S, colW = (W - 2*M - (cols-1)*G)/cols;
+  var th = MENU_THEMES[o.theme] || MENU_THEMES.royal, photoLayout = o.layout==="photos";
+  var cols = photoLayout ? (o.size==="A5" ? 3 : 4) : (o.size==="A5" ? 1 : 2);
+  var M = 36*S, G = (photoLayout ? 10 : 24)*S, colW = (W - 2*M - (cols-1)*G)/cols;
   var serif = "Fraunces, Georgia, serif", sans = "'Work Sans', 'Noto Sans', system-ui, sans-serif";
   var secs = menuPdfSections(o), pages = [], ctx, page, col, y, top, bottom;
   var meas = document.createElement("canvas").getContext("2d");
   function font(sz, w, fam){ return (w||400)+" "+Math.round(sz*S)+"px "+(fam||sans); }
   function wrap(text, maxW, f){ meas.font = f; var words = String(text).split(/\s+/), lines = [], cur = ""; words.forEach(function(w){ var t = cur ? cur+" "+w : w; if(meas.measureText(t).width > maxW && cur){ lines.push(cur); cur = w; } else cur = t; }); if(cur) lines.push(cur); return lines; }
+  function rrect(x, yy, w, h, r){ ctx.beginPath(); ctx.moveTo(x+r, yy); ctx.arcTo(x+w, yy, x+w, yy+h, r); ctx.arcTo(x+w, yy+h, x, yy+h, r); ctx.arcTo(x, yy+h, x, yy, r); ctx.arcTo(x, yy, x+w, yy, r); ctx.closePath(); }
+  function ornaments(){
+    ctx.strokeStyle = th.line; ctx.lineWidth = 1.2*S; ctx.strokeRect(14*S, 14*S, W-28*S, H-28*S);
+    if(!th.orn) return;
+    ctx.strokeStyle = th.accent; ctx.lineWidth = 0.8*S; ctx.strokeRect(19*S, 19*S, W-38*S, H-38*S);
+    var L = 26*S;
+    [[14,14,1,1],[W/S-14,14,-1,1],[14,H/S-14,1,-1],[W/S-14,H/S-14,-1,-1]].forEach(function(c){
+      var x = c[0]*S, yy = c[1]*S; ctx.lineWidth = 2.2*S; ctx.beginPath(); ctx.moveTo(x, yy + c[3]*L); ctx.lineTo(x, yy); ctx.lineTo(x + c[2]*L, yy); ctx.stroke();
+      ctx.fillStyle = th.accent; ctx.beginPath(); ctx.arc(x + c[2]*9*S, yy + c[3]*9*S, 2.2*S, 0, Math.PI*2); ctx.fill();
+    });
+  }
+  function divider(cx, yy, half){ ctx.strokeStyle = th.accent; ctx.lineWidth = 1*S; ctx.beginPath(); ctx.moveTo(cx-half, yy); ctx.lineTo(cx-8*S, yy); ctx.moveTo(cx+8*S, yy); ctx.lineTo(cx+half, yy); ctx.stroke();
+    ctx.fillStyle = th.accent; ctx.save(); ctx.translate(cx, yy); ctx.rotate(Math.PI/4); ctx.fillRect(-3*S, -3*S, 6*S, 6*S); ctx.restore(); }
   function newPage(){
     var c = document.createElement("canvas"); c.width = W; c.height = H; ctx = c.getContext("2d");
-    ctx.fillStyle = th.bg; ctx.fillRect(0,0,W,H);
-    ctx.strokeStyle = th.line; ctx.lineWidth = 1.2*S; ctx.strokeRect(14*S, 14*S, W-28*S, H-28*S);
+    ctx.fillStyle = th.bg; ctx.fillRect(0,0,W,H); ornaments();
     pages.push(c); page = pages.length; col = 0;
     if(page===1){
-      ctx.textAlign = "center"; ctx.fillStyle = th.accent; ctx.font = font(o.size==="A5"?28:36, 600, serif); ctx.fillText(o.title||"Menu", W/2, M+30*S);
-      var yy = M+30*S;
+      var yy = M+28*S;
+      ctx.textAlign = "center"; ctx.fillStyle = th.accent; ctx.font = font(o.size==="A5"?28:38, 600, serif); ctx.fillText(o.title||"Menu", W/2, yy);
+      yy += 14*S; divider(W/2, yy, 70*S);
       if(o.tagline){ yy += 18*S; ctx.fillStyle = th.muted; ctx.font = font(10.5, 400); ctx.fillText(o.tagline, W/2, yy); }
-      if(o.phone){ yy += 15*S; ctx.fillStyle = th.ink; ctx.font = font(10.5, 600); ctx.fillText("📞 Orders / delivery: "+o.phone, W/2, yy); }
-      yy += 14*S; ctx.strokeStyle = th.accent; ctx.lineWidth = 1.5*S; ctx.beginPath(); ctx.moveTo(W/2-60*S, yy); ctx.lineTo(W/2+60*S, yy); ctx.stroke();
-      top = yy + 22*S;
+      if(o.phone){ yy += 15*S; ctx.fillStyle = th.ink; ctx.font = font(10.5, 600); ctx.fillText("Orders / delivery: "+o.phone, W/2, yy); }
+      top = yy + 24*S;
     } else {
       ctx.textAlign = "center"; ctx.fillStyle = th.accent; ctx.font = font(14, 600, serif); ctx.fillText(o.title||"Menu", W/2, M+8*S);
       top = M + 30*S;
     }
-    bottom = H - M - 22*S; y = top;
+    bottom = H - M - 24*S; y = top;
   }
-  function colX(){ return M + col*(colW+G); }
-  var curSec = null;
-  function need(h){
-    if(y + h <= bottom) return;
-    if(col < cols-1){ col++; y = top; } else newPage();
-    if(curSec){ ctx.textAlign = "left"; ctx.fillStyle = th.accent; ctx.font = font(11, 600, serif); ctx.fillText(curSec.cat+" (contd.)", colX(), y + 9*S);
-      if(curSec.sizes){ ctx.textAlign = "right"; ctx.fillStyle = th.muted; ctx.font = font(8, 600); ctx.fillText("HALF / FULL", colX() + colW, y + 9*S); }
-      y += 20*S; }
+  // FSSAI marks: green = vegetarian; brown = non-vegetarian (egg dishes count as non-vegetarian).
+  function vegMark(x, yb, v, sz){
+    if(!o.veg || !v) return 0; var s = (sz||8)*S, col0 = v==="veg" ? "#1F8A3B" : "#7B3F1D";
+    ctx.fillStyle = "#FFFFFF"; ctx.fillRect(x - 1.5*S, yb - s - 0.5*S, s + 3*S, s + 3*S);
+    ctx.strokeStyle = col0; ctx.lineWidth = 1.2*S; ctx.strokeRect(x, yb - s + 1*S, s, s); ctx.fillStyle = col0;
+    if(v==="veg"){ ctx.beginPath(); ctx.arc(x+s/2, yb - s/2 + 1*S, s*0.28, 0, Math.PI*2); ctx.fill(); }
+    else { ctx.beginPath(); ctx.moveTo(x+s/2, yb - s + 1*S + s*0.2); ctx.lineTo(x + s*0.8, yb + 1*S - s*0.2); ctx.lineTo(x + s*0.2, yb + 1*S - s*0.2); ctx.closePath(); ctx.fill(); }
+    return s + 5*S;
   }
-  function vegMark(x, yb, v){ var vm = VEG_MARK[v]; if(!vm || !o.veg) return 0; var s = 8*S; ctx.strokeStyle = vm.color; ctx.lineWidth = 1.2*S; ctx.strokeRect(x, yb - s + 1*S, s, s); ctx.fillStyle = vm.color; ctx.beginPath(); ctx.arc(x+s/2, yb - s/2 + 1*S, 2.2*S, 0, Math.PI*2); ctx.fill(); return s + 5*S; }
   newPage();
   if(!secs.length){ ctx.textAlign = "center"; ctx.fillStyle = th.muted; ctx.font = font(12); ctx.fillText("No dishes on the menu yet.", W/2, top+40*S); }
-  secs.forEach(function(sec){
-    var nameF = font(11.5, 600), locF = font(9.5, 400), priceF = font(11.5, 600);
-    function rowH(r){ var pw = (meas.font = priceF, meas.measureText(rowPrice(r)).width); var lines = wrap(r.name, colW - pw - 30*S, nameF); return lines.length*15*S + (o.hindi && r.local ? 12*S : 0) + 7*S; }
-    curSec = null; need(30*S + (sec.rows[0] ? rowH(sec.rows[0]) : 0));
-    var x = colX();
-    ctx.textAlign = "left"; ctx.fillStyle = th.accent; ctx.font = font(16, 600, serif); ctx.fillText(sec.cat, x, y + 14*S);
-    if(sec.sizes){ ctx.textAlign = "right"; ctx.fillStyle = th.muted; ctx.font = font(8.5, 600); ctx.fillText("HALF / FULL", x + colW, y + 14*S); }
-    ctx.strokeStyle = th.line; ctx.lineWidth = 1*S; ctx.beginPath(); ctx.moveTo(x, y + 21*S); ctx.lineTo(x + colW, y + 21*S); ctx.stroke();
-    y += 32*S; curSec = sec;
-    sec.rows.forEach(function(r){
-      var h = rowH(r); need(h); x = colX();
-      var price = rowPrice(r); ctx.font = priceF; var pw = ctx.measureText(price).width;
-      var off = vegMark(x, y + 10*S, r.veg);
-      var lines = wrap(r.name, colW - pw - 30*S - off, nameF);
-      ctx.textAlign = "left"; ctx.fillStyle = th.ink; ctx.font = nameF;
-      lines.forEach(function(l, i){ ctx.fillText(l, x + off, y + 10*S + i*15*S); });
-      var lastW = (ctx.font = nameF, ctx.measureText(lines[lines.length-1]).width), ly = y + 10*S + (lines.length-1)*15*S;
-      ctx.fillStyle = th.muted; for(var dx = x + off + lastW + 6*S; dx < x + colW - pw - 6*S; dx += 4*S) ctx.fillRect(dx, ly - 1*S, 1.1*S, 1.1*S);
-      ctx.textAlign = "right"; ctx.fillStyle = th.ink; ctx.font = priceF; ctx.fillText(price, x + colW, ly);
-      if(o.hindi && r.local){ ctx.textAlign = "left"; ctx.fillStyle = th.muted; ctx.font = locF; ctx.fillText(r.local, x + off, ly + 12*S); }
-      y += h;
+  if(!photoLayout){
+    var curSec = null;
+    var colX = function(){ return M + col*(colW+G); };
+    var need = function(h){
+      if(y + h <= bottom) return;
+      if(col < cols-1){ col++; y = top; } else newPage();
+      if(curSec){ ctx.textAlign = "left"; ctx.fillStyle = th.accent; ctx.font = font(11, 600, serif); ctx.fillText(curSec.cat+" (contd.)", colX(), y + 9*S);
+        if(curSec.sizes){ ctx.textAlign = "right"; ctx.fillStyle = th.muted; ctx.font = font(8, 600); ctx.fillText("HALF / FULL", colX() + colW, y + 9*S); }
+        y += 20*S; }
+    };
+    secs.forEach(function(sec){
+      var nameF = font(11.5, 600), locF = font(9.5, 400), priceF = font(11.5, 600);
+      function rowH(r){ var pw = (meas.font = priceF, meas.measureText(rowPrice(r)).width); var lines = wrap(r.name, colW - pw - 30*S, nameF); return lines.length*15*S + (o.hindi && r.local ? 12*S : 0) + 7*S; }
+      curSec = null; need(30*S + (sec.rows[0] ? rowH(sec.rows[0]) : 0));
+      var x = colX();
+      ctx.textAlign = "left"; ctx.fillStyle = th.accent; ctx.font = font(16, 600, serif); ctx.fillText(sec.cat, x, y + 14*S);
+      if(sec.sizes){ ctx.textAlign = "right"; ctx.fillStyle = th.muted; ctx.font = font(8.5, 600); ctx.fillText("HALF / FULL", x + colW, y + 14*S); }
+      ctx.strokeStyle = th.line; ctx.lineWidth = 1*S; ctx.beginPath(); ctx.moveTo(x, y + 21*S); ctx.lineTo(x + colW, y + 21*S); ctx.stroke();
+      y += 32*S; curSec = sec;
+      sec.rows.forEach(function(r){
+        var h = rowH(r); need(h); x = colX();
+        var price = rowPrice(r); ctx.font = priceF; var pw = ctx.measureText(price).width;
+        var off = vegMark(x, y + 10*S, r.veg);
+        var lines = wrap(r.name, colW - pw - 30*S - off, nameF);
+        ctx.textAlign = "left"; ctx.fillStyle = th.ink; ctx.font = nameF;
+        lines.forEach(function(l, i){ ctx.fillText(l, x + off, y + 10*S + i*15*S); });
+        var lastW = (ctx.font = nameF, ctx.measureText(lines[lines.length-1]).width), ly = y + 10*S + (lines.length-1)*15*S;
+        ctx.fillStyle = th.muted; for(var dx = x + off + lastW + 6*S; dx < x + colW - pw - 6*S; dx += 4*S) ctx.fillRect(dx, ly - 1*S, 1.1*S, 1.1*S);
+        ctx.textAlign = "right"; ctx.fillStyle = th.ink; ctx.font = priceF; ctx.fillText(price, x + colW, ly);
+        if(o.hindi && r.local){ ctx.textAlign = "left"; ctx.fillStyle = th.muted; ctx.font = locF; ctx.fillText(r.local, x + off, ly + 12*S); }
+        y += h;
+      });
+      y += 10*S; curSec = null;
     });
-    y += 10*S; curSec = null;
-  });
-  // UPI QR on the last page, then footers.
+  } else {
+    // Photo cards: each dish with its picture (or an illustrated badge), name, Hindi name and price.
+    var imgH = colW*0.66, nameF2 = font(9.5, 600), locF2 = font(8, 400), priceF2 = font(11, 700, sans);
+    function cardH(r){ var lines = Math.min(2, wrap(r.name, colW - 14*S, nameF2).length); return imgH + 8*S + lines*12*S + (o.hindi && r.local ? 10*S : 0) + 20*S; }
+    function secHead(text, small){
+      ctx.textAlign = "center"; ctx.fillStyle = th.accent; ctx.font = font(small ? 12 : 17, 600, serif); ctx.fillText(text, W/2, y + (small ? 11 : 15)*S);
+      ctx.font = font(small ? 12 : 17, 600, serif); var tw = ctx.measureText(text).width;
+      ctx.strokeStyle = th.line; ctx.lineWidth = 1*S; ctx.beginPath(); ctx.moveTo(M, y + 10*S); ctx.lineTo(W/2 - tw/2 - 12*S, y + 10*S); ctx.moveTo(W/2 + tw/2 + 12*S, y + 10*S); ctx.lineTo(W - M, y + 10*S); ctx.stroke();
+      y += (small ? 24 : 30)*S;
+    }
+    function drawCard(r, x, yy, h){
+      ctx.save(); rrect(x, yy, colW, h, 10*S); ctx.fillStyle = th.card; ctx.fill(); ctx.strokeStyle = th.line; ctx.lineWidth = 0.8*S; ctx.stroke(); ctx.restore();
+      ctx.save(); rrect(x, yy, colW, imgH, 10*S); ctx.clip();
+      var im = r.photo ? photos[r.photo] : null;
+      if(im && im.naturalWidth){ var sc = Math.max(colW/im.naturalWidth, imgH/im.naturalHeight), iw = im.naturalWidth*sc, ih = im.naturalHeight*sc; ctx.drawImage(im, x + (colW-iw)/2, yy + (imgH-ih)/2, iw, ih); }
+      else {
+        var g = ctx.createLinearGradient(x, yy, x + colW, yy + imgH); g.addColorStop(0, th.accent); g.addColorStop(1, th.line); ctx.globalAlpha = 0.28; ctx.fillStyle = g; ctx.fillRect(x, yy, colW, imgH); ctx.globalAlpha = 1;
+        ctx.fillStyle = th.bg; ctx.globalAlpha = 0.55; ctx.beginPath(); ctx.arc(x + colW/2, yy + imgH/2, imgH*0.34, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1;
+        ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.font = Math.round(imgH*0.38)+"px 'Noto Color Emoji','Apple Color Emoji','Segoe UI Emoji',sans-serif"; ctx.fillText(dishIcon(r.m||{ name:r.name }), x + colW/2, yy + imgH/2 + 2*S); ctx.textBaseline = "alphabetic";
+      }
+      ctx.restore();
+      vegMark(x + 7*S, yy + 15*S, r.veg, 9);
+      var ty = yy + imgH + 14*S, lines = wrap(r.name, colW - 14*S, nameF2).slice(0, 2);
+      ctx.textAlign = "left"; ctx.fillStyle = th.ink; ctx.font = nameF2; lines.forEach(function(l, i){ ctx.fillText(l, x + 7*S, ty + i*12*S); });
+      ty += (lines.length-1)*12*S;
+      if(o.hindi && r.local){ ty += 10*S; ctx.fillStyle = th.muted; ctx.font = locF2; ctx.fillText(r.local, x + 7*S, ty); }
+      ctx.fillStyle = th.accent; ctx.font = priceF2; ctx.fillText(rowPrice(r), x + 7*S, yy + h - 8*S);
+      if(r.half!==undefined && r.half!==null && r.full!==null){ ctx.textAlign = "right"; ctx.fillStyle = th.muted; ctx.font = font(6.5, 600); ctx.fillText("HALF/FULL", x + colW - 7*S, yy + h - 9*S); }
+    }
+    secs.forEach(function(sec){
+      var rowsOf = []; for(var i=0;i<sec.rows.length;i+=cols) rowsOf.push(sec.rows.slice(i, i+cols));
+      var first = true;
+      rowsOf.forEach(function(group){
+        var h = Math.max.apply(null, group.map(cardH));
+        if(first){ if(y + 30*S + h > bottom) newPage(); secHead(sec.cat); first = false; }
+        else if(y + h > bottom){ newPage(); secHead(sec.cat+" (contd.)", true); }
+        group.forEach(function(r, k){ drawCard(r, M + k*(colW+G), y, h); });
+        y += h + G;
+      });
+      y += 6*S;
+    });
+  }
+  // Legend and legal note at the end, then the UPI QR, then footers.
+  if(o.legal && o.legalText){
+    var lf = font(7.6, 400), lw = W - 2*M - (qrImg ? 96*S : 0), ll = wrap(o.legalText, lw, lf), hiL = o.hindi ? wrap(MENU_LEGAL_HI, lw, lf) : [];
+    var lh = 22*S + (o.veg ? 14*S : 0) + (ll.length + hiL.length)*10.5*S;
+    if(y + lh > bottom){ newPage(); }
+    var ly0 = Math.max(y + 8*S, bottom - lh);
+    ctx.strokeStyle = th.line; ctx.lineWidth = 0.8*S; ctx.beginPath(); ctx.moveTo(M, ly0); ctx.lineTo(W - M, ly0); ctx.stroke();
+    var yy2 = ly0 + 14*S;
+    ctx.textAlign = "left"; ctx.fillStyle = th.accent; ctx.font = font(8.5, 700); ctx.fillText("PLEASE NOTE", M, yy2);
+    if(o.veg){ yy2 += 13*S; var ox = M; ox += vegMark(ox, yy2, "veg", 7.5); ctx.fillStyle = th.ink; ctx.font = font(8, 600); ctx.fillText("Vegetarian", ox, yy2); ox += ctx.measureText("Vegetarian").width + 16*S;
+      ox += vegMark(ox, yy2, "nonveg", 7.5); ctx.fillStyle = th.ink; ctx.fillText("Non-vegetarian (includes egg)", ox, yy2); }
+    ctx.fillStyle = th.muted; ctx.font = lf;
+    ll.concat(hiL).forEach(function(l){ yy2 += 10.5*S; ctx.fillText(l, M, yy2); });
+  }
   if(qrImg){
-    var qs = 74*S; if(y + qs + 20*S > bottom && col===cols-1) newPage();
-    var qx = W - M - qs, qy = H - M - 22*S - qs - 14*S;
+    var qs = 70*S; if(!o.legal && y + qs + 20*S > bottom) newPage();
+    var qx = W - M - qs, qy = H - M - 24*S - qs - 12*S;
     ctx.fillStyle = "#fff"; ctx.fillRect(qx - 4*S, qy - 4*S, qs + 8*S, qs + 8*S); ctx.drawImage(qrImg, qx, qy, qs, qs);
     ctx.textAlign = "center"; ctx.fillStyle = th.muted; ctx.font = font(8, 600); ctx.fillText("Scan to pay (UPI)", qx + qs/2, qy + qs + 12*S);
   }
   pages.forEach(function(c, i){
-    var g = c.getContext("2d"); g.textAlign = "center"; g.fillStyle = th.muted; g.font = font(8.5, 400);
-    g.fillText((o.note ? o.note+"   ·   " : "")+(pages.length>1 ? (i+1)+" / "+pages.length : ""), W/2, H - M + 4*S);
+    var g = c.getContext("2d"); g.textAlign = "center"; g.fillStyle = th.muted; g.font = font(8, 400);
+    var foot = [o.note, photoLayout ? "Images are for illustration only; actual food may vary" : "", pages.length>1 ? (i+1)+" / "+pages.length : ""].filter(Boolean).join("   ·   ");
+    g.fillText(foot, W/2, H - M + 6*S);
   });
   return { pages:pages, sizePt:sizePt };
 }
@@ -5774,30 +5873,39 @@ function openMenuPdfSheet(){
     o.phone = document.getElementById("mp_phone").value.trim(); o.note = document.getElementById("mp_note").value.trim();
     o.hindi = document.getElementById("mp_hindi").checked; o.veg = document.getElementById("mp_veg").checked;
     var q = document.getElementById("mp_qr"); o.qr = q ? q.checked : false;
+    o.legal = document.getElementById("mp_legal").checked; var lt = document.getElementById("mp_legaltext"); if(lt) o.legalText = lt.value.trim() || MENU_LEGAL_DEFAULT;
     o.skip = cats.filter(function(c){ var b = sheet.querySelector('[data-mpc="'+CSS.escape(c)+'"]'); return b && !b.checked; });
     saveMenuPdfOpts(o);
   }
   function draw(){
-    var html = '<h2 class="serif">🖨️ Printable menu</h2><div class="backupnote">A ready-to-print PDF of the dishes on the menu (hidden dishes are left out). Half / Full portions share one line.</div>';
+    var html = '<h2 class="serif">🖨️ Printable menu</h2><div class="backupnote">A ready-to-print PDF of the dishes on the menu (hidden dishes are left out). Half / Full portions share one line or card.</div>';
     html += '<div class="field"><label>Title</label><input id="mp_title" value="'+esc(o.title)+'"></div>';
     html += '<div class="field"><label>Line under the title (address, timings)</label><input id="mp_tag" placeholder="Sector 27, Noida · near Atta Market · 7 AM – 11 PM" value="'+esc(o.tagline)+'"></div>';
     html += '<div class="field two"><div><label>Phone for orders</label><input id="mp_phone" inputmode="tel" value="'+esc(o.phone)+'"></div><div><label>Note at the bottom</label><input id="mp_note" value="'+esc(o.note)+'"></div></div>';
     html += '<div class="dgroup">Size</div><div class="kqchips" style="justify-content:flex-start;">'+[["A4","A4 · wall / counter (2 columns)"],["A5","A5 · table card"]].map(function(x){ return '<button data-mps="'+x[0]+'" class="'+(o.size===x[0]?"on":"")+'">'+x[1]+'</button>'; }).join("")+'</div>';
+    html += '<div class="dgroup">Layout</div><div class="kqchips" style="justify-content:flex-start;">'+[["photos","🖼️ With food pictures"],["list","📃 Classic list"]].map(function(x){ return '<button data-mpl="'+x[0]+'" class="'+(o.layout===x[0]?"on":"")+'">'+x[1]+'</button>'; }).join("")+'</div>';
+    if(o.layout==="photos"){ var np = menuItems.filter(function(m){ return m.active!==false && m.photo; }).length, nt = menuItems.filter(function(m){ return m.active!==false && +m.price>0; }).length;
+      html += '<div class="backupnote">'+np+' of '+nt+' dishes have a photo. Dishes without one get an illustrated picture. Add your own photos in Menu → tap a dish → 📷 for the best look.</div>'; }
     html += '<div class="dgroup">Look</div><div class="kqchips" style="justify-content:flex-start;">'+Object.keys(MENU_THEMES).map(function(k){ return '<button data-mpt="'+k+'" class="'+(o.theme===k?"on":"")+'">'+MENU_THEMES[k].name+'</button>'; }).join("")+'</div>';
     html += '<label class="poclose"><input type="checkbox" id="mp_hindi"'+(o.hindi?" checked":"")+'> Show Hindi names under the dishes</label>';
     html += '<label class="poclose"><input type="checkbox" id="mp_veg"'+(o.veg?" checked":"")+'> Veg / egg / non-veg marks</label>';
     if(settings.upiId) html += '<label class="poclose"><input type="checkbox" id="mp_qr"'+(o.qr?" checked":"")+'> UPI QR code to pay ('+esc(settings.upiId)+')</label>';
+    html += '<label class="poclose"><input type="checkbox" id="mp_legal"'+(o.legal?" checked":"")+'> Add the legal note at the end (images, prices &amp; taxes, FSSAI marks, allergens)</label>';
+    if(o.legal) html += '<div class="field"><textarea id="mp_legaltext" rows="5">'+esc(o.legalText)+'</textarea><div class="muted" style="font-size:11.5px;margin-top:4px;">Edit if needed (e.g. if prices exclude GST). <a href="#" id="mp_legalreset">Reset to the standard note</a></div></div>';
     if(cats.length) html += '<div class="dgroup">Sections</div><div class="mpcats">'+cats.map(function(c){ return '<label><input type="checkbox" data-mpc="'+esc(c)+'"'+((o.skip||[]).indexOf(c)<0?" checked":"")+'> '+esc(c)+'</label>'; }).join("")+'</div>';
     html += '<div id="mp_prev" class="mpprev"></div>';
     html += '<div class="err" id="mp_err"></div><div class="sheetbtns"><button class="btn-cancel" id="mp_close">Close</button><button class="btn-cancel" id="mp_show">Preview</button><button class="btn-save" id="mp_make">📄 Make PDF</button></div>';
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     Array.prototype.forEach.call(sheet.querySelectorAll("[data-mps]"), function(b){ b.addEventListener("click", function(){ read(); o.size = b.getAttribute("data-mps"); saveMenuPdfOpts(o); draw(); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-mpl]"), function(b){ b.addEventListener("click", function(){ read(); o.layout = b.getAttribute("data-mpl"); saveMenuPdfOpts(o); draw(); }); });
+    document.getElementById("mp_legal").addEventListener("change", function(){ read(); draw(); });
+    var lr = document.getElementById("mp_legalreset"); if(lr) lr.addEventListener("click", function(ev){ ev.preventDefault(); read(); o.legalText = MENU_LEGAL_DEFAULT; saveMenuPdfOpts(o); draw(); });
     Array.prototype.forEach.call(sheet.querySelectorAll("[data-mpt]"), function(b){ b.addEventListener("click", function(){ read(); o.theme = b.getAttribute("data-mpt"); saveMenuPdfOpts(o); draw(); }); });
     document.getElementById("mp_close").addEventListener("click", function(){ read(); closeForm(); });
     document.getElementById("mp_show").addEventListener("click", function(){ read(); preview(); });
     document.getElementById("mp_make").addEventListener("click", function(){ read(); make(); });
   }
-  function build(){ return ensureMenuFonts().then(function(){ return menuQrImage(o); }).then(function(qr){ return drawMenuPages(o, qr); }); }
+  function build(){ var qr0; return ensureMenuFonts().then(function(){ return menuQrImage(o); }).then(function(qr){ qr0 = qr; return o.layout==="photos" ? loadMenuPhotos(o) : {}; }).then(function(ph){ return drawMenuPages(o, qr0, ph); }); }
   function preview(){
     var box = document.getElementById("mp_prev"); box.innerHTML = '<div class="muted">Drawing…</div>';
     build().then(function(r){ box.innerHTML = '<div class="muted" style="margin-bottom:6px;">'+r.pages.length+' page'+(r.pages.length!==1?'s':'')+' · '+o.size+'</div>'+r.pages.map(function(c){ return '<img src="'+c.toDataURL("image/jpeg", 0.8)+'" alt="Menu page">'; }).join(""); box.scrollIntoView({ behavior:"smooth", block:"start" }); })
