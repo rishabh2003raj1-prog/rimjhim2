@@ -326,6 +326,27 @@ items to use first, missed or failed checks, broken / needs-repair equipment, ch
 to go there. Chef and billing logins can file checks but can't change or delete anyone else's; they only see the
 last two days of checks.
 
+### Purchase orders with approvals (Step 4)
+Records → **Orders**. The order of hands: **staff request → manager approves (up to a limit) or sends it to the
+owner → owner / partner approves → sent to the vendor → goods received and checked**.
+- **+ New purchase request** (chef, counter, manager, owner): vendor, needed-by date and items. Picking a known item
+  fills in its usual vendor and the last price paid (kg / g and litre / ml converted). **From low stock** and the
+  Stock order list make a ready request per vendor with the suggested quantities.
+- **Manager** approves requests up to the **manager approval limit** (default ₹2,000, set by the owner); bigger
+  ones show only **Send to owner**. Managers can also reject (with a reason) or edit.
+- **Owner / partners** approve anything; their own requests are approved when saved.
+- **Approved** orders: **📲 Send to vendor on WhatsApp** (a numbered purchase order, e.g. PO-0007) or **Ordered by
+  phone**.
+- **📦 Goods arrived**: enter what actually came and the price on the bill. Short deliveries and prices more than 5%
+  above the expected price are flagged. Choose pay later (vendor udhaar), cafe cash or cafe UPI. Each item becomes a
+  purchase (so stock and costs update), linked to the order. Part deliveries keep the order open for the rest, or
+  tick "nothing more is coming" to close it.
+- Every order keeps a **history** (who requested, approved, sent, received, when) and "Needs your action" shows what
+  each person has to do; the Dashboard's Needs attention card and the Records badge include orders.
+- **Enforced on the server**: the server stamps who approved; a manager can't approve above the limit or change the
+  limit; chef / counter logins can only create requests, edit or cancel their own pending ones, and receive goods for
+  ordered items — they can't approve, reject or delete.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the

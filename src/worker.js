@@ -167,6 +167,8 @@ const FULL_ACCESS = { owner: true, partner: true, full: true };
 const PAY_FIELDS = ["salary", "salaryHistory", "salaryMonths", "houseRent", "foodAllowance", "travelAllowance", "foodBasis", "travelBasis", "allowHistory", "allowMonths", "upi"];
 const STAFF_PUBLIC = ["id", "name", "role", "defaultShift", "status", "joinDate", "leftDate"];
 const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
+// Readable by the manager but only the owner / partners can change them.
+const SETTINGS_OWNER = ["poManagerLimit"];
 const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays"];
 const STAFF_PAY_CATS = ["Staff Salary", "Staff House Rent", "Staff Food Allowance", "Staff Travel Allowance", "Staff Bonus"];
 const CASH_MGR_TYPES = ["counter", "atm", "atmheld", "taken", "pass", "bank"];
@@ -202,6 +204,7 @@ const POLICY = {
   conduct_v1:        { manager: "rw" },
   settings_v1:       { manager: "settings", chef: "settingspub", billing: "settingspub" },
   checks_v1:         { manager: "rw", chef: "append2", billing: "append2" },
+  pos_v1:            { manager: "po", chef: "po", billing: "po" },
   partners_v1:       { manager: "r", chef: "r", billing: "r" }
   // investments, loans, payroll and anything new: owner / partner / full only.
 };
@@ -220,7 +223,7 @@ function redactPay(x) { return { id: x.id, date: x.date, category: x.category, d
 function readView(rule, value, who) {
   if (!rule) return undefined;
   switch (rule) {
-    case "rw": case "r": case "append": return value;
+    case "rw": case "r": case "append": case "po": return value;
     case "append2": return arr(value).filter((r) => recentOrOwn(r, who));
     case "own": return arr(value).filter((r) => r && r.by === who.login);
     case "expenses": return arr(value).map((x) => (x && STAFF_PAY_CATS.indexOf(x.category) >= 0) ? redactPay(x) : x);
@@ -235,6 +238,60 @@ function readView(rule, value, who) {
 }
 // The value to store when a restricted login saves `sent` over `cur`.
 // Returns { value } or { error }.
+// ---- purchase orders: request -> (manager) approve or send to owner -> ordered -> received ----
+// The server stamps who approved, holds managers to their limit, and lets staff only request,
+// edit their own pending requests and receive goods that were ordered.
+const PO_APPROVED = ["approved", "ordered", "partial", "received"];
+const PO_STAMP = ["approvedBy", "approvedRole", "approvedAt"];
+const PO_RECEIVE_FIELDS = ["status", "received", "receivedAt", "receivedByName", "purchaseIds"];
+function poTotal(po) { return arr(po && po.lines).reduce((a, l) => a + (+(l && l.qty) || 0) * (+(l && l.rate) || 0), 0); }
+function poStamp(o, r, who) {
+  if (!r || typeof r !== "object") return r;
+  const out = omit(r, PO_STAMP);
+  if (o && o.approvedBy) return Object.assign(out, pick(o, PO_STAMP));
+  if (PO_APPROVED.indexOf(r.status) >= 0) return Object.assign(out, { approvedBy: who.role === "owner" ? "owner" : who.login, approvedRole: accessOf(who), approvedAt: Date.now() });
+  return out;
+}
+function poHistory(o, r) { const h = arr(o && o.history); return h.concat(arr(r && r.history).slice(h.length)); }
+async function poWrite(env, outlet, cur, sent, who) {
+  if (!Array.isArray(sent)) return { error: "bad value" };
+  const old = idMap(cur), acc = accessOf(who), me = who.role === "owner" ? "owner" : who.login;
+  if (isFull(who) || acc === "manager") {
+    let limit = 2000;
+    if (acc === "manager") {
+      const st = (await readOne(env, outlet, "settings_v1")).value || {};
+      if (st.poManagerLimit !== undefined && st.poManagerLimit !== null && st.poManagerLimit !== "" && +st.poManagerLimit >= 0) limit = +st.poManagerLimit;
+    }
+    const out = [];
+    for (const r of sent) {
+      const o = r && old.get(String(r.id));
+      const was = !!o && PO_APPROVED.indexOf(o.status) >= 0, now = !!r && PO_APPROVED.indexOf(r.status) >= 0;
+      if (acc === "manager" && now && !was && poTotal(r) > limit + 0.5) return { error: "Above your approval limit (Rs " + limit + "). Send it to the owner." };
+      const x = poStamp(o, r, who);
+      if (x && typeof x === "object") x.by = (o && o.by) || x.by || me;
+      out.push(x);
+    }
+    return { value: out };
+  }
+  const sentMap = idMap(sent), out = [], seen = new Set();
+  arr(cur).forEach((o) => {
+    const id = String(o && o.id); seen.add(id);
+    const r = sentMap.get(id);
+    if (!r) { out.push(o); return; }
+    if (o.by === who.login && o.status === "requested" && (r.status === "requested" || r.status === "cancelled")) {
+      out.push(Object.assign(omit(r, PO_STAMP), { by: o.by, history: poHistory(o, r) })); return;
+    }
+    if ((o.status === "ordered" || o.status === "partial") && ["ordered", "partial", "received"].indexOf(r.status) >= 0) {
+      out.push(Object.assign({}, o, pick(r, PO_RECEIVE_FIELDS), { history: poHistory(o, r) })); return;
+    }
+    out.push(o);
+  });
+  arr(sent).forEach((r) => {
+    const id = r && String(r.id);
+    if (r && typeof r === "object" && !seen.has(id)) out.push(Object.assign(omit(r, PO_STAMP), { status: "requested", by: who.login }));
+  });
+  return { value: out };
+}
 function mergeWrite(rule, cur, sent, who) {
   const stamp = (r) => (r && typeof r === "object" && !r.by) ? Object.assign({}, r, { by: who.login }) : r;
   switch (rule) {
@@ -273,7 +330,7 @@ function mergeWrite(rule, cur, sent, who) {
       const old = idMap(cur);
       return { value: arr(sent).map((r) => { const o = old.get(String(r && r.id)); return Object.assign(omit(r, PAY_FIELDS), o ? pick(o, PAY_FIELDS) : {}); }) };
     }
-    case "settings": return { value: Object.assign(omit(sent, SETTINGS_PRIVATE), pick(cur, SETTINGS_PRIVATE)) };
+    case "settings": { const keep = SETTINGS_PRIVATE.concat(SETTINGS_OWNER); return { value: Object.assign(omit(sent, keep), pick(cur, keep)) }; }
     case "cashmgr": {
       const keep = arr(cur).filter((m) => !(m && CASH_MGR_TYPES.indexOf(m.type) >= 0));
       return { value: keep.concat(arr(sent).filter((m) => m && CASH_MGR_TYPES.indexOf(m.type) >= 0).map(stamp)) };
@@ -507,7 +564,11 @@ async function handleData(req, env, url, path, who) {
     const cur = await readOne(env, outlet, key);
     if (cur.rev !== baseRev) return json({ conflict: true, rev: cur.rev, value: isFull(who) ? cur.value : readView(rule, cur.value, who) }, 409);
     let value = sent;
-    if (!isFull(who)) {
+    if (key === "pos_v1") {
+      const pw = await poWrite(env, outlet, cur.value, sent, who);
+      if (pw.error) return json({ error: pw.error, readOnly: true }, 403);
+      value = pw.value;
+    } else if (!isFull(who)) {
       const mw = mergeWrite(rule, cur.value, sent, who);
       if (mw.error) return json({ error: mw.error, readOnly: true }, 403);
       value = mw.value;

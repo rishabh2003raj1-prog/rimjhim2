@@ -204,6 +204,11 @@
   .ppay .ast.ok.on{background:#2E7D4F;} .ppay .ast.repair.on{background:#C9772B;} .ppay .ast.broken.on{background:#A6402D;}
   nav.tabs button{position:relative;}
   .navbadge{position:absolute;top:4px;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:#A6402D;color:#fff;font-size:10.5px;font-weight:700;line-height:18px;padding:0 5px;}
+  .poline{display:grid;grid-template-columns:1fr 64px 74px 76px auto;gap:5px;margin-bottom:6px;align-items:center;}
+  .poline input,.poline select{min-width:0;padding:9px 6px;border-radius:9px;border:1px solid var(--line);font:inherit;font-size:13.5px;background:#fff;}
+  @media(max-width:380px){.poline{grid-template-columns:1fr 56px 66px;}.poline .porate{grid-column:1 / 3;}}
+  .pdacts{display:flex;flex-direction:column;gap:8px;margin:12px 0;} .pdacts button{width:100%;}
+  .rcvflag{font-size:12.5px;margin-top:4px;} .poclose{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:4px 0 10px;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -638,6 +643,7 @@
       <div class="segctl recctl5" id="recCtl">
         <button data-r="sales" class="on">Sales</button>
         <button data-r="purchases">Purch.</button>
+        <button data-r="orders">Orders</button>
         <button data-r="investments">Invest</button>
         <button data-r="expenses">Expense</button>
         <button data-r="fixed">Bills</button>
@@ -655,6 +661,7 @@
       </div>
       <div id="salesList" class="reclist"></div>
       <div id="purchList" class="reclist" style="display:none;"></div>
+      <div id="ordersView" class="reclist" style="display:none;"></div>
       <div id="investList" class="reclist" style="display:none;"></div>
       <div id="expenseList" class="reclist" style="display:none;"></div>
       <div id="fixedView" class="reclist" style="display:none;"></div>
@@ -833,7 +840,7 @@ function appAlert(msg){
 
 function storeKey(k){ return OUTLET.id==="rimjhim" ? k : (OUTLET.id + "__" + k); }
 
-var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1", LOANS_KEY = "loans_v1", CHECKS_KEY = "checks_v1";
+var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1", LOANS_KEY = "loans_v1", CHECKS_KEY = "checks_v1", POS_KEY = "pos_v1";
 var sales = [], purchases = [], notes = [], investments = [], expenses = [], bills = [];
 var staff = [], roster = [], attendance = [], tasks = [], conduct = [], cashDays = [];
 var menuItems = [], ingredients = [], dishLog = [], vendors = [], assets = [], customers = [], creditPayments = [];
@@ -844,7 +851,7 @@ var loans = []; // loans the cafe took from / gave to anyone other than a partne
 var retailItems = [], retailSales = [];
 var cafeUse = [];
 var stockSub = "all";
-var custPayments = [], offers = [], checks = [];
+var custPayments = [], offers = [], checks = [], pos = [];
 var assetDraft = null;
 var vendorSub = "list", vendorPeriod = 30, vendorFrom = null, vendorTo = null;
 var settings = {};
@@ -1000,7 +1007,7 @@ function seedData(){
 var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
-  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY];
+  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
@@ -1240,7 +1247,7 @@ function setKeyValue(key, v){
     case RETAIL_KEY: retailItems = arr; break;      case RSALE_KEY: retailSales = arr; break;
     case WASTE_KEY: wastage = arr; break;           case PREP_KEY: prepBatches = arr; break;
     case AUDIT_KEY: stockAudits = arr; break;       case CUST_KEY: customers = arr; break;
-    case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;
+    case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;  case POS_KEY: pos = arr; break;
     case CREDPAY_KEY: creditPayments = arr; break;  case ASSETS_KEY: assets = arr; break;
     case VENDORS_KEY: vendors = arr; break;         case MENU_KEY: menuItems = arr; break;
     case ING_KEY: ingredients = arr; break;         case DISH_KEY: dishLog = arr; break;
@@ -1451,9 +1458,9 @@ function canSwitchStores(){ return isOwner() || (cloud.who && cloud.who.outlet==
 var ACCESS_LABEL = { owner:"Owner", partner:"Partner", full:"Full access", manager:"Manager", chef:"Chef / kitchen", billing:"Billing / counter" };
 // Each role's screens. Anything not listed is hidden.
 var ROLE_SCREENS = {
-  manager: { nav:["dashboard","counter","calendar","notes","staff","records"], rec:["sales","purchases","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
-  chef:    { nav:["notes","staff","records"], rec:["purchases","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
-  billing: { nav:["counter","notes","staff","records"], rec:["sales","customers","cash"], staff:["roster","attendance","tasks"] }
+  manager: { nav:["dashboard","counter","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
+  chef:    { nav:["notes","staff","records"], rec:["purchases","orders","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
+  billing: { nav:["counter","notes","staff","records"], rec:["sales","orders","customers","cash"], staff:["roster","attendance","tasks"] }
 };
 function roleScreens(){ return isFullAccess() ? null : (ROLE_SCREENS[myAccess()] || ROLE_SCREENS.billing); }
 // Lists each kind of note writes to, so a note this login can't file is refused clearly.
@@ -2051,6 +2058,7 @@ function readLists(){
   var cu2 = lsGet(CAFEUSE_KEY);
   cafeUse = Array.isArray(cu2) ? cu2 : [];
   var ck0 = lsGet(CHECKS_KEY); checks = Array.isArray(ck0) ? ck0 : [];
+  var po0 = lsGet(POS_KEY); pos = Array.isArray(po0) ? po0 : [];
   var cu = lsGet(CUST_KEY), cp = lsGet(CUSTPAY_KEY), of = lsGet(OFFERS_KEY);
   customers = Array.isArray(cu) ? cu : [];
   custPayments = Array.isArray(cp) ? cp : [];
@@ -2096,6 +2104,7 @@ function saveCafeUse(){ return lsSet(CAFEUSE_KEY, cafeUse); }
 function saveCustPayments(){ return lsSet(CUSTPAY_KEY, custPayments); }
 function saveOffers(){ return lsSet(OFFERS_KEY, offers); }
 function saveChecks(){ return lsSet(CHECKS_KEY, checks); }
+function savePos(){ return lsSet(POS_KEY, pos); }
 
 function initAfterLoad(){
   // Seed only what is genuinely missing. Wiping a store that loaded fine just
@@ -2204,6 +2213,7 @@ function renderAll(){
   renderDayPanel();
   renderSalesList();
   renderPurchList();
+  renderOrdersView();
   renderInvestList();
   renderExpenseList();
   renderFixedView();
@@ -3477,9 +3487,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", orders:"ordersView", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", orders:"Purchase orders", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -3492,6 +3502,7 @@ function updateRecordsTotal(){
   else if(recSub==="investments"){ var li = recInvestIn(); lbl.textContent = rl+" · net "+rupeeSigned(li.reduce(function(a,v){return a+investAmt(v);},0)); }
   else if(recSub==="expenses"){ var le = recExpIn(); lbl.textContent = rl+" · "+rupee(le.reduce(function(a,x){return a+expAmt(x);},0)); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
+  else if(recSub==="orders"){ var op = pos.filter(function(p){ return ["received","rejected","cancelled"].indexOf(p.status)<0; }); lbl.textContent = op.length+" open · "+rupee(op.reduce(function(a,p){ return a+poTotalOf(p); },0)); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
   else if(recSub==="bank"){ lbl.textContent = rupee(bankBalanceNow())+" now"; }
   else if(recSub==="loans"){ var lt = loanTotals(loanMonthEnd(lnMonth)); lbl.textContent = rupee(lt.cafeOwes)+" owed by cafe"+(lt.owedToCafe?" · "+rupee(lt.owedToCafe)+" to collect":""); }
@@ -4259,7 +4270,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos };
 }
 
 function exportBackup(){
@@ -4439,7 +4450,7 @@ function applyBackupData(data, errEl, partial){
     payroll = take("payroll", payroll);
     cashMoves = take("cashMoves", cashMoves);
     loans = take("loans", loans);
-    offers = take("offers", offers); checks = take("checks", checks);
+    offers = take("offers", offers); checks = take("checks", checks); pos = take("pos", pos);
     if(Array.isArray(data.partners) && data.partners.length){
       PARTNERS = partial ? PARTNERS.concat(data.partners.filter(function(p){ return PARTNERS.indexOf(p)<0; })) : data.partners;
     } else if(!partial){ PARTNERS = OUTLET.defaultPartners.slice(); }
@@ -4456,7 +4467,7 @@ function saveEverything(){
   saveSales(); savePurch(); saveInvest(); saveExpense(); saveNotes(); savePartners(); saveBills();
   saveStaff(); saveRoster(); saveAttend(); saveTasks(); saveConduct(); saveCashDays(); saveSettings();
   saveMenu(); saveIngredients(); saveDishLog(); saveVendors(); saveAssets(); saveCustomers(); saveCreditPayments();
-  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); saveChecks(); savePayroll(); saveCashMoves(); saveLoans();
+  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); saveChecks(); savePos(); savePayroll(); saveCashMoves(); saveLoans();
 }
 
 function importBackup(file){
@@ -6212,6 +6223,7 @@ function openOrderList(){
           '<div style="display:flex;align-items:center;gap:6px;"><input type="number" inputmode="decimal" class="dq" data-oq="'+esc(s.ing.id)+'" value="'+(qty[s.ing.id]||"")+'" style="width:84px;"><span class="runit">'+esc(s.ing.unit)+'</span></div></div>';
       }).join("");
       html += '<button class="btn-additem" data-wa="'+esc(v)+'" style="margin:6px 0 4px;">📲 Send '+esc(v)+'’s list on WhatsApp</button>';
+      if(canWriteKey(POS_KEY)) html += '<button class="btn-additem" data-mkpo="'+esc(v)+'" style="margin:0 0 4px;">📝 Make a purchase order for approval</button>';
     });
     html += '<div class="field" style="margin-top:12px;"><label>Days of stock to keep after a delivery</label><input type="number" inputmode="numeric" id="ol_cover" value="'+coverDays()+'"'+(canWriteKey(SETTINGS_KEY)?'':' disabled')+'></div>';
     html += '<div class="sheetbtns"><button class="btn-cancel" id="ol_close" style="flex:1;">Close</button></div>';
@@ -6222,6 +6234,12 @@ function openOrderList(){
       if(!lines.length){ appAlert("Nothing to order from "+v+"."); return; }
       var txt = (OUTLET.name||"RimJhim Cafe")+" — order "+parseDate(fmtDate(new Date())).toLocaleDateString("en-IN")+"\n"+lines.map(function(s){ return "• "+s.ing.name+" — "+niceQty(qty[s.ing.id], s.ing.unit); }).join("\n")+"\nPlease confirm. Thank you!";
       window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank");
+    }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-mkpo]"), function(b){ b.addEventListener("click", function(){
+      var v = b.getAttribute("data-mkpo"), vv = v==="No usual vendor" ? "" : v;
+      var lines = lowStockLines(vv).map(function(l){ var q = qty[l.ingredientId], g = ingById(l.ingredientId);
+        if(q>0 && g){ l.qty = (g.unit==="g" || g.unit==="ml") ? Math.round(q/100)/10 : q; } return l; });
+      openPoForm(null, { vendor:vv, lines:lines });
     }); });
     var cv = document.getElementById("ol_cover");
     cv.addEventListener("change", function(){ var n = parseFloat(cv.value); if(n>0 && canWriteKey(SETTINGS_KEY)){ settings.stockCoverDays = n; saveSettings();
@@ -6391,6 +6409,7 @@ function attentionItems(){
     var ex = expiringBatches(); if(ex.length) out.push({ t:"⏰ "+ex.length+" cooked item"+(ex.length!==1?"s":"")+" to use first or throw", go:"stock" });
   }
   checklistStatus().forEach(function(x){ if(x.missed) out.push({ t:"⚠️ "+x.l.name+" check "+x.label, go:"assets" }); else if(x.bad) out.push({ t:"⚠️ "+x.l.name+" check found "+x.bad+" problem"+(x.bad!==1?"s":""), go:"assets" }); });
+  if(canReadKey(POS_KEY)) out = out.concat(poAttention());
   if(canReadKey(ASSETS_KEY)) assetAlerts().forEach(function(x){ out.push({ t:(x.st==="broken"?"⛔ ":"🛠️ ")+x.a.name+": "+x.why.join(", "), go:"assets" }); });
   return out;
 }
@@ -6407,6 +6426,303 @@ function updateNavBadge(){
   if(!n){ if(dot) dot.remove(); return; }
   if(!dot){ dot = document.createElement("span"); dot.className = "navbadge"; b.appendChild(dot); }
   dot.textContent = n;
+}
+
+// ---------- PURCHASE ORDERS ----------
+// Staff (chef / counter) request -> manager approves up to their limit or sends it to the owner
+// -> owner / partner approves -> sent to the vendor -> goods received (and become purchases).
+// The server enforces who may do what and stamps who approved.
+var PO_STATUS = {
+  requested:{ t:"Waiting for manager", c:"warnamt" }, review:{ t:"Waiting for owner", c:"warnamt" },
+  approved:{ t:"Approved · send to vendor", c:"ok" }, ordered:{ t:"Ordered · waiting for delivery", c:"" },
+  partial:{ t:"Part received", c:"warnamt" }, received:{ t:"Received", c:"ok" },
+  rejected:{ t:"Rejected", c:"bad" }, cancelled:{ t:"Cancelled", c:"muted" }
+};
+var PO_UNITS = ["kg","g","litre","ml","pcs","packet","dozen","box","bottle","tray"];
+function poManagerLimit(){ var v = settings.poManagerLimit; return (v===0 || +v>0) ? +v : 2000; }
+function poTotalOf(po){ return (po.lines||[]).reduce(function(a,l){ return a+(+l.qty||0)*(+l.rate||0); },0); }
+function poById(id){ return pos.find(function(p){ return p.id===id; }) || null; }
+function poNo(po){ return "PO-"+("000"+(po.no||0)).slice(-4); }
+function nextPoNo(){ return 1 + pos.reduce(function(a,p){ return Math.max(a, +p.no||0); },0); }
+function myLogin(){ var w = cloud.who; return w && w.role==="store" ? w.login : "owner"; }
+function poMine(po){ return po.by===myLogin(); }
+function canApprovePo(po){ var a = myAccess(); return isFullAccess() || (a==="manager" && poTotalOf(po) <= poManagerLimit()+0.5); }
+function isMgrOrFull(){ return isFullAccess() || myAccess()==="manager"; }
+function stamp(){ var d = new Date(); return fmtDate(d)+" "+nowHM(); }
+function poLog(po, what){ po.history = (po.history||[]).concat([{ at:stamp(), who:myName(), what:what }]); }
+// Last price paid for an item, in the unit asked for (kg vs g, litre vs ml handled).
+function lastRate(item, unit){
+  var n = normItem(item); if(!n) return null;
+  var hit = purchases.filter(function(p){ return !p.isDelivery && p.item && normItem(p.item)===n && +p.rate>0; }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
+  if(!hit) return null;
+  var r = +hit.rate, f = unitFactor(hit.unit, unit);
+  return f===0.001 ? r/1000 : f===1000 ? r*1000 : r;
+}
+function lastCategory(item){
+  var n = normItem(item), hit = purchases.filter(function(p){ return p.item && normItem(p.item)===n && p.category; }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
+  return hit ? hit.category : (/milk|doodh|paneer|curd|dahi|butter|cream|cheese/i.test(item) ? "Dairy" : /cup|box|container|foil|bag|tissue/i.test(item) ? "Packaging" : "Grocery");
+}
+function vendorNames(){
+  var s = {}; (vendors||[]).forEach(function(v){ if(v && v.name) s[v.name] = 1; }); ingredients.forEach(function(g){ if(g.vendor) s[g.vendor] = 1; });
+  purchases.forEach(function(p){ if(p.vendor && p.vendor!=="Unknown vendor") s[p.vendor] = 1; });
+  return Object.keys(s).sort();
+}
+// Lines for a vendor from the low-stock list, converted to buying units.
+function lowStockLines(vendor){
+  return ingredients.map(stockInfo).filter(function(s){ return s.status!=="ok" && (s.ing.vendor||"")===(vendor||""); }).map(function(s){
+    var q = roundOrder(s.order, s.ing.unit), unit = s.ing.unit;
+    if(unit==="g"){ q = Math.round(q/100)/10; unit = "kg"; } else if(unit==="ml"){ q = Math.round(q/100)/10; unit = "litre"; }
+    var lr = lastRate(s.ing.name, unit);
+    return { id:uid(), ingredientId:s.ing.id, item:s.ing.name, qty:q||1, unit:unit, rate: lr!==null ? Math.round(lr*100)/100 : "" };
+  });
+}
+function poNeedsMe(po){
+  var a = myAccess();
+  if(po.status==="review") return isFullAccess();
+  if(po.status==="requested") return isMgrOrFull();
+  if(po.status==="approved") return isMgrOrFull();
+  if(po.status==="ordered" || po.status==="partial") return canWriteKey(PURCH_KEY) && (!po.needBy || po.needBy <= fmtDate(new Date()));
+  return false;
+}
+function renderOrdersView(){
+  var el = document.getElementById("ordersView"); if(!el) return;
+  var canReq = canWriteKey(POS_KEY), html = "";
+  if(canReq) html += '<button class="btn-big green" id="po_new">+ New purchase request</button>';
+  if(canReq && canReadKey(PURCH_KEY)){
+    var lowV = {}; ingredients.map(stockInfo).forEach(function(s){ if(s.status!=="ok") lowV[s.ing.vendor||""] = (lowV[s.ing.vendor||""]||0)+1; });
+    var lv = Object.keys(lowV);
+    if(lv.length) html += '<div class="card" style="margin-bottom:12px;"><h3>From low stock</h3>'+lv.sort().map(function(v){
+      return '<div class="psrow"><span>'+esc(v||"No usual vendor")+' · '+lowV[v]+' item'+(lowV[v]!==1?'s':'')+'</span><button class="btn-additem" style="width:auto;padding:6px 12px;" data-polow="'+esc(v)+'">Make request</button></div>'; }).join("")+'</div>';
+  }
+  if(isFullAccess()) html += '<div class="backupnote">Managers can approve orders up to <b>'+rupee(poManagerLimit())+'</b>; bigger ones come to you. <a href="#" id="po_limit">Change</a></div>';
+  else if(myAccess()==="manager") html += '<div class="backupnote">You can approve orders up to <b>'+rupee(poManagerLimit())+'</b>. Bigger ones go to the owner.</div>';
+  var mine = pos.filter(poNeedsMe);
+  var order = ["review","requested","approved","ordered","partial","received","rejected","cancelled"];
+  var list = pos.slice().sort(function(a,b){ return order.indexOf(a.status)-order.indexOf(b.status) || (b.no||0)-(a.no||0); });
+  if(mine.length) html += '<div class="daygroup">Needs your action · '+mine.length+'</div>'+mine.map(poRow).join("");
+  var done = {}; mine.forEach(function(p){ done[p.id] = 1; });
+  var rest = list.filter(function(p){ return !done[p.id]; });
+  var cutoff = addDays(fmtDate(new Date()), -30);
+  var open = rest.filter(function(p){ return ["received","rejected","cancelled"].indexOf(p.status)<0; });
+  var closed = rest.filter(function(p){ return ["received","rejected","cancelled"].indexOf(p.status)>=0 && (p.date||"") >= cutoff; });
+  if(open.length) html += '<div class="daygroup">Open · '+open.length+'</div>'+open.map(poRow).join("");
+  if(closed.length) html += '<div class="daygroup">Last 30 days</div>'+closed.map(poRow).join("");
+  if(!pos.length) html += '<div class="empty">No purchase orders yet. Staff send a request, the manager approves (or sends big ones to the owner), then it goes to the vendor and is checked when the goods arrive.</div>';
+  el.innerHTML = html;
+  var nb = document.getElementById("po_new"); if(nb) nb.addEventListener("click", function(){ openPoForm(null); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-polow]"), function(b){ b.addEventListener("click", function(){ var v = b.getAttribute("data-polow"); openPoForm(null, { vendor:v, lines:lowStockLines(v) }); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-po]"), function(r){ r.addEventListener("click", function(){ openPoDetail(r.getAttribute("data-po")); }); });
+  var pl = document.getElementById("po_limit"); if(pl) pl.addEventListener("click", function(ev){ ev.preventDefault(); openPoLimit(); });
+  if(recSub==="orders") updateRecordsTotal();
+}
+function poRow(po){
+  var st = PO_STATUS[po.status] || { t:po.status, c:"" };
+  return '<div class="entry" data-po="'+esc(po.id)+'"><div><div class="who">'+poNo(po)+' · '+esc(po.vendor||"No vendor")+'</div>'+
+    '<div class="meta">'+(po.lines||[]).length+' item'+((po.lines||[]).length!==1?'s':'')+' · '+esc(po.byName||"")+(po.needBy?' · needed '+parseDate(po.needBy).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):'')+'</div>'+
+    '<div class="meta '+st.c+'">'+esc(st.t)+'</div></div><div class="amt purch">'+rupee(poTotalOf(po))+'</div></div>';
+}
+function openPoLimit(){
+  var sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<h2 class="serif">Manager approval limit</h2><div class="backupnote">Orders up to this amount can be approved by a manager. Bigger orders need you or a partner. Only the owner and partners can change this.</div>'+
+    '<div class="field"><label>Limit (₹)</label><input type="number" inputmode="numeric" id="pl_v" value="'+poManagerLimit()+'"></div><div class="err" id="pl_err"></div>'+
+    '<div class="sheetbtns"><button class="btn-cancel" id="pl_c">Cancel</button><button class="btn-save" id="pl_s">Save</button></div>';
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("pl_c").addEventListener("click", closeForm);
+  document.getElementById("pl_s").addEventListener("click", function(){ var v = parseFloat(document.getElementById("pl_v").value);
+    if(!(v>=0)){ var e = document.getElementById("pl_err"); e.textContent = "Enter an amount (0 means every order comes to you)."; e.style.display = "block"; return; }
+    settings.poManagerLimit = v; saveSettings(); closeForm(); renderAll(); });
+}
+// New / edit request.
+function openPoForm(id, preset){
+  var po = id ? poById(id) : null;
+  var d = po ? JSON.parse(JSON.stringify(po)) : { id:uid(), vendor:(preset&&preset.vendor)||"", needBy:addDays(fmtDate(new Date()),1), note:"", lines:(preset&&preset.lines&&preset.lines.length) ? preset.lines : [{ id:uid(), ingredientId:"", item:"", qty:"", unit:"kg", rate:"" }] };
+  var sheet = document.getElementById("sheet");
+  function sync(){
+    d.vendor = document.getElementById("po_vendor").value.trim(); d.needBy = document.getElementById("po_need").value; d.note = document.getElementById("po_note").value.trim();
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-pl]"), function(inp){ var l = d.lines[+inp.getAttribute("data-pl")], f = inp.getAttribute("data-f"); l[f] = inp.value; });
+  }
+  function totalBox(){ var t = poTotalOf(d), b = document.getElementById("po_tot"); if(!b) return;
+    var lim = myAccess()==="manager" && t > poManagerLimit()+0.5;
+    b.innerHTML = 'Estimated total <b>'+rupee(t)+'</b>'+(lim ? '<br><span class="warnamt">Above your '+rupee(poManagerLimit())+' limit, so it goes to the owner.</span>' : ''); }
+  function draw(){
+    var items = ingredients.map(function(g){ return g.name; });
+    var html = '<h2 class="serif">'+(po ? "Edit "+poNo(po) : "Purchase request")+'</h2>';
+    html += '<div class="field two"><div><label>Vendor</label><input id="po_vendor" list="po_vlist" value="'+esc(d.vendor)+'" placeholder="Who to buy from"></div><div><label>Needed by</label><input type="date" id="po_need" value="'+esc(d.needBy||"")+'"></div></div>';
+    html += '<datalist id="po_vlist">'+vendorNames().map(function(v){ return '<option value="'+esc(v)+'">'; }).join("")+'</datalist>';
+    html += '<datalist id="po_ilist">'+items.map(function(v){ return '<option value="'+esc(v)+'">'; }).join("")+'</datalist>';
+    html += '<label class="billlabel">Items</label>';
+    html += d.lines.map(function(l, i){
+      return '<div class="poline"><input data-pl="'+i+'" data-f="item" list="po_ilist" placeholder="Item" value="'+esc(l.item)+'" class="poitem">'+
+        '<input data-pl="'+i+'" data-f="qty" type="number" inputmode="decimal" placeholder="Qty" value="'+esc(l.qty)+'" class="poqty">'+
+        '<select data-pl="'+i+'" data-f="unit" class="pounit">'+PO_UNITS.map(function(u){ return '<option'+(l.unit===u?" selected":"")+'>'+u+'</option>'; }).join("")+'</select>'+
+        '<input data-pl="'+i+'" data-f="rate" type="number" inputmode="decimal" placeholder="₹ per '+esc(l.unit)+'" value="'+esc(l.rate)+'" class="porate">'+
+        (d.lines.length>1 ? '<button class="ndel" data-plrm="'+i+'">×</button>' : '')+'</div>';
+    }).join("");
+    html += '<button class="btn-additem" id="po_addl">+ Add item</button>';
+    html += '<div class="backupnote" id="po_tot" style="margin-top:10px;"></div>';
+    html += '<div class="field"><label>Note (optional)</label><input id="po_note" value="'+esc(d.note||"")+'" placeholder="e.g. need fresh paneer, not frozen"></div>';
+    var act = isFullAccess() ? "Save & approve" : myAccess()==="manager" ? "Save" : "Send request";
+    html += '<div class="err" id="po_err"></div><div class="sheetbtns"><button class="btn-cancel" id="po_cancel">Cancel</button><button class="btn-save" id="po_save">'+act+'</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    totalBox();
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-pl]"), function(inp){
+      inp.addEventListener("input", function(){ sync(); totalBox(); });
+      inp.addEventListener("change", function(){
+        sync(); var l = d.lines[+inp.getAttribute("data-pl")], f = inp.getAttribute("data-f");
+        if(f==="item" || f==="unit"){
+          var g = ingredients.find(function(x){ return normItem(x.name)===normItem(l.item); });
+          if(g){ l.ingredientId = g.id; if(f==="item" && !d.vendor && g.vendor) d.vendor = g.vendor; if(f==="item" && (g.unit==="g" || g.unit==="ml") && l.unit==="kg" && g.unit==="ml") l.unit = "litre"; if(f==="item" && g.unit==="pcs") l.unit = "pcs"; }
+          var lr = lastRate(l.item, l.unit); if(lr!==null && (f==="unit" || !l.rate)) l.rate = Math.round(lr*100)/100;
+          draw();
+        }
+      });
+    });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-plrm]"), function(b){ b.addEventListener("click", function(){ sync(); d.lines.splice(+b.getAttribute("data-plrm"),1); draw(); }); });
+    document.getElementById("po_addl").addEventListener("click", function(){ sync(); d.lines.push({ id:uid(), ingredientId:"", item:"", qty:"", unit:"kg", rate:"" }); draw(); });
+    document.getElementById("po_cancel").addEventListener("click", closeForm);
+    document.getElementById("po_save").addEventListener("click", function(){
+      sync();
+      var e = document.getElementById("po_err"); function bad(m){ e.textContent = m; e.style.display = "block"; }
+      d.lines = d.lines.filter(function(l){ return (l.item||"").trim() || +l.qty>0; });
+      if(!d.lines.length) { d.lines = [{ id:uid(), item:"", qty:"", unit:"kg", rate:"" }]; draw(); return bad("Add at least one item."); }
+      if(d.lines.some(function(l){ return !(l.item||"").trim() || !(+l.qty>0); })) return bad("Every item needs a name and a quantity.");
+      if(!d.vendor) return bad("Who are we buying from?");
+      d.lines.forEach(function(l){ l.item = l.item.trim(); l.qty = +l.qty; l.rate = +l.rate||0; });
+      if(po){
+        Object.assign(po, { vendor:d.vendor, needBy:d.needBy, note:d.note, lines:d.lines }); poLog(po, "edited");
+      } else {
+        po = { id:d.id, no:nextPoNo(), date:fmtDate(new Date()), vendor:d.vendor, needBy:d.needBy, note:d.note, lines:d.lines, status:"requested", byName:myName(), history:[] };
+        poLog(po, "requested"); pos.push(po);
+        if(isFullAccess()){ po.status = "approved"; poLog(po, "approved"); }
+      }
+      savePos(); closeForm(); renderAll();
+      if(!isFullAccess() && myAccess()!=="manager") appAlert(poNo(po)+" sent. The manager will check it.");
+    });
+  }
+  draw();
+}
+function poText(po){
+  return (OUTLET.name||"RimJhim Cafe")+" — Purchase order "+poNo(po)+"\nDate: "+parseDate(po.date||fmtDate(new Date())).toLocaleDateString("en-IN")+(po.needBy?"\nNeeded by: "+parseDate(po.needBy).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"}):"")+"\n\n"+
+    (po.lines||[]).map(function(l, i){ return (i+1)+". "+l.item+" — "+fmtQty(l.qty)+" "+l.unit+(l.rate?" @ ₹"+fmtQty(l.rate)+"/"+l.unit:""); }).join("\n")+
+    (po.note?"\n\nNote: "+po.note:"")+"\n\nPlease confirm the delivery time. Thank you!";
+}
+function openPoDetail(id){
+  var po = poById(id); if(!po) return;
+  var st = PO_STATUS[po.status] || { t:po.status, c:"" }, sheet = document.getElementById("sheet"), tot = poTotalOf(po);
+  var html = '<h2 class="serif">'+poNo(po)+' · '+esc(po.vendor||"")+'</h2>';
+  html += '<div class="psrow"><span>Status</span><b class="'+st.c+'">'+esc(st.t)+'</b></div>';
+  html += '<div class="psrow"><span>Asked by</span><b>'+esc(po.byName||po.by||"")+' · '+parseDate(po.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</b></div>';
+  if(po.needBy) html += '<div class="psrow"><span>Needed by</span><b>'+parseDate(po.needBy).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</b></div>';
+  if(po.approvedBy) html += '<div class="psrow"><span>Approved by</span><b class="ok">'+esc(po.approvedBy)+(po.approvedRole?' ('+esc(ACCESS_LABEL[po.approvedRole]||po.approvedRole)+')':'')+'</b></div>';
+  if(po.status==="rejected" && po.rejectReason) html += '<div class="attmwarn">Rejected: '+esc(po.rejectReason)+'</div>';
+  var rec = {}; (po.received||[]).forEach(function(r){ var x = rec[r.lineId] || (rec[r.lineId] = { qty:0, amt:0 }); x.qty += +r.qty||0; x.amt += (+r.qty||0)*(+r.rate||0); });
+  html += '<div class="card" style="margin:10px 0;">'+(po.lines||[]).map(function(l){
+    var r = rec[l.id];
+    return '<div class="psrow"><span>'+esc(l.item)+'<br><span class="muted" style="font-size:11.5px;">'+fmtQty(l.qty)+' '+esc(l.unit)+(l.rate?' × '+rupeeFine(l.rate):'')+
+      (r ? ' · got '+fmtQty(r.qty)+' '+esc(l.unit)+(r.qty < l.qty-0.0001 ? ' <span class="bad">(short '+fmtQty(l.qty-r.qty)+')</span>' : '') : '')+'</span></span><b>'+rupee((+l.qty||0)*(+l.rate||0))+'</b></div>';
+  }).join("")+'<div class="psrow"><span><b>Estimated total</b></span><b>'+rupee(tot)+'</b></div>'+
+    ((po.received||[]).length ? '<div class="psrow"><span><b>Billed on delivery</b></span><b>'+rupee(Object.keys(rec).reduce(function(a,k){ return a+rec[k].amt; },0))+'</b></div>' : '')+'</div>';
+  if(po.note) html += '<div class="backupnote">Note: '+esc(po.note)+'</div>';
+  var b = [], mgr = isMgrOrFull();
+  if(po.status==="requested" || po.status==="review"){
+    if((po.status==="requested" && mgr && canApprovePo(po)) || (po.status==="review" && isFullAccess())) b.push(['pd_ok','btn-save','✔ Approve']);
+    if(po.status==="requested" && myAccess()==="manager") b.push(['pd_up','btn-cancel','Send to owner']);
+    if((po.status==="requested" && mgr) || (po.status==="review" && isFullAccess())) b.push(['pd_no','btn-del','Reject']);
+    if(mgr || (poMine(po) && po.status==="requested")) b.push(['pd_edit','btn-cancel','Edit']);
+    if(poMine(po) && po.status==="requested") b.push(['pd_cx','btn-del','Cancel request']);
+  }
+  if(po.status==="approved" && mgr){ b.push(['pd_wa','btn-save','📲 Send to vendor on WhatsApp']); b.push(['pd_ord','btn-cancel','Ordered by phone']); }
+  if((po.status==="ordered" || po.status==="partial") && canWriteKey(PURCH_KEY)) b.push(['pd_rcv','btn-save','📦 Goods arrived — check & receive']);
+  if(po.status==="requested" && myAccess()==="manager" && !canApprovePo(po)) html += '<div class="backupnote warnamt">'+rupee(tot)+' is above your '+rupee(poManagerLimit())+' limit. Send it to the owner.</div>';
+  html += '<div class="pdacts">'+b.map(function(x){ return '<button class="'+x[1]+'" id="'+x[0]+'">'+x[2]+'</button>'; }).join("")+'</div>';
+  if((po.history||[]).length) html += '<div class="dgroup">History</div>'+po.history.map(function(h){ return '<div class="meta" style="padding:2px 0;">'+esc(h.at)+' · '+esc(h.who)+' · '+esc(h.what)+'</div>'; }).join("");
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="pd_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  function on(id, fn){ var e = document.getElementById(id); if(e) e.addEventListener("click", fn); }
+  function done(msg){ savePos(); renderAll(); openPoDetail(po.id); if(msg) appAlert(msg); }
+  on("pd_close", closeForm);
+  on("pd_ok", function(){ po.status = "approved"; poLog(po, "approved"); done(); });
+  on("pd_up", function(){ po.status = "review"; poLog(po, "sent to owner for approval"); done(); });
+  on("pd_no", function(){ askReason("Why is it rejected?", function(r){ po.status = "rejected"; po.rejectReason = r; poLog(po, "rejected"+(r?": "+r:"")); done(); }); });
+  on("pd_cx", function(){ askConfirm("Cancel "+poNo(po)+"?", function(){ po.status = "cancelled"; poLog(po, "cancelled"); done(); }); });
+  on("pd_edit", function(){ openPoForm(po.id); });
+  on("pd_wa", function(){ window.open("https://wa.me/?text="+encodeURIComponent(poText(po)), "_blank"); po.status = "ordered"; poLog(po, "sent to vendor on WhatsApp"); done(); });
+  on("pd_ord", function(){ po.status = "ordered"; poLog(po, "ordered by phone"); done(); });
+  on("pd_rcv", function(){ openPoReceive(po.id); });
+}
+function askReason(q, cb){
+  var sheet = document.getElementById("sheet"), prev = sheet.innerHTML;
+  var box = document.createElement("div"); box.className = "card"; box.style.marginTop = "10px";
+  box.innerHTML = '<div class="field"><label>'+esc(q)+'</label><input id="ar_t" placeholder="optional"></div><div class="sheetbtns"><button class="btn-cancel" id="ar_c">Back</button><button class="btn-del" id="ar_ok">Reject</button></div>';
+  sheet.appendChild(box); document.getElementById("ar_t").focus();
+  document.getElementById("ar_c").addEventListener("click", function(){ box.remove(); });
+  document.getElementById("ar_ok").addEventListener("click", function(){ cb(document.getElementById("ar_t").value.trim()); });
+}
+// Goods arrive: what came, at what price, how it is paid. Each line becomes a purchase.
+function openPoReceive(id){
+  var po = poById(id); if(!po) return;
+  var got = {}; (po.received||[]).forEach(function(r){ got[r.lineId] = (got[r.lineId]||0) + (+r.qty||0); });
+  var rows = (po.lines||[]).map(function(l){ var left = Math.max(0, (+l.qty||0) - (got[l.id]||0)); return { l:l, qty:left, rate:+l.rate||"" }; }).filter(function(r){ return r.qty>0; });
+  var sheet = document.getElementById("sheet"), full = isFullAccess() || myAccess()==="manager";
+  var html = '<h2 class="serif">📦 Receive '+poNo(po)+'</h2><div class="backupnote">Check each item as it is unloaded. Change the quantity if less came, and the price if the bill says something else.</div>';
+  html += rows.map(function(r, i){
+    return '<div class="card rcvrow" style="margin-bottom:8px;padding:10px 12px;"><b>'+esc(r.l.item)+'</b><div class="muted" style="font-size:12px;">ordered '+fmtQty(r.l.qty)+' '+esc(r.l.unit)+(got[r.l.id]?' · '+fmtQty(got[r.l.id])+' already received':'')+(r.l.rate?' · expected '+rupeeFine(r.l.rate)+'/'+esc(r.l.unit):'')+'</div>'+
+      '<div class="field two" style="margin:6px 0 0;"><div><label>Received ('+esc(r.l.unit)+')</label><input type="number" inputmode="decimal" data-rq="'+i+'" value="'+fmtQty(r.qty).replace(/,/g,"")+'"></div>'+
+      '<div><label>Price on bill (₹/'+esc(r.l.unit)+')</label><input type="number" inputmode="decimal" data-rr="'+i+'" value="'+esc(r.rate)+'"></div></div><div class="rcvflag" id="rf_'+i+'"></div></div>';
+  }).join("");
+  html += '<div class="field"><label>Payment</label><select id="rc_pay"><option value="credit">Pay later (vendor udhaar)</option><option value="cash">Paid now from cafe cash</option><option value="upi">Paid now by cafe UPI / bank</option></select></div>';
+  html += '<label class="poclose"><input type="checkbox" id="rc_close"> Nothing more is coming — close the order even if something is short</label>';
+  html += '<div class="backupnote" id="rc_tot"></div><div class="err" id="rc_err"></div><div class="sheetbtns"><button class="btn-cancel" id="rc_c">Back</button><button class="btn-save" id="rc_s">Save delivery</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  function readRows(){ rows.forEach(function(r, i){ r.gotQ = parseFloat(sheet.querySelector('[data-rq="'+i+'"]').value)||0; r.gotR = parseFloat(sheet.querySelector('[data-rr="'+i+'"]').value)||0; }); }
+  function flags(){
+    readRows(); var t = 0;
+    rows.forEach(function(r, i){
+      var f = [], el = document.getElementById("rf_"+i);
+      if(r.gotQ < r.qty-0.0001) f.push('<span class="bad">short by '+fmtQty(r.qty-r.gotQ)+' '+esc(r.l.unit)+'</span>');
+      if(r.gotQ > r.qty+0.0001) f.push('<span class="warnamt">'+fmtQty(r.gotQ-r.qty)+' '+esc(r.l.unit)+' more than ordered</span>');
+      if(r.l.rate && r.gotR > r.l.rate*1.05) f.push('<span class="bad">price ₹'+fmtQty(r.gotR-r.l.rate)+' higher than expected</span>');
+      el.innerHTML = f.join(" · "); t += r.gotQ*r.gotR;
+    });
+    document.getElementById("rc_tot").innerHTML = 'Bill total <b>'+rupee(t)+'</b>';
+  }
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-rq],[data-rr]"), function(inp){ inp.addEventListener("input", flags); });
+  flags();
+  document.getElementById("rc_c").addEventListener("click", function(){ openPoDetail(po.id); });
+  document.getElementById("rc_s").addEventListener("click", function(){
+    readRows();
+    var e = document.getElementById("rc_err");
+    var lines = rows.filter(function(r){ return r.gotQ>0; });
+    if(!lines.length && !document.getElementById("rc_close").checked){ e.textContent = "Enter what was received (or tick close the order)."; e.style.display = "block"; return; }
+    if(lines.some(function(r){ return !(r.gotR>0); })){ e.textContent = "Enter the price for every item received."; e.style.display = "block"; return; }
+    var pay = document.getElementById("rc_pay").value, mode = pay==="credit" ? "Credit" : pay==="cash" ? "Cash" : "UPI", paidBy = pay==="upi" ? "Cafe UPI/bank" : "Cafe cash";
+    var today = fmtDate(new Date()), bid = "po_"+po.id+"_"+((po.purchaseIds||[]).length+1), ids = [];
+    lines.forEach(function(r){
+      var pid = uid(); ids.push(pid);
+      purchases.push({ id:pid, billId:bid, date:today, vendor:po.vendor, purchasedBy:myName(), paidBy:paidBy, item:r.l.item, category:lastCategory(r.l.item),
+                       qty:r.gotQ, unit:r.l.unit, rate:r.gotR, gst:0, mode:mode, poId:po.id });
+    });
+    po.received = (po.received||[]).concat(lines.map(function(r){ return { lineId:r.l.id, qty:r.gotQ, rate:r.gotR, date:today }; }));
+    po.purchaseIds = (po.purchaseIds||[]).concat(ids);
+    var gotAll = {}; po.received.forEach(function(r){ gotAll[r.lineId] = (gotAll[r.lineId]||0) + r.qty; });
+    var complete = (po.lines||[]).every(function(l){ return (gotAll[l.id]||0) >= (+l.qty||0)-0.0001; });
+    po.status = complete || document.getElementById("rc_close").checked ? "received" : "partial";
+    po.receivedAt = today; po.receivedByName = myName();
+    var short = rows.filter(function(r){ return r.gotQ < r.qty-0.0001; }).length, dear = rows.filter(function(r){ return r.l.rate && r.gotR > r.l.rate*1.05; }).length;
+    poLog(po, "received "+lines.length+" item"+(lines.length!==1?"s":"")+" ("+rupee(lines.reduce(function(a,r){ return a+r.gotQ*r.gotR; },0))+", "+(mode==="Credit"?"pay later":mode)+")"+(short?" · "+short+" short":"")+(dear?" · "+dear+" pricier":""));
+    if(lines.length) savePurch();
+    savePos(); renderAll(); openPoDetail(po.id);
+  });
+}
+function poAttention(){
+  var out = [], mine = pos.filter(poNeedsMe);
+  var rv = mine.filter(function(p){ return p.status==="review"; }).length, rq = mine.filter(function(p){ return p.status==="requested"; }).length,
+      ap = mine.filter(function(p){ return p.status==="approved"; }).length, dl = mine.filter(function(p){ return p.status==="ordered" || p.status==="partial"; }).length;
+  if(rv) out.push({ t:"📝 "+rv+" purchase order"+(rv!==1?"s":"")+" waiting for your approval", go:"orders" });
+  if(rq) out.push({ t:"📝 "+rq+" purchase request"+(rq!==1?"s":"")+" to check", go:"orders" });
+  if(ap) out.push({ t:"📲 "+ap+" approved order"+(ap!==1?"s":"")+" not sent to the vendor yet", go:"orders" });
+  if(dl) out.push({ t:"📦 "+dl+" order"+(dl!==1?"s":"")+" due for delivery", go:"orders" });
+  return out;
 }
 
 function openWastageForm(){
