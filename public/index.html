@@ -1408,6 +1408,8 @@ function applyWho(w){
       localStorage.removeItem(STORE_LOGIN);
     }
   }catch(e){}
+  // Screens may have been drawn before the server said who this is: draw them again for this role.
+  if(lastRenderDay){ try{ renderAll(); }catch(e){} }
   return false;
 }
 function isOwner(){ return !cloud.who || cloud.who.role!=="store"; }
