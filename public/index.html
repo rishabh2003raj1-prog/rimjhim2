@@ -47,7 +47,10 @@
   .billrowhead{display:flex;justify-content:space-between;align-items:center;font-size:11.5px;font-weight:600;color:var(--ink-soft);margin-bottom:8px;}
   .billrowtot{font-size:11.5px;color:var(--ink-soft);text-align:right;margin-top:2px;}
   .billrowtot b{color:var(--ink);}
-  .btn-additem{width:100%;padding:11px;border-radius:11px;border:1px dashed var(--line);background:transparent;color:var(--ink-soft);font-family:inherit;font-size:13px;font-weight:600;}
+  .btn-big{display:block;width:100%;margin:0 0 8px;padding:13px 12px;border:none;border-radius:12px;background:var(--ink);color:#fff;font-family:inherit;font-size:15px;font-weight:700;box-shadow:0 2px 6px rgba(36,26,18,.18);}
+  .btn-big.green{background:#1F5C52;}
+  body.simple .btn-big{font-size:18px;padding:16px 12px;}
+  .btn-additem{width:100%;padding:11px;border-radius:11px;border:1.5px solid #CFC3AC;background:var(--panel);color:var(--ink);box-shadow:0 1px 2px rgba(36,26,18,.08);font-family:inherit;font-size:13px;font-weight:600;}
   .billtotal{display:flex;justify-content:space-between;align-items:center;padding:12px 2px;font-size:13.5px;color:var(--ink-soft);border-top:1px solid var(--line);margin:8px 0 6px;}
   .billtotal b{font-family:'Fraunces',serif;font-size:19px;color:var(--ink);}
   .billphoto img{width:100%;border-radius:11px;border:1px solid var(--line);display:block;}
@@ -5131,11 +5134,11 @@ function renderMenuView(){
   var costs = seesCosts(), html = '';
   var ready = menuItems.filter(function(m){ return !dishGaps(m).length; }).length;
   if(canWriteKey(SALES_KEY) || canWriteKey(DISH_KEY)){
-    html += '<button class="btn-save" id="menu_tally" style="width:100%;margin-bottom:8px;">⚡ Quick tally — tap as you serve</button>';
+    html += '<button class="btn-big" id="menu_tally">⚡ Quick tally — tap as you serve</button>';
     html += '<div class="addrow"><button class="sale" id="menu_log">Type counts</button><button class="expense" id="menu_est">Estimate from takings</button></div>';
   }
   html += '<div class="addrow">'+(canWriteKey(MENU_KEY)?'<button class="purch" id="menu_add">+ Dish</button>':'')+'<button class="invest" id="menu_prep">Today’s prep list</button></div>';
-  if(canWriteKey(MENU_KEY)) html += '<button class="btn-save" id="menu_import" style="width:100%;margin-bottom:8px;background:#1F5C52;">📋 Paste a list of dishes — add or update many at once</button>';
+  if(canWriteKey(MENU_KEY)) html += '<button class="btn-big green" id="menu_import">📋 Paste a list of dishes — add or update many at once</button>';
   html += '<div class="addrow"><button class="sale" id="menu_book">📖 Recipe &amp; SOP book (PDF)</button>'+(costs?'<button class="expense" id="menu_eng">Menu analysis</button>':'')+'</div>';
   if(menuItems.length){
     html += '<div class="card" style="margin-bottom:10px;padding:10px 12px;"><div class="psrow" style="padding:2px 0;"><span><b>'+ready+' of '+menuItems.length+' dishes ready</b><br><span class="muted" style="font-size:11.5px;">ready = photo, price, recipe and SOP all set</span></span>'+
@@ -5291,6 +5294,7 @@ function openMenuForm(menuId){
 function renderMenuFormSheet(draft, isEdit){
   var sheet = document.getElementById("sheet"), costs = seesCosts();
   var html = '<h2 class="serif">'+(isEdit?"Edit dish":"New dish")+'</h2>';
+  if(!isEdit) html += '<button class="btn-big green" id="m_bulk" style="margin-bottom:12px;">📋 Adding many dishes? Paste a whole list instead</button>';
   html += draft.photo ? '<div class="billphoto"><img src="'+esc(draft.photo)+'" alt="Dish photo"><div class="billphotobtns"><button class="btn-cancel" id="m_imgchange">Replace photo</button><button class="btn-del" id="m_imgremove">Remove</button></div></div>'
                       : '<button class="btn-additem" id="m_imgadd" style="margin-bottom:10px;">📷 Add dish photo (shown on the menu and billing screen)</button>';
   html += '<div class="field two"><div><label>Name</label><input type="text" id="m_name" value="'+esc(draft.name)+'" placeholder="e.g. Masala chai"></div>';
@@ -5365,6 +5369,7 @@ function renderMenuFormSheet(draft, isEdit){
   costBox();
   Array.prototype.forEach.call(sheet.querySelectorAll(".ri"), function(inp){ inp.addEventListener("input", function(){ sync(); costBox(); }); inp.addEventListener("change", function(){ sync(); costBox(); }); });
   document.getElementById("m_price").addEventListener("input", function(){ sync(); costBox(); });
+  var mb = document.getElementById("m_bulk"); if(mb) mb.addEventListener("click", function(){ closeForm(); setTimeout(openMenuImport, 0); });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-veg]"), function(b){ b.addEventListener("click", function(){ sync(); draft.veg = b.getAttribute("data-veg"); redraw(); }); });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-rrm]"), function(b){ b.addEventListener("click", function(){ sync(); draft.recipe.splice(+b.getAttribute("data-rrm"),1); redraw(); }); });
   var addIng = document.getElementById("m_adding");
