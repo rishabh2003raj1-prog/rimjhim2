@@ -407,6 +407,31 @@ Customers get their own page at **/c** (e.g. `https://<your-site>/c`), completel
   Only menu photos of dishes on the menu can be opened by a customer.
 - Matching is by the customer's name on bills (as in Customers & loyalty) and payments recorded against them.
 
+### Order types & Live orders (Counter)
+At the top of the Counter: **🍽️ Dine-in · 🛍️ Takeaway · 🛵 Delivery · 🔴 Zomato · 🟠 Swiggy** (the choice is remembered
+on the phone).
+- **Dine-in**: pick a table (tables are set in ⚙️ Settings; busy tables show their running amount), add items,
+  **Send to kitchen** — no payment yet. More items for the same table join the same order (marked new for the
+  kitchen). The bill is made from Live orders when the guests ask, then paid as usual (cash / UPI / udhaar,
+  discounts).
+- **Takeaway**: pay first; the order goes to the kitchen.
+- **Delivery** (own rider): name, phone, address (room / ward for hospital orders) and delivery charge, then
+  **Pay now** or **Cash on delivery** (collected when delivered).
+- **Zomato / Swiggy**: accept the order on the partner app, add the same items here (platform prices: optional
+  markup % and packing charge per platform), type the platform order ID. The sale is kept at what the cafe gets
+  (customer price − commission %) and shows as **payout waiting** until **Record payout** (Sales); payouts go into
+  the bank figures. The same platform order can't be entered twice.
+- **📋 Live orders** (Counter, and Kitchen → 🔥 Orders to cook) shows every open order with a timer (red when past
+  the dishes' prep time) and a **step-by-step guide in Hindi and English** with one big button per step:
+  dine-in: cook → serve to table → make bill → table cleared; takeaway: cook → pack → hand over; delivery: cook →
+  pack → out for delivery (rider name, cash to collect) → delivered; Zomato / Swiggy: accept on the app → cook (and
+  press "Food ready" on the app) → pack → hand to rider **only after matching the order ID / OTP**. Packing uses a
+  checklist (lid tight, spoon & tissue, sauces, bill or order ID on the bag, hot and cold apart) — every line must be
+  ticked.
+- Sales show **Counter bills by order type**, with what customers paid on Zomato / Swiggy.
+- A direct link to the Zomato / Swiggy accounts (orders arriving automatically) needs an approved integration
+  (e.g. through a middleware such as UrbanPiper); the app is ready to take such orders as Live orders.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the

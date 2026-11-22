@@ -236,6 +236,23 @@
   .custcode{font-size:38px;font-weight:800;letter-spacing:6px;text-align:center;margin:10px 0 2px;font-variant-numeric:tabular-nums;}
   .mpcats{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px;} .mpcats label{display:flex;gap:5px;align-items:center;}
   .mpprev img{width:100%;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;display:block;}
+  .ctype{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px;}
+  .ctype button{border:2px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 2px;font:inherit;font-size:12px;font-weight:600;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .ctype button span{font-size:22px;line-height:1;} .ctype button.on{border-color:var(--ink);background:var(--ink);color:#fff;}
+  .ctype button.zomato.on{background:#CB202D;border-color:#CB202D;} .ctype button.swiggy.on{background:#FC8019;border-color:#FC8019;}
+  .ctables{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:6px;}
+  .ctables button{flex:0 0 auto;border:2px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 12px;font:inherit;font-size:13.5px;font-weight:700;color:var(--ink);display:flex;flex-direction:column;align-items:center;}
+  .ctables button i{font-style:normal;font-size:11px;font-weight:500;color:var(--ink-soft);} .ctables button.busy{border-color:#C9772B;background:#FFF4E0;} .ctables button.on{border-color:var(--teal-dk);background:var(--teal-bg);box-shadow:0 0 0 2px var(--teal-dk);}
+  body.simple .ctype button{font-size:13.5px;padding:10px 2px;} body.simple .ctype button span{font-size:28px;} body.simple .ctables button{font-size:16px;padding:10px 14px;}
+  .ltk{border:2px solid var(--line);border-left-width:6px;border-radius:14px;padding:10px 12px;margin-bottom:10px;background:var(--panel);}
+  .ltk.dine{border-left-color:#1F5C52;} .ltk.take{border-left-color:#8A6D1F;} .ltk.delivery{border-left-color:#3B5BA9;} .ltk.zomato{border-left-color:#CB202D;} .ltk.swiggy{border-left-color:#FC8019;}
+  .ltk.late{background:#FFF1EE;} .ltkh{display:flex;justify-content:space-between;align-items:center;gap:8px;} .ltkh b{font-size:16px;} .ltime{font-weight:700;font-size:13px;} .ltk.late .ltime{color:#A6402D;}
+  .ltkitems{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;} .ltkitems span{background:#EFE8D8;border-radius:8px;padding:4px 8px;font-size:14px;font-weight:600;} .ltkitems span.new{background:#FFE3B3;}
+  .lguide{background:#F3F7F5;border-radius:10px;padding:8px 10px;margin-bottom:8px;font-size:13.5px;} .lguide b{display:block;font-size:15px;margin-bottom:2px;}
+  .lcancel{display:block;text-align:center;font-size:12.5px;color:var(--ink-soft);margin-top:4px;}
+  .packrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:2px solid var(--line);background:var(--panel);border-radius:12px;padding:12px;margin-bottom:8px;font:inherit;font-size:15px;color:var(--ink);}
+  .packrow b{width:28px;height:28px;border-radius:8px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex:0 0 28px;} .packrow.on{border-color:#2E7D4F;background:#EEF7F1;} .packrow.on b{background:#2E7D4F;color:#fff;border-color:#2E7D4F;}
+  .kbig.cook{background:#C2412D;} .kbig.live{background:#1F5C52;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -873,7 +890,7 @@ function appAlert(msg){
 
 function storeKey(k){ return OUTLET.id==="rimjhim" ? k : (OUTLET.id + "__" + k); }
 
-var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1", LOANS_KEY = "loans_v1", CHECKS_KEY = "checks_v1", POS_KEY = "pos_v1";
+var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1", LOANS_KEY = "loans_v1", CHECKS_KEY = "checks_v1", POS_KEY = "pos_v1", LIVE_KEY = "liveorders_v1";
 var sales = [], purchases = [], notes = [], investments = [], expenses = [], bills = [];
 var staff = [], roster = [], attendance = [], tasks = [], conduct = [], cashDays = [];
 var menuItems = [], ingredients = [], dishLog = [], vendors = [], assets = [], customers = [], creditPayments = [];
@@ -884,7 +901,7 @@ var loans = []; // loans the cafe took from / gave to anyone other than a partne
 var retailItems = [], retailSales = [];
 var cafeUse = [];
 var stockSub = "all";
-var custPayments = [], offers = [], checks = [], pos = [];
+var custPayments = [], offers = [], checks = [], pos = [], liveOrders = [];
 var assetDraft = null;
 var vendorSub = "list", vendorPeriod = 30, vendorFrom = null, vendorTo = null;
 var settings = {};
@@ -1040,7 +1057,7 @@ function seedData(){
 var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
-  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY];
+  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY, LIVE_KEY];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
@@ -1280,7 +1297,7 @@ function setKeyValue(key, v){
     case RETAIL_KEY: retailItems = arr; break;      case RSALE_KEY: retailSales = arr; break;
     case WASTE_KEY: wastage = arr; break;           case PREP_KEY: prepBatches = arr; break;
     case AUDIT_KEY: stockAudits = arr; break;       case CUST_KEY: customers = arr; break;
-    case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;  case POS_KEY: pos = arr; break;
+    case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;  case POS_KEY: pos = arr; break;  case LIVE_KEY: liveOrders = arr; break;
     case CREDPAY_KEY: creditPayments = arr; break;  case ASSETS_KEY: assets = arr; break;
     case VENDORS_KEY: vendors = arr; break;         case MENU_KEY: menuItems = arr; break;
     case ING_KEY: ingredients = arr; break;         case DISH_KEY: dishLog = arr; break;
@@ -2092,6 +2109,7 @@ function readLists(){
   cafeUse = Array.isArray(cu2) ? cu2 : [];
   var ck0 = lsGet(CHECKS_KEY); checks = Array.isArray(ck0) ? ck0 : [];
   var po0 = lsGet(POS_KEY); pos = Array.isArray(po0) ? po0 : [];
+  var lo0 = lsGet(LIVE_KEY); liveOrders = Array.isArray(lo0) ? lo0 : [];
   var cu = lsGet(CUST_KEY), cp = lsGet(CUSTPAY_KEY), of = lsGet(OFFERS_KEY);
   customers = Array.isArray(cu) ? cu : [];
   custPayments = Array.isArray(cp) ? cp : [];
@@ -3645,9 +3663,11 @@ function renderSalesList(){
   if(mk.length>1 || (mk.length && ["Cash","UPI"].indexOf(mk[0])<0))
     html += '<div class="card" style="margin-bottom:12px;padding:8px 12px;"><div class="barsub" style="margin:0 0 4px;font-weight:600;">By payment mode · '+esc(r.label)+'</div>'+
       mk.map(function(k){ return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+esc(k)+'</span><b>'+rupee(modes[k])+(tot>0?' · '+Math.round(modes[k]/tot*100)+'%':'')+'</b></div>'; }).join("")+'</div>';
+  html += channelCard(list);
   html += recGrouped(collapseCounterSales(list), { word:"sales", one:"sale", date:function(x){ return x.date; }, amt:function(x){ return x.counterDay ? x.t : saleTotal(x); }, cls:function(){ return "sale"; }, row:function(x){ return x.counterDay ? counterDayRow(x) : entryRow(x,"sale"); } });
   el.innerHTML = html;
   wireCounterDayRows(el);
+  Array.prototype.forEach.call(el.querySelectorAll("[data-payout]"), function(a){ a.addEventListener("click", function(ev){ ev.preventDefault(); openPayoutForm(a.getAttribute("data-payout")); }); });
   wireRecPeriodBar(el);
   wireEntryClicks(el);
   if(recSub==="sales") updateRecordsTotal();
@@ -4304,7 +4324,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos, liveOrders:liveOrders };
 }
 
 function exportBackup(){
@@ -4484,7 +4504,7 @@ function applyBackupData(data, errEl, partial){
     payroll = take("payroll", payroll);
     cashMoves = take("cashMoves", cashMoves);
     loans = take("loans", loans);
-    offers = take("offers", offers); checks = take("checks", checks); pos = take("pos", pos);
+    offers = take("offers", offers); checks = take("checks", checks); pos = take("pos", pos); liveOrders = take("liveOrders", liveOrders);
     if(Array.isArray(data.partners) && data.partners.length){
       PARTNERS = partial ? PARTNERS.concat(data.partners.filter(function(p){ return PARTNERS.indexOf(p)<0; })) : data.partners;
     } else if(!partial){ PARTNERS = OUTLET.defaultPartners.slice(); }
@@ -6978,7 +6998,10 @@ function renderKitchen(){
     var low = kSeesStock() ? stockAlerts().length : 0, ord = kOrdered().length, mine = kMyRequests();
     html += '<div class="listhead"><h2 class="serif">Kitchen · रसोई</h2></div>';
     if(myAccess()==="chef") html += attentionCard();
+    var cook = activeTickets().filter(function(t){ return t.status==="new" || t.status==="cooking"; }).length, liveN = activeTickets().length;
     html += '<div class="khome">';
+    if(canWriteKey(LIVE_KEY)) html += '<button class="kbig cook" id="k_cook"><span>🔥</span><b>ऑर्डर बनाना है</b><i>Orders to cook</i>'+(cook?'<em>'+cook+'</em>':'')+'</button>';
+    if(canWriteKey(LIVE_KEY) && liveN) html += '<button class="kbig live" id="k_live"><span>📋</span><b>चालू ऑर्डर</b><i>All live orders</i><em>'+liveN+'</em></button>';
     if(canWriteKey(POS_KEY)) html += '<button class="kbig buy" data-kv="buy"><span>🛒</span><b>मँगवाना है</b><i>Need to buy</i>'+(low?'<em>'+low+'</em>':'')+'</button>';
     if(canWriteKey(PURCH_KEY) && canWriteKey(POS_KEY)) html += '<button class="kbig recv" data-kv="recv"><span>📦</span><b>माल आया</b><i>Goods arrived</i>'+(ord?'<em>'+ord+'</em>':'')+'</button>';
     if(canWriteKey(WASTE_KEY)) html += '<button class="kbig waste" data-kv="waste"><span>🗑️</span><b>खराब हुआ</b><i>Wasted</i></button>';
@@ -7018,6 +7041,8 @@ function renderKitchen(){
   on("[data-kv]", function(b){ kView = b.getAttribute("data-kv"); renderKitchen(); window.scrollTo(0,0); });
   wireAttention(el);
   on("#k_back", function(){ kView = "home"; renderKitchen(); });
+  on("#k_cook", function(){ openLiveOrders(true); });
+  on("#k_live", function(){ openLiveOrders(false); });
   on("#k_checks", function(){ var sheet = document.getElementById("sheet"); sheet.innerHTML = checksCard(false)+'<div class="sheetbtns"><button class="btn-cancel" id="cc_close" style="flex:1;">Close</button></div>';
     document.getElementById("sheetBg").classList.add("on"); wireChecksCard(sheet); document.getElementById("cc_close").addEventListener("click", closeForm); });
   on("#k_simple", function(){ setSimpleMode(!simpleMode()); renderKitchen(); });
@@ -9369,6 +9394,248 @@ function openFixDates(){
 // plates go straight into the dish counts, so stock and forecasts need no tally.
 // "Big & simple" (per phone) makes everything larger with fewer choices.
 var SIMPLE_KEY = "simple_mode_v1", VOICE_KEY = "counter_voice_v1";
+// ---------- ORDER TYPES & LIVE ORDERS ----------
+// Dine-in (table, bill at the end), Takeaway (pay first), Delivery (own rider; pay now or cash on
+// delivery), Zomato and Swiggy (entered from the partner app with the platform's order ID).
+// Every order becomes a ticket on the Live orders board, which walks staff through each step.
+var CHANNELS = {
+  dine:{ t:"Dine-in", hi:"यहीं खाना", i:"🍽️" }, take:{ t:"Takeaway", hi:"पैक करके", i:"🛍️" }, delivery:{ t:"Delivery", hi:"घर पहुँचाना", i:"🛵" },
+  zomato:{ t:"Zomato", hi:"ज़ोमैटो", i:"🔴", platform:true }, swiggy:{ t:"Swiggy", hi:"स्विगी", i:"🟠", platform:true }
+};
+var TYPE_KEY = "counter_type_v1";
+var counterType = (function(){ try{ var v = localStorage.getItem(TYPE_KEY); return CHANNELS[v] ? v : "take"; }catch(e){ return "take"; } })();
+var counterTable = null, counterTicket = null, counterMeta = {};
+function setCounterType(t){ counterType = t; counterTable = null; counterTicket = null; counterMeta = {}; try{ localStorage.setItem(TYPE_KEY, t); }catch(e){} }
+function isPlatform(t){ return !!(CHANNELS[t] && CHANNELS[t].platform); }
+function platformCfg(p){ var c = (settings.platforms||{})[p] || {}; return { enabled: c.enabled!==false, commission: c.commission===0 || +c.commission>0 ? +c.commission : 25, markup: +c.markup||0, packing: +c.packing||0, prep: +c.prep>0 ? +c.prep : 15 }; }
+function cafeTables(){ var t = settings.tables; return Array.isArray(t) && t.length ? t : ["Table 1","Table 2","Table 3","Table 4","Outside 1","Outside 2","Outside 3"]; }
+function deliveryCharge(){ var v = settings.deliveryCharge; return v===0 || +v>0 ? +v : 20; }
+// Price for the current order type: platforms can carry a markup to cover their commission.
+function unitPrice(m, type){
+  type = type || counterType; var p = +m.price||0;
+  if(isPlatform(type)){ var mk = platformCfg(type).markup; if(mk>0) p = Math.round(p*(1+mk/100)/5)*5; }
+  return p;
+}
+function openTicketFor(table){ return liveOrders.find(function(t){ return t.type==="dine" && t.table===table && !t.paid && t.status!=="cancelled"; }) || null; }
+function activeTickets(){ return liveOrders.filter(function(t){ return t.status!=="done" && t.status!=="cancelled"; }).sort(function(a,b){ return (a.at||0)-(b.at||0); }); }
+function nextTicketNo(){ var d = fmtDate(new Date()); return 1 + liveOrders.filter(function(t){ return t.date===d; }).reduce(function(a,t){ return Math.max(a, +t.no||0); },0); }
+function ticketLabel(t){
+  var c = CHANNELS[t.type] || { t:t.type, i:"" };
+  return c.i+" "+(t.type==="dine" ? t.table : isPlatform(t.type) ? c.t+" #"+t.pid : t.type==="delivery" ? "Delivery · "+(t.cname||"") : "Takeaway"+(t.cname?" · "+t.cname:""));
+}
+function ticketTarget(t){ var m = 0; (t.items||[]).forEach(function(i){ var mm = menuById(i.menuId); if(mm && +mm.prepTime>m) m = +mm.prepTime; }); if(isPlatform(t.type)) m = Math.max(m, platformCfg(t.type).prep); return m || 15; }
+function ticketMins(t){ return Math.max(0, Math.round((Date.now() - (t.at||Date.now()))/60000)); }
+function saveLive(){
+  var cut = addDays(fmtDate(new Date()), -2);
+  liveOrders = liveOrders.filter(function(t){ return (t.status!=="done" && t.status!=="cancelled") || (t.date||"") >= cut; });
+  return lsSet(LIVE_KEY, liveOrders);
+}
+function tLog(t, k){ t.steps = t.steps || {}; t.steps[k] = nowHM(); }
+// The guide: for each order type, what the current step means and what to do next.
+var PACK_LISTS = {
+  take:["Lid closed tight · ढक्कन टाइट","Spoon & tissue · चम्मच, टिशू","Sauce / chutney · सॉस / चटनी","Bill in the bag · बिल अंदर","Hot and cold packed apart · गरम-ठंडा अलग"],
+  delivery:["Lid closed tight, bag tied · ढक्कन टाइट, बैग बंद","Spoon & tissue · चम्मच, टिशू","Sauce / chutney · सॉस / चटनी","Bill in the bag · बिल अंदर","Name, phone & address on the bag · बैग पर नाम-पता"],
+  platform:["Every item checked against the app · ऐप से हर चीज़ मिलाई","Bag sealed with tape / sticker · बैग सील","Order ID written on the bag · बैग पर ऑर्डर नंबर","Spoon, tissue & sauces · चम्मच, टिशू, सॉस","Hot and cold packed apart · गरम-ठंडा अलग"]
+};
+function ticketStep(t){
+  var c = CHANNELS[t.type]||{}, plat = isPlatform(t.type), money = rupee(t.amount||0);
+  if(plat && t.status==="new") return { hi:"पहले "+c.t+" ऐप पर ऑर्डर Accept करें", en:"Open the "+c.t+" partner app and ACCEPT order #"+t.pid+" now. Set preparation time to "+platformCfg(t.type).prep+" min.", btn:"✔ Accepted on "+c.t, next:"cooking" };
+  if(t.status==="new" || t.status==="cooking") return { hi:"रसोई: ये बनाएँ", en:"Kitchen: make these items"+(t.type==="dine"?" for "+t.table:"")+". Tap Ready when done."+(plat?" Then press “Food ready” on the "+c.t+" app.":""), btn:"✔ Food ready · तैयार", next:"ready" };
+  if(t.status==="ready"){
+    if(t.type==="dine") return { hi:"खाना "+t.table+" पर दें", en:"Serve it to "+t.table+".", btn:"✔ Served · परोस दिया", next:"served" };
+    return { hi:"पैक करें — हर चीज़ पर ✔", en:"Pack it. Tick every line on the packing list.", btn:"📦 Pack · पैक करें", pack: plat ? "platform" : t.type, next:"packed" };
+  }
+  if(t.status==="served") return t.paid ? { hi:"पूरा हुआ", en:"Paid. Clear the table when the guests leave.", btn:"✔ Table cleared", next:"done" }
+                                         : { hi:"बिल माँगें तो बिल बनाएँ", en:"When the guests ask for the bill, make it here.", btn:"🧾 Make bill · बिल बनाएँ", bill:true };
+  if(t.status==="packed"){
+    if(plat) return { hi:"राइडर से ऑर्डर नंबर / OTP मिलाएँ: #"+t.pid, en:"When the "+c.t+" rider comes, ask for the order ID / OTP and match #"+t.pid+". Hand over only if it matches.", btn:"🛵 Handed to rider", rider:true, next:"done" };
+    if(t.type==="delivery") return { hi:"डिलीवरी के लिए भेजें", en:"Give it to the delivery person"+(t.cod ? " and tell them to collect "+money+" cash" : "")+".", btn:"🛵 Out for delivery", rider:true, next:"out" };
+    return { hi:"बिल नंबर "+t.no+" पुकारें और दें", en:"Call out order "+t.no+(t.cname?" ("+t.cname+")":"")+" and hand it over.", btn:"✔ Handed over · दे दिया", next:"done" };
+  }
+  if(t.status==="out") return t.cod && !t.paid ? { hi:money+" कैश / UPI लेकर आएँ", en:"Delivered? Collect "+money+" (cash on delivery).", btn:"💵 Delivered & paid", collect:true }
+                                               : { hi:"डिलीवर हुआ?", en:"Tap when the customer has it.", btn:"✔ Delivered", next:"done" };
+  return { hi:"", en:"", btn:"" };
+}
+// A ticket for the kitchen; the sale (if already paid) is linked by its id.
+function createTicket(o){
+  var now = new Date(), t = Object.assign({ id:uid(), no:nextTicketNo(), date:fmtDate(now), at:now.getTime(), time:nowHM(), status: isPlatform(o.type) && !o.accepted ? "new" : "cooking", steps:{}, byName:myName() }, o);
+  tLog(t, "placed"); liveOrders.push(t); saveLive(); return t;
+}
+function counterBarLabel(){
+  if(counterTicket) return "Bill ➜";
+  if(counterType==="dine") return counterTable ? (openTicketFor(counterTable) ? "Add to "+counterTable+" ➜" : "Send to kitchen ➜") : "Pick a table ↑";
+  if(counterType==="delivery") return "Details ➜";
+  if(isPlatform(counterType)) return "Enter "+CHANNELS[counterType].t+" order ➜";
+  return "Bill ➜";
+}
+function counterTypeHtml(){
+  var html = '<div class="ctype">'+Object.keys(CHANNELS).filter(function(k){ return !CHANNELS[k].platform || platformCfg(k).enabled; }).map(function(k){
+    var c = CHANNELS[k]; return '<button data-ctype="'+k+'" class="'+k+(counterType===k?" on":"")+'"><span>'+c.i+'</span>'+c.t+'</button>'; }).join("")+'</div>';
+  if(counterType==="dine" && !counterTicket){
+    html += '<div class="ctables">'+cafeTables().map(function(tb){ var o = openTicketFor(tb);
+      return '<button data-table="'+esc(tb)+'" class="'+(counterTable===tb?"on ":"")+(o?"busy":"")+'">'+esc(tb)+(o?'<i>'+rupee((o.items||[]).reduce(function(a,i){ return a+i.qty*i.price; },0))+'</i>':'<i>free</i>')+'</button>'; }).join("")+'</div>';
+  }
+  if(counterTicket){ var tk = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk) html += '<div class="backupnote">Billing <b>'+esc(ticketLabel(tk))+'</b>. <a href="#" id="ct_unbill">Stop</a></div>'; }
+  if(isPlatform(counterType)){ var pc = platformCfg(counterType); html += '<div class="backupnote">'+CHANNELS[counterType].t+' prices'+(pc.markup?' (+'+pc.markup+'%)':'')+'. Add the items exactly as in the '+CHANNELS[counterType].t+' app.</div>'; }
+  return html;
+}
+function wireCounterType(el){
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ctype]"), function(b){ b.addEventListener("click", function(){ if(counterTicket) return; setCounterType(b.getAttribute("data-ctype")); renderCounter(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-table]"), function(b){ b.addEventListener("click", function(){ var tb = b.getAttribute("data-table"); counterTable = counterTable===tb ? null : tb; renderCounter(); }); });
+  var ub = el.querySelector("#ct_unbill"); if(ub) ub.addEventListener("click", function(ev){ ev.preventDefault(); counterTicket = null; counterOrder = {}; counterDisc = null; renderCounter(); });
+}
+// What "Bill / Send" does for the chosen order type.
+function counterGo(){
+  if(counterTicket || counterType==="take"){ openCounterPay(); return; }
+  if(counterType==="dine"){
+    if(!counterTable){ appAlert("Pick a table first · पहले टेबल चुनें"); return; }
+    var lines = orderLines(), items = lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:unitPrice(l.m, "dine") }; });
+    var open = openTicketFor(counterTable);
+    if(open){ var rnd = 1 + (open.items||[]).reduce(function(a,i){ return Math.max(a, i.round||1); },1);
+      items.forEach(function(i){ i.round = rnd; open.items.push(i); }); open.status = "cooking"; open.at = Date.now(); tLog(open, "added"); saveLive(); }
+    else createTicket({ type:"dine", table:counterTable, items:items.map(function(i){ i.round = 1; return i; }) });
+    var tb = counterTable; counterOrder = {}; counterDisc = null; counterTable = null; renderAll();
+    sayHindi("ऑर्डर रसोई में भेज दिया"); appAlert("Sent to kitchen ✔ · "+tb+". Make the bill from Live orders when they finish."); return;
+  }
+  if(counterType==="delivery"){ openDeliveryDetails(); return; }
+  if(isPlatform(counterType)){ openPlatformEntry(); return; }
+}
+function openDeliveryDetails(){
+  var m = counterMeta, sheet = document.getElementById("sheet");
+  if(m.charge===undefined) m.charge = deliveryCharge();
+  var html = '<h2 class="serif">🛵 Delivery details</h2>'+
+    '<div class="field two"><div><label>Name · नाम</label><input id="dl_name" value="'+esc(m.cname||"")+'"></div><div><label>Phone · फ़ोन</label><input id="dl_phone" inputmode="tel" value="'+esc(m.phone||"")+'"></div></div>'+
+    '<div class="field"><label>Address · पता (room / ward for the hospital)</label><textarea id="dl_addr" rows="2">'+esc(m.address||"")+'</textarea></div>'+
+    '<div class="field"><label>Delivery charge (₹)</label><input id="dl_charge" type="number" inputmode="numeric" value="'+esc(m.charge)+'"></div>'+
+    '<div class="err" id="dl_err"></div><div class="ppay" style="grid-template-columns:1fr 1fr;"><button class="cash" id="dl_now"><span>💳</span>Pay now</button><button class="udh" id="dl_cod"><span>💵</span>Cash on delivery</button></div>'+
+    '<div class="sheetbtns"><button class="btn-cancel" id="dl_back" style="flex:1;">← Back</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  function read(){ m.cname = document.getElementById("dl_name").value.trim(); m.phone = document.getElementById("dl_phone").value.trim(); m.address = document.getElementById("dl_addr").value.trim(); m.charge = parseFloat(document.getElementById("dl_charge").value)||0;
+    if(!m.address){ var e = document.getElementById("dl_err"); e.textContent = "Write the address · पता लिखें"; e.style.display = "block"; return false; } return true; }
+  document.getElementById("dl_back").addEventListener("click", closeForm);
+  document.getElementById("dl_now").addEventListener("click", function(){ if(read()){ m.cod = false; openCounterPay(); } });
+  document.getElementById("dl_cod").addEventListener("click", function(){
+    if(!read()) return; m.cod = true;
+    var lines = orderLines(), sub = orderTotal(), disc = discountAmt(sub);
+    createTicket({ type:"delivery", cod:true, cname:m.cname, phone:m.phone, address:m.address, charge:m.charge, amount: sub - disc + m.charge,
+      items: lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:unitPrice(l.m) }; }), discount:disc, discountLabel: disc ? counterDisc.label : "" });
+    counterOrder = {}; counterDisc = null; counterMeta = {}; closeForm(); renderAll(); sayHindi("ऑर्डर रसोई में भेज दिया");
+    appAlert("Sent to kitchen ✔ · cash on delivery "+rupee(sub - disc + m.charge)+". Collect it when delivered (Live orders).");
+  });
+}
+function openPlatformEntry(){
+  var p = counterType, c = CHANNELS[p], cfg = platformCfg(p), m = counterMeta, sheet = document.getElementById("sheet");
+  var sub = orderTotal(), gross = sub + cfg.packing, comm = Math.round(gross*cfg.commission/100);
+  var html = '<h2 class="serif">'+c.i+' '+c.t+' order</h2>'+
+    '<div class="backupnote">Copy from the '+c.t+' partner app. · '+c.t+' ऐप से ऑर्डर नंबर लिखें।</div>'+
+    '<div class="field two"><div><label>Order ID (last 4+ digits) · ऑर्डर नंबर</label><input id="pf_id" inputmode="numeric" value="'+esc(m.pid||"")+'"></div><div><label>Customer first name</label><input id="pf_name" value="'+esc(m.cname||"")+'"></div></div>'+
+    '<div class="card" style="margin-bottom:10px;">'+orderLines().map(function(l){ return '<div class="psrow"><span>'+l.qty+'× '+esc(l.m.name)+'</span><b>'+rupee(l.amt)+'</b></div>'; }).join("")+
+      (cfg.packing?'<div class="psrow"><span>Packing</span><b>'+rupee(cfg.packing)+'</b></div>':'')+
+      '<div class="psrow"><span><b>Customer pays '+c.t+'</b></span><b>'+rupee(gross)+'</b></div><div class="psrow"><span>'+c.t+' commission (~'+cfg.commission+'%)</span><b class="warnamt">− '+rupee(comm)+'</b></div><div class="psrow"><span><b>Cafe gets (payout)</b></span><b class="ok">'+rupee(gross-comm)+'</b></div></div>'+
+    '<label class="poclose"><input type="checkbox" id="pf_acc"> I have already ACCEPTED it on the '+c.t+' app · ऐप पर Accept कर दिया</label>'+
+    '<div class="err" id="pf_err"></div><div class="sheetbtns"><button class="btn-cancel" id="pf_back">← Back</button><button class="btn-save" id="pf_ok">✔ Send to kitchen</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("pf_back").addEventListener("click", closeForm);
+  document.getElementById("pf_ok").addEventListener("click", function(){
+    var pid = document.getElementById("pf_id").value.replace(/\s/g,""), e = document.getElementById("pf_err");
+    if(pid.length < 3){ e.textContent = "Type the "+c.t+" order ID · ऑर्डर नंबर लिखें"; e.style.display = "block"; return; }
+    if(liveOrders.some(function(t){ return t.type===p && t.pid===pid && t.date===fmtDate(new Date()) && t.status!=="cancelled"; })){ e.textContent = "This "+c.t+" order is already entered."; e.style.display = "block"; return; }
+    m.pid = pid; m.cname = document.getElementById("pf_name").value.trim();
+    finishCounterBill(c.t, null, 0, { platform:p, pid:pid, cname:m.cname, gross:gross, commission:comm, packing:cfg.packing, accepted: document.getElementById("pf_acc").checked });
+  });
+}
+// The Live orders board (Counter and Kitchen).
+function openLiveOrders(kitchenOnly){
+  var sheet = document.getElementById("sheet"), list = activeTickets().filter(function(t){ return !kitchenOnly || t.status==="cooking" || t.status==="new"; });
+  var html = '<h2 class="serif">📋 '+(kitchenOnly ? "Orders to cook · बनाना है" : "Live orders · चालू ऑर्डर")+'</h2>';
+  if(!list.length) html += '<div class="empty">No orders right now. · अभी कोई ऑर्डर नहीं।</div>';
+  html += list.map(function(t){
+    var st = ticketStep(t), mins = ticketMins(t), late = (t.status==="new"||t.status==="cooking") && mins > ticketTarget(t);
+    var maxRound = (t.items||[]).reduce(function(a,i){ return Math.max(a, i.round||1); },1);
+    return '<div class="ltk '+t.type+(late?" late":"")+'"><div class="ltkh"><b>'+esc(ticketLabel(t))+'</b><span class="ltime">'+(late?"⏰ ":"")+mins+' min</span></div>'+
+      '<div class="muted">Order '+t.no+' · '+esc(t.time)+(t.paid?' · <span class="ok">paid</span>':t.cod?' · <b class="warnamt">cash on delivery '+rupee(t.amount||0)+'</b>':' · <span class="warnamt">not paid</span>')+(t.address?' · '+esc(t.address):'')+(t.phone?' · '+esc(t.phone):'')+'</div>'+
+      '<div class="ltkitems">'+(t.items||[]).map(function(i){ return '<span class="'+((i.round||1)===maxRound && maxRound>1 ? "new" : "")+'">'+i.qty+'× '+esc(i.name)+'</span>'; }).join("")+'</div>'+
+      '<div class="lguide"><b>'+esc(st.hi)+'</b><div>'+esc(st.en)+'</div></div>'+
+      (st.btn ? '<button class="btn-big green" data-lstep="'+esc(t.id)+'">'+esc(st.btn)+'</button>' : '')+
+      (!t.paid && (t.status==="new"||t.status==="cooking") ? '<a href="#" class="lcancel" data-lcancel="'+esc(t.id)+'">Cancel order</a>' : '')+'</div>';
+  }).join("");
+  html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="lo_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("lo_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-lcancel]"), function(a){ a.addEventListener("click", function(ev){ ev.preventDefault(); var t = liveOrders.find(function(x){ return x.id===a.getAttribute("data-lcancel"); });
+    askConfirm("Cancel "+ticketLabel(t)+"?", function(){ t.status = "cancelled"; tLog(t, "cancelled"); saveLive(); renderAll(); openLiveOrders(kitchenOnly); }); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-lstep]"), function(b){ b.addEventListener("click", function(){ ticketAdvance(b.getAttribute("data-lstep"), kitchenOnly); }); });
+}
+function ticketAdvance(id, kitchenOnly){
+  var t = liveOrders.find(function(x){ return x.id===id; }); if(!t) return;
+  var st = ticketStep(t);
+  function go(){ t.status = st.next; tLog(t, st.next); saveLive(); renderAll(); if(st.next==="ready") sayHindi("खाना तैयार"); openLiveOrders(kitchenOnly); }
+  if(st.pack){ openPackList(t, PACK_LISTS[st.pack], function(){ go(); }); return; }
+  if(st.bill || st.collect){
+    // Load the ticket into the Counter and take payment there.
+    closeForm(); showView("counter"); counterTicket = t.id; counterType = t.type; counterTable = t.table || null;
+    counterOrder = {}; (t.items||[]).forEach(function(i){ counterOrder[i.menuId] = (counterOrder[i.menuId]||0) + i.qty; });
+    counterMeta = t.type==="delivery" ? { cname:t.cname, phone:t.phone, address:t.address, charge:t.charge||0, cod:true } : {};
+    if(t.discount && t.discountLabel) counterDisc = { label:t.discountLabel, kind:"amt", value:t.discount };
+    renderCounter(); openCounterPay(); return;
+  }
+  if(st.rider){
+    var sheet = document.getElementById("sheet");
+    sheet.innerHTML = '<h2 class="serif">🛵 '+esc(ticketLabel(t))+'</h2><div class="lguide"><b>'+esc(st.hi)+'</b><div>'+esc(st.en)+'</div></div>'+
+      '<div class="field"><label>Rider name (optional)</label><input id="rd_name"></div>'+
+      (isPlatform(t.type) ? '<label class="poclose"><input type="checkbox" id="rd_match"> Order ID / OTP matched #'+esc(t.pid)+' · नंबर मिल गया</label>' : '')+
+      '<div class="err" id="rd_err"></div><div class="sheetbtns"><button class="btn-cancel" id="rd_c">Back</button><button class="btn-save" id="rd_ok">'+esc(st.btn)+'</button></div>';
+    document.getElementById("rd_c").addEventListener("click", function(){ openLiveOrders(kitchenOnly); });
+    document.getElementById("rd_ok").addEventListener("click", function(){
+      var mt = document.getElementById("rd_match"); if(mt && !mt.checked){ var e = document.getElementById("rd_err"); e.textContent = "Match the order ID / OTP first. Don’t hand over without it."; e.style.display = "block"; return; }
+      t.rider = document.getElementById("rd_name").value.trim(); go();
+    });
+    return;
+  }
+  go();
+}
+function openPackList(t, items, done){
+  var ticks = items.map(function(){ return false; }), sheet = document.getElementById("sheet");
+  function draw(){
+    sheet.innerHTML = '<h2 class="serif">📦 Pack · '+esc(ticketLabel(t))+'</h2><div class="ltkitems" style="margin-bottom:8px;">'+(t.items||[]).map(function(i){ return '<span>'+i.qty+'× '+esc(i.name)+'</span>'; }).join("")+'</div>'+
+      items.map(function(x, i){ return '<button class="packrow'+(ticks[i]?" on":"")+'" data-pk="'+i+'"><b>'+(ticks[i]?"✔":"")+'</b>'+esc(x.replace("Order ID", "Order ID #"+(t.pid||t.no)))+'</button>'; }).join("")+
+      '<div class="err" id="pk_err"></div><div class="sheetbtns"><button class="btn-cancel" id="pk_c">Back</button><button class="btn-save" id="pk_ok">✔ Packed · पैक हो गया</button></div>';
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-pk]"), function(b){ b.addEventListener("click", function(){ var i = +b.getAttribute("data-pk"); ticks[i] = !ticks[i]; draw(); }); });
+    document.getElementById("pk_c").addEventListener("click", function(){ openLiveOrders(); });
+    document.getElementById("pk_ok").addEventListener("click", function(){ if(ticks.some(function(x){ return !x; })){ var e = document.getElementById("pk_err"); e.textContent = "Tick every line · हर लाइन पर ✔"; e.style.display = "block"; return; } done(); });
+  }
+  draw();
+}
+// Zomato / Swiggy money: sales are kept at the cafe's payout (after commission) and wait here
+// until the weekly payout reaches the bank.
+function platformPending(p){
+  var net = sales.filter(function(s){ return s.order && s.order.platform===p; }).reduce(function(a,s){ return a+saleTotal(s); },0);
+  var paid = (settings.platformPayouts||[]).filter(function(x){ return x.platform===p; }).reduce(function(a,x){ return a+(+x.amount||0); },0);
+  return Math.round(net - paid);
+}
+function openPayoutForm(p){
+  var c = CHANNELS[p], sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<h2 class="serif">'+c.i+' '+c.t+' payout received</h2><div class="backupnote">Waiting for payout: <b>'+rupee(platformPending(p))+'</b>. Enter what reached the bank (from the '+c.t+' payout statement).</div>'+
+    '<div class="field two"><div><label>Amount (₹)</label><input id="po_amt" type="number" inputmode="decimal"></div><div><label>Date</label><input id="po_date" type="date" value="'+fmtDate(new Date())+'"></div></div>'+
+    '<div class="err" id="po_err"></div><div class="sheetbtns"><button class="btn-cancel" id="po_c">Cancel</button><button class="btn-save" id="po_s">Save</button></div>';
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("po_c").addEventListener("click", closeForm);
+  document.getElementById("po_s").addEventListener("click", function(){ var a = parseFloat(document.getElementById("po_amt").value);
+    if(!(a>0)){ var e = document.getElementById("po_err"); e.textContent = "Enter the amount."; e.style.display = "block"; return; }
+    settings.platformPayouts = (settings.platformPayouts||[]).concat([{ id:uid(), platform:p, date:document.getElementById("po_date").value||fmtDate(new Date()), amount:a }]);
+    saveSettings(); closeForm(); renderAll(); });
+}
+function channelCard(list){
+  var by = {}, tot = 0;
+  list.forEach(function(s){ if(!s.order) return; var k = s.order.type || "take"; var g = by[k] || (by[k] = { n:0, amt:0, gross:0 }); g.n++; g.amt += saleTotal(s); g.gross += +(s.order.gross||saleTotal(s)); tot += saleTotal(s); });
+  var keys = Object.keys(by); if(!keys.length) return "";
+  var html = '<div class="card" style="margin-bottom:12px;padding:8px 12px;"><div class="barsub" style="margin:0 0 4px;font-weight:600;">Counter bills by order type</div>'+
+    keys.map(function(k){ var c = CHANNELS[k]||{ t:k, i:"" }; return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+c.i+' '+esc(c.t)+' · '+by[k].n+'</span><b>'+rupee(by[k].amt)+(isPlatform(k)?' <span class="muted" style="font-weight:400;">(customers paid '+rupee(by[k].gross)+')</span>':'')+'</b></div>'; }).join("");
+  ["zomato","swiggy"].forEach(function(p){ var pend = platformPending(p); if(pend>0 || sales.some(function(s){ return s.order && s.order.platform===p; }))
+    html += '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+CHANNELS[p].i+' '+CHANNELS[p].t+' payout waiting</span><b class="warnamt">'+rupee(pend)+(isMgrOrFull() && canWriteKey(SETTINGS_KEY) ? ' <a href="#" data-payout="'+p+'">Record payout</a>' : '')+'</b></div>'; });
+  return html+'</div>';
+}
+
 var counterOrder = {}, counterCat = "__top", counterDisc = null;   // counterDisc: { label, kind:"pct"|"amt", value, offer }
 function simpleMode(){ try{ return localStorage.getItem(SIMPLE_KEY)==="1"; }catch(e){ return false; } }
 function setSimpleMode(on){ try{ localStorage.setItem(SIMPLE_KEY, on?"1":"0"); }catch(e){} applySimpleMode(); renderCounter(); }
@@ -9398,7 +9665,7 @@ function counterTop(n){
 function counterCats(){ var seen = {}, out = []; counterItems().forEach(function(m){ var c = m.category || "Other"; if(!seen[c]){ seen[c] = 1; out.push(c); } }); return out; }
 function orderLines(){
   return Object.keys(counterOrder).filter(function(k){ return counterOrder[k]>0 && menuById(k); }).map(function(k){
-    var m = menuById(k); return { m:m, qty:counterOrder[k], amt:counterOrder[k]*(+m.price||0) };
+    var m = menuById(k); return { m:m, qty:counterOrder[k], amt:counterOrder[k]*unitPrice(m) };
   });
 }
 function orderTotal(){ return orderLines().reduce(function(a,l){ return a+l.amt; },0); }
@@ -9432,7 +9699,7 @@ function tileHtml(m){
       (q ? '<b class="cqty">'+q+'</b>' : '')+'</div>'+
     (m.localName ? '<div class="cloc">'+esc(m.localName)+'</div>' : '')+
     ((!simple || !m.localName) ? '<div class="cname">'+esc(m.name)+'</div>' : '')+
-    '<div class="cprice">'+rupee(m.price)+'</div>'+
+    '<div class="cprice">'+rupee(unitPrice(m))+'</div>'+
     (q ? '<span class="cminus" data-minus="'+esc(m.id)+'" aria-label="one less">−</span>' : '')+'</button>';
 }
 function renderCounter(){
@@ -9443,17 +9710,19 @@ function renderCounter(){
   var canBill = canWriteKey(SALES_KEY);
   var html = '<div class="listhead"><h2 class="serif">Counter</h2><div class="monthtot">'+bills.length+' bill'+(bills.length!==1?'s':'')+' today · '+rupee(bills.reduce(function(a,s){ return a+saleTotal(s); },0))+'</div></div>';
   html += '<div class="ctools">'+
+    '<button id="ct_live" class="'+(activeTickets().some(function(t){ return (t.status==="new"||t.status==="cooking") && ticketMins(t)>ticketTarget(t); })?"warn":"")+'">📋 Live orders ('+activeTickets().length+')</button>'+
     '<button id="ct_bills">🧾 Today’s bills</button>'+
     (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checksInUse() && checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
     '<button id="ct_voice" class="'+(voiceOn()?"on":"")+'">'+(voiceOn()?"🔊":"🔇")+'</button>'+
-    ((isFullAccess() || myAccess()==="manager") && !simple ? '<button id="ct_upi">⚙️ UPI & discounts</button>' : '')+'</div>';
+    ((isFullAccess() || myAccess()==="manager") && !simple ? '<button id="ct_upi">⚙️ Settings</button>' : '')+'</div>';
   if(!canBill) html += '<div class="backupnote">This login can look but cannot make bills.</div>';
   var items = counterItems();
   if(!items.length){
     html += '<div class="empty">No dishes with a price yet. Add the menu first (Records → Menu).</div>';
     el.innerHTML = html; wireCounterTools(el); return;
   }
+  html += counterTypeHtml();
   var cats = counterCats();
   if(counterCat!=="__top" && counterCat!=="__all" && cats.indexOf(counterCat)<0) counterCat = "__top";
   html += '<div class="ccats">'+[["__top","⭐ "+(simple?"Most sold":"Most sold")]].concat(cats.map(function(c){ return [c, (iconFor(c)||"🍽️")+" "+c]; })).concat(simple?[]:[["__all","All"]]).map(function(c){
@@ -9462,7 +9731,7 @@ function renderCounter(){
   html += '<div class="cgrid">'+show.map(tileHtml).join("")+'</div>';
   var n = orderCount(), t = billNet();
   html += '<div class="cbar'+(n?" on":"")+'">'+(n ?
-    '<button class="cclear" id="ct_clear" aria-label="clear">✕</button><div class="ctot"><b>'+rupee(t)+'</b><span>'+n+' item'+(n!==1?'s':'')+'</span></div><button class="cgo" id="ct_go">Bill ➜</button>' :
+    '<button class="cclear" id="ct_clear" aria-label="clear">✕</button><div class="ctot"><b>'+rupee(t)+'</b><span>'+n+' item'+(n!==1?'s':'')+'</span></div><button class="cgo" id="ct_go">'+esc(counterBarLabel())+'</button>' :
     '<div class="chint">Tap a picture to add it</div>')+'</div>';
   el.innerHTML = html;
   wireCounterTools(el);
@@ -9475,11 +9744,13 @@ function renderCounter(){
       renderCounter();
     });
   });
-  var go = document.getElementById("ct_go"); if(go) go.addEventListener("click", function(){ if(!canBill){ appAlert("This login cannot make bills."); return; } openCounterPay(); });
-  var cl = document.getElementById("ct_clear"); if(cl) cl.addEventListener("click", function(){ askConfirm("Clear this order?", function(){ counterOrder = {}; counterDisc = null; renderCounter(); }); });
+  wireCounterType(el);
+  var go = document.getElementById("ct_go"); if(go) go.addEventListener("click", function(){ if(!canBill){ appAlert("This login cannot make bills."); return; } counterGo(); });
+  var cl = document.getElementById("ct_clear"); if(cl) cl.addEventListener("click", function(){ askConfirm("Clear this order?", function(){ counterOrder = {}; counterDisc = null; counterTicket = null; counterMeta = {}; renderCounter(); }); });
 }
 function wireCounterTools(el){
   var b = document.getElementById("ct_bills"); if(b) b.addEventListener("click", function(){ openCounterBills(fmtDate(new Date())); });
+  var lv = document.getElementById("ct_live"); if(lv) lv.addEventListener("click", function(){ openLiveOrders(false); });
   var s = document.getElementById("ct_simple"); if(s) s.addEventListener("click", function(){ setSimpleMode(!simpleMode()); });
   var v = document.getElementById("ct_voice"); if(v) v.addEventListener("click", function(){ setVoice(!voiceOn()); renderCounter(); });
   var u = document.getElementById("ct_upi"); if(u) u.addEventListener("click", openUpiSettings);
@@ -9503,8 +9774,17 @@ function openUpiSettings(){
       html += '<div class="field two" style="margin-top:8px;"><div><input id="of_name" placeholder="Offer name"></div><div class="two" style="display:flex;gap:6px;"><input type="number" inputmode="decimal" id="of_val" placeholder="Value" style="flex:1;min-width:0;"><select id="of_kind" style="flex:1;min-width:0;"><option value="pct">%</option><option value="amt">₹</option></select></div></div>'+
         '<button class="btn-additem" id="of_add">+ Add offer</button>';
     }
+    html += '<div class="dgroup">Order types</div>'+
+      '<div class="field"><label>Tables (comma separated)</label><input id="up_tables" value="'+esc(cafeTables().join(", "))+'"></div>'+
+      '<div class="field"><label>Own delivery charge (₹)</label><input id="up_dcharge" type="number" inputmode="numeric" value="'+esc(deliveryCharge())+'"></div>';
+    ["zomato","swiggy"].forEach(function(pl){ var pc = platformCfg(pl), ch = CHANNELS[pl];
+      html += '<div class="card" style="margin-bottom:8px;"><label class="poclose" style="margin:0 0 6px;"><input type="checkbox" id="up_'+pl+'_on"'+(pc.enabled?" checked":"")+'> <b>'+ch.i+' '+ch.t+'</b> orders</label>'+
+        '<div class="field two"><div><label>Commission %</label><input id="up_'+pl+'_comm" type="number" inputmode="decimal" value="'+esc(pc.commission)+'"></div><div><label>Price markup % on '+ch.t+'</label><input id="up_'+pl+'_mk" type="number" inputmode="decimal" value="'+esc(pc.markup)+'"></div></div>'+
+        '<div class="field two"><div><label>Packing charge (₹)</label><input id="up_'+pl+'_pack" type="number" inputmode="numeric" value="'+esc(pc.packing)+'"></div><div><label>Preparation time (min)</label><input id="up_'+pl+'_prep" type="number" inputmode="numeric" value="'+esc(pc.prep)+'"></div></div></div>';
+    });
+    html += '<div class="backupnote">Zomato and Swiggy orders are accepted on their partner apps and entered here with the order ID; the Live orders board then guides packing and rider handover. A direct link to your Zomato / Swiggy accounts needs an approved integration (for example through UrbanPiper); orders could then arrive here automatically.</div>';
     html += '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
-    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
+    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_tables","up_dcharge"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     Object.keys(keep).forEach(function(k){ var e = document.getElementById(k); if(e) e.value = keep[k]; });
     function err(m){ var e = document.getElementById("up_err"); e.textContent = m; e.style.display = "block"; }
@@ -9522,7 +9802,12 @@ function openUpiSettings(){
       var id = document.getElementById("up_id").value.trim(), nm = document.getElementById("up_name").value.trim(), mx = parseFloat(document.getElementById("up_max").value);
       if(id && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(id)) return err("That doesn\u2019t look like a UPI ID (name@bank).");
       if(!(mx>=0 && mx<=100)) return err("The limit must be between 0 and 100%.");
-      settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx; saveSettings();
+      settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx;
+      var tbs = document.getElementById("up_tables").value.split(",").map(function(x){ return x.trim(); }).filter(Boolean); if(tbs.length) settings.tables = tbs;
+      var dc = parseFloat(document.getElementById("up_dcharge").value); settings.deliveryCharge = dc>=0 ? dc : 0;
+      var pls = {}; ["zomato","swiggy"].forEach(function(pl){ pls[pl] = { enabled: document.getElementById("up_"+pl+"_on").checked, commission: parseFloat(document.getElementById("up_"+pl+"_comm").value)||0,
+        markup: parseFloat(document.getElementById("up_"+pl+"_mk").value)||0, packing: parseFloat(document.getElementById("up_"+pl+"_pack").value)||0, prep: parseFloat(document.getElementById("up_"+pl+"_prep").value)||15 }; });
+      settings.platforms = pls; saveSettings();
       if(canOffers){ offers = offs; saveOffers(); }
       closeForm(); renderCounter();
     });
@@ -9543,7 +9828,8 @@ var payStep = "order", payGiven = 0;
 function openCounterPay(){ payStep = "order"; payGiven = 0; renderCounterPay(true); }
 var NOTES = [[10,"#C9A66B"],[20,"#E7C55B"],[50,"#62B6C9"],[100,"#9C8ACB"],[200,"#F2A541"],[500,"#9AA59A"]];
 function renderCounterPay(speak){
-  var lines = orderLines(), sub = orderTotal(), disc = discountAmt(sub), total = sub - disc;
+  var charge = counterType==="delivery" ? (+counterMeta.charge||0) : 0;
+  var lines = orderLines(), sub = orderTotal(), disc = discountAmt(sub), total = sub - disc + charge;
   if(!lines.length){ counterDisc = null; closeForm(); renderCounter(); return; }
   var sheet = document.getElementById("sheet"), html = "";
   if(payStep==="order"){
@@ -9555,6 +9841,7 @@ function renderCounterPay(speak){
     }).join("");
     html += '<button class="pdisc'+(disc?" on":"")+'" id="pp_disc"><span>🏷️ '+(disc ? esc(counterDisc.label) : "Discount")+'</span><b>'+(disc ? "− "+rupee(disc) : "Add")+'</b></button>';
     if(disc) html += '<div class="psub"><span>Before discount</span><s>'+rupee(sub)+'</s></div>';
+    if(charge) html += '<div class="psub"><span>🛵 Delivery charge</span><b>'+rupee(charge)+'</b></div>';
     html += '<div class="ptotal"><span>Total</span><b>'+rupee(total)+'</b><button class="psay" id="pp_say" aria-label="say the total">🔊</button></div>';
     html += '<div class="ppay"><button class="cash" data-pay="cash"><span>💵</span>Cash</button><button class="upi" data-pay="upi"><span>📱</span>UPI</button><button class="udh" data-pay="udhaar"><span>📒</span>Udhaar</button></div>';
     html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back" style="flex:1;">← Add more</button></div>';
@@ -9636,22 +9923,35 @@ function renderCounterPay(speak){
 }
 function nextBillNo(day){ return 1 + counterBills(day).reduce(function(a,s){ return Math.max(a, +s.order.no||0); },0); }
 function billText(s){ return (s.order.items||[]).map(function(i){ return i.qty+"× "+i.name; }).join(", "); }
-function finishCounterBill(mode, customer, given){
+function finishCounterBill(mode, customer, given, plat){
   var lines = orderLines(); if(!lines.length) return;
   var day = fmtDate(new Date()), now = new Date(), id = uid(), no = nextBillNo(day);
-  var items = lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:+l.m.price||0 }; });
-  var sub = orderTotal(), disc = discountAmt(sub), total = sub - disc;
-  var rec = { id:id, date:day, customer: customer || "Counter", desc:"", amount:total, gst:0, mode:mode,
-              order:{ no:no, time:("0"+now.getHours()).slice(-2)+":"+("0"+now.getMinutes()).slice(-2), items:items, given: given||0 } };
+  var items = lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:unitPrice(l.m) }; });
+  var charge = counterType==="delivery" ? (+counterMeta.charge||0) : 0;
+  var sub = orderTotal(), disc = plat ? 0 : discountAmt(sub), total = plat ? (plat.gross - plat.commission) : sub - disc + charge;
+  var tk = counterTicket ? liveOrders.find(function(x){ return x.id===counterTicket; }) : null;
+  var rec = { id:id, date:day, customer: customer || (plat ? CHANNELS[plat.platform].t+" #"+plat.pid : counterType==="delivery" && counterMeta.cname ? counterMeta.cname : "Counter"), desc:"", amount:total, gst:0, mode:mode,
+              order:{ no:no, time:("0"+now.getHours()).slice(-2)+":"+("0"+now.getMinutes()).slice(-2), items:items, given: given||0, type:counterType } };
+  if(counterTable) rec.order.table = counterTable;
+  if(charge) rec.order.deliveryCharge = charge;
+  if(counterType==="delivery"){ rec.order.address = counterMeta.address||""; rec.order.phone = counterMeta.phone||""; }
+  if(plat){ Object.assign(rec.order, { platform:plat.platform, pid:plat.pid, gross:plat.gross, commission:plat.commission, packing:plat.packing }); }
   if(disc){ rec.order.subtotal = sub; rec.order.discount = disc; rec.order.discountLabel = counterDisc.label; if(counterDisc.offer) rec.order.offerId = counterDisc.offer; }
-  rec.desc = "Bill "+no+": "+billText(rec)+(disc ? " · discount "+rupee(disc) : "");
+  rec.desc = (CHANNELS[counterType] ? CHANNELS[counterType].t+" · " : "")+"Bill "+no+": "+billText(rec)+(disc ? " · discount "+rupee(disc) : "")+(plat ? " · "+CHANNELS[plat.platform].t+" #"+plat.pid+", customer paid "+rupee(plat.gross)+", commission ~"+rupee(plat.commission) : "");
   sales.push(rec);
   items.forEach(function(i){ dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:id }); });
+  var sentToKitchen = false;
+  if(tk){ tk.paid = true; tk.saleId = id; tk.amount = total; tLog(tk, "paid"); if(tk.status==="out") { tk.status = "done"; tLog(tk, "done"); } saveLive(); }
+  else if(counterType!=="dine"){
+    createTicket({ type:counterType, paid:true, saleId:id, amount:total, items:items, cname: plat ? plat.cname : (counterMeta.cname||""), phone:counterMeta.phone||"", address:counterMeta.address||"", charge:charge,
+                   platform: plat ? plat.platform : null, pid: plat ? plat.pid : null, accepted: plat ? !!plat.accepted : undefined });
+    sentToKitchen = true;
+  }
   saveSales(); saveDishLog();
-  counterOrder = {}; counterDisc = null;
+  counterOrder = {}; counterDisc = null; counterTicket = null; counterMeta = {}; counterTable = null;
   closeForm(); renderAll();
   var sheet = document.getElementById("sheet");
-  sheet.innerHTML = '<div class="pdone"><div class="tick">✔</div><b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+
+  sheet.innerHTML = '<div class="pdone"><div class="tick">✔</div><b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+(sentToKitchen ? '<div class="muted" style="margin-top:6px;">Sent to the kitchen · Live orders</div>' : '')+
     '<button class="btn-save" id="pd_ok" style="width:100%;margin-top:16px;">Next customer</button></div>';
   document.getElementById("sheetBg").classList.add("on");
   sayHindi("धन्यवाद");
@@ -9670,7 +9970,7 @@ function openCounterBills(dateStr){
   if(!list.length) html += '<div class="empty">No bills yet.</div>';
   var canCancel = canWriteKey(SALES_KEY);
   html += list.map(function(s){
-    return '<div class="entry"><div><div class="who">#'+s.order.no+' · '+esc(s.order.time||"")+' · '+(s.mode==="Credit"?"Udhaar ("+esc(s.customer)+")":esc(s.mode))+'</div>'+
+    return '<div class="entry"><div><div class="who">'+(CHANNELS[s.order.type] ? CHANNELS[s.order.type].i+' ' : '')+'#'+s.order.no+(s.order.table?' · '+esc(s.order.table):'')+(s.order.pid?' · '+esc(CHANNELS[s.order.platform].t)+' #'+esc(s.order.pid):'')+' · '+esc(s.order.time||"")+' · '+(s.mode==="Credit"?"Udhaar ("+esc(s.customer)+")":esc(s.mode))+'</div>'+
       '<div class="meta">'+esc(billText(s))+'</div>'+
       (s.order.discount ? '<div class="meta warnamt">🏷️ − '+rupee(s.order.discount)+' · '+esc(s.order.discountLabel||"discount")+' (bill was '+rupee(s.order.subtotal)+')</div>' : '')+
       '<div class="meta"><a href="#" data-share="'+esc(s.id)+'">Share</a>'+(canCancel?' · <a href="#" data-void="'+esc(s.id)+'" class="bad">Cancel bill</a>':'')+'</div></div>'+
@@ -9911,6 +10211,7 @@ function bankRows(){
   var byDay = {};
   sales.forEach(function(x){ if(x.date && (x.mode==="UPI" || x.mode==="Card")) byDay[x.date] = (byDay[x.date]||0) + saleTotal(x); });
   Object.keys(byDay).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:byDay[d], text:"UPI / card sales", ref:d }); });
+  (settings.platformPayouts||[]).forEach(function(x){ if(x && x.date) rows.push({ date:x.date, kind:"sales", amt:+x.amount||0, text:(CHANNELS[x.platform]?CHANNELS[x.platform].t:"Online")+" payout", ref:x.id }); });
   creditPayments.forEach(function(x){
     if(x.date && x.mode && x.mode!=="Cash"){ var c = custById ? custById(x.customerId) : null;
       rows.push({ date:x.date, kind:"udhaar", amt:+x.amount||0, text:"Udhaar paid back"+(c?" · "+c.name:"")+" ("+x.mode+")", ref:x.customerId||"" }); }
