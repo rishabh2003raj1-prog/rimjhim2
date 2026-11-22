@@ -142,6 +142,69 @@
   .tallyhead b{font-family:'Fraunces',serif;font-size:22px;display:block;}
   .tallyhead span{font-size:12px;color:var(--ink-soft);}
   .tdate{font-size:12px;color:var(--ink-soft);}
+  /* Counter: picture billing */
+  .ctools{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+  .ctools button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:8px 12px;font:inherit;font-size:13px;color:var(--ink);}
+  .ctools button.on{background:var(--teal-bg);border-color:var(--teal-dk);font-weight:600;}
+  .ccats{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;-webkit-overflow-scrolling:touch;}
+  .ccats button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:9px 12px;font:inherit;font-size:13.5px;color:var(--ink);white-space:nowrap;}
+  .ccats button.on{background:var(--ink);color:var(--panel);border-color:var(--ink);}
+  .cgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding-bottom:84px;}
+  .ctile{position:relative;background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:6px;font:inherit;color:var(--ink);display:flex;flex-direction:column;align-items:stretch;gap:1px;text-align:center;}
+  .ctile.has{border-color:var(--teal-dk);background:var(--teal-bg);}
+  .cimg{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:#EFE8D8;display:flex;align-items:center;justify-content:center;}
+  .cimg img{width:100%;height:100%;object-fit:cover;} .cimg span{font-size:40px;line-height:1;}
+  .cimg .vegdot{position:absolute;top:5px;left:5px;background:#fff;}
+  .cqty{position:absolute;top:4px;right:4px;min-width:28px;height:28px;border-radius:14px;background:var(--teal-dk);color:#fff;font-size:16px;display:flex;align-items:center;justify-content:center;padding:0 6px;}
+  .cloc{font-size:14px;font-weight:600;line-height:1.2;margin-top:3px;}
+  .cname{font-size:11.5px;line-height:1.2;color:var(--ink-soft);margin-top:2px;}
+  .cloc + .cname{margin-top:0;}
+  .cprice{font-size:15px;font-weight:700;margin-top:2px;}
+  .cminus{position:absolute;left:4px;bottom:4px;width:34px;height:34px;border-radius:17px;background:#fff;border:1.5px solid var(--line);font-size:22px;line-height:30px;font-weight:700;color:var(--ink);}
+  .cbar{position:fixed;left:0;right:0;max-width:480px;margin:0 auto;bottom:calc(58px + env(safe-area-inset-bottom));z-index:14;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -4px 14px rgba(0,0,0,.06);}
+  .cbar .chint{flex:1;text-align:center;color:var(--ink-soft);font-size:13px;padding:6px;}
+  .cclear{width:44px;height:48px;border-radius:12px;border:1px solid var(--line);background:var(--panel);font-size:18px;color:var(--ink-soft);}
+  .ctot{flex:1;display:flex;flex-direction:column;line-height:1.1;} .ctot b{font-size:24px;} .ctot span{font-size:12px;color:var(--ink-soft);}
+  .cgo{height:52px;padding:0 22px;border-radius:14px;border:none;background:#2E7D4F;color:#fff;font:inherit;font-size:19px;font-weight:700;}
+  .paysheet h2{margin-bottom:8px;}
+  .pline{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);}
+  .picon{font-size:26px;} .pname{flex:1;display:flex;flex-direction:column;line-height:1.2;} .pname span{font-size:11.5px;color:var(--ink-soft);}
+  .pbtn{width:42px;height:42px;border-radius:21px;border:1.5px solid var(--line);background:var(--panel);font-size:22px;font-weight:700;color:var(--ink);}
+  .pbtn.small{width:auto;height:30px;padding:0 10px;font-size:13px;border-radius:15px;}
+  .pq{min-width:24px;text-align:center;font-size:18px;} .pamt{min-width:62px;text-align:right;font-weight:600;}
+  .ptotal{display:flex;align-items:center;gap:10px;margin:14px 0;padding:12px 14px;border-radius:14px;background:var(--teal-bg);}
+  .ptotal span{font-size:16px;} .ptotal b{flex:1;text-align:right;font-size:34px;}
+  .psay{width:46px;height:46px;border-radius:23px;border:none;background:var(--panel);font-size:22px;}
+  .ppay{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;}
+  .ppay button{border:none;border-radius:16px;padding:14px 4px;font:inherit;font-size:17px;font-weight:700;color:#fff;display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .ppay button span{font-size:34px;line-height:1;}
+  .ppay .cash{background:#2E7D4F;} .ppay .upi{background:#3B5BA9;} .ppay .udh{background:#B5651D;}
+  .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
+  .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
+  .pchange{display:flex;justify-content:space-between;align-items:center;padding:14px;border-radius:14px;background:#E3F3E8;font-size:18px;margin-bottom:8px;}
+  .pchange b{font-size:34px;color:#2E7D4F;} .pchange.short{background:#FBE7E4;color:#A33;font-weight:700;}
+  .pqr{width:240px;max-width:80%;margin:6px auto;background:#fff;padding:6px;border-radius:12px;text-align:center;} .pqr svg{width:100%;height:auto;display:block;}
+  .pupiid{text-align:center;font-weight:600;margin-bottom:8px;}
+  .pnames{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+  .pnames button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 14px;font:inherit;font-size:16px;color:var(--ink);}
+  .pdone{text-align:center;padding:18px 6px;} .pdone .tick{width:84px;height:84px;margin:0 auto 10px;border-radius:42px;background:#2E7D4F;color:#fff;font-size:46px;line-height:84px;}
+  .pdone b{font-size:22px;display:block;margin-bottom:4px;}
+  /* Big & simple (per phone): larger text, bigger buttons, fewer choices */
+  body.simple{font-size:17px;}
+  body.simple .cgrid{grid-template-columns:repeat(2,1fr);gap:10px;}
+  body.simple .cloc{font-size:20px;} body.simple .cname{font-size:16px;color:var(--ink);font-weight:600;} body.simple .cprice{font-size:21px;}
+  body.simple .cimg span{font-size:58px;} body.simple .cqty{min-width:38px;height:38px;border-radius:19px;font-size:22px;}
+  body.simple .cminus{width:46px;height:46px;border-radius:23px;font-size:28px;line-height:40px;}
+  body.simple .ccats button{font-size:17px;padding:12px 16px;}
+  body.simple .ctools button{font-size:15px;padding:10px 14px;}
+  body.simple .ctot b{font-size:30px;} body.simple .cgo{height:60px;font-size:22px;}
+  body.simple nav.tabs button{font-size:12.5px;} body.simple nav.tabs svg{width:26px;height:26px;}
+  body.simple .entry .who{font-size:17px;} body.simple .entry .meta{font-size:14px;} body.simple .entry .amt{font-size:18px;}
+  body.simple .btn-save,body.simple .btn-cancel,body.simple .btn-del{font-size:18px;padding:15px 12px;}
+  body.simple .field label{font-size:15px;} body.simple .field input,body.simple .field select,body.simple .field textarea{font-size:18px;padding:12px;}
+  body.simple .pname b{font-size:19px;} body.simple .pbtn{width:50px;height:50px;border-radius:25px;font-size:26px;} body.simple .pq{font-size:22px;}
+  body.simple .ptotal b{font-size:42px;} body.simple .ppay button{font-size:20px;padding:18px 4px;} body.simple .pnotes button{height:68px;font-size:24px;}
   .tallygrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
   .tallybtn{position:relative;min-height:74px;border-radius:14px;border:1px solid var(--line);background:var(--panel);font-family:inherit;padding:10px 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;}
   .tallybtn.has{background:var(--teal-bg);border-color:var(--teal-dk);}
@@ -539,6 +602,8 @@
       <div class="daypanel" id="dayPanel"></div>
     </div>
 
+    <div class="view" id="view-counter"><div id="counterView"></div></div>
+
     <div class="view" id="view-records">
       <div class="listhead">
         <h2 class="serif" id="recordsTitle">Sales</h2>
@@ -628,6 +693,10 @@
   <button class="fab" id="fabAdd" aria-label="Add entry">+</button>
 
   <nav class="tabs">
+    <button data-v="counter">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
+      Counter
+    </button>
     <button data-v="dashboard" class="on">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l9-8 9 8"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
       Dashboard
@@ -1354,9 +1423,9 @@ function canSwitchStores(){ return isOwner() || (cloud.who && cloud.who.outlet==
 var ACCESS_LABEL = { owner:"Owner", partner:"Partner", full:"Full access", manager:"Manager", chef:"Chef / kitchen", billing:"Billing / counter" };
 // Each role's screens. Anything not listed is hidden.
 var ROLE_SCREENS = {
-  manager: { nav:["dashboard","calendar","notes","staff","records"], rec:["sales","purchases","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
+  manager: { nav:["dashboard","counter","calendar","notes","staff","records"], rec:["sales","purchases","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
   chef:    { nav:["notes","staff","records"], rec:["purchases","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
-  billing: { nav:["notes","staff","records"], rec:["sales","customers","cash"], staff:["roster","attendance","tasks"] }
+  billing: { nav:["counter","notes","staff","records"], rec:["sales","customers","cash"], staff:["roster","attendance","tasks"] }
 };
 function roleScreens(){ return isFullAccess() ? null : (ROLE_SCREENS[myAccess()] || ROLE_SCREENS.billing); }
 // Lists each kind of note writes to, so a note this login can't file is refused clearly.
@@ -2121,6 +2190,7 @@ function renderAll(){
   renderPartnersView();
   renderStaffSection();
   renderNotes();
+  renderCounter();
 }
 
 // ---------- DASHBOARD ----------
@@ -3300,7 +3370,7 @@ function renderDayPanel(){
   } else {
     if(daySales.length){
       html += '<div class="daygroup">Sales · '+rupee(sTot)+'</div>';
-      daySales.forEach(function(s){ html += entryRow(s,"sale"); });
+      html += saleRowsHtml(daySales);
     }
     if(dayPurch.length){
       html += '<div class="daygroup">Purchases · '+rupee(pTot)+'</div>';
@@ -3499,8 +3569,9 @@ function renderSalesList(){
   if(mk.length>1 || (mk.length && ["Cash","UPI"].indexOf(mk[0])<0))
     html += '<div class="card" style="margin-bottom:12px;padding:8px 12px;"><div class="barsub" style="margin:0 0 4px;font-weight:600;">By payment mode · '+esc(r.label)+'</div>'+
       mk.map(function(k){ return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+esc(k)+'</span><b>'+rupee(modes[k])+(tot>0?' · '+Math.round(modes[k]/tot*100)+'%':'')+'</b></div>'; }).join("")+'</div>';
-  html += recGrouped(list, { word:"sales", one:"sale", date:function(x){ return x.date; }, amt:saleTotal, cls:function(){ return "sale"; }, row:function(x){ return entryRow(x,"sale"); } });
+  html += recGrouped(collapseCounterSales(list), { word:"sales", one:"sale", date:function(x){ return x.date; }, amt:function(x){ return x.counterDay ? x.t : saleTotal(x); }, cls:function(){ return "sale"; }, row:function(x){ return x.counterDay ? counterDayRow(x) : entryRow(x,"sale"); } });
   el.innerHTML = html;
+  wireCounterDayRows(el);
   wireRecPeriodBar(el);
   wireEntryClicks(el);
   if(recSub==="sales") updateRecordsTotal();
@@ -7994,13 +8065,275 @@ function openFixDates(){
 }
 
 
+// ---------- COUNTER: picture billing ----------
+// Big photo tiles: tap what the customer wants, see the total in large numbers, pick
+// Cash / UPI / Udhaar with pictures. Each bill is one sale (with its items) and its
+// plates go straight into the dish counts, so stock and forecasts need no tally.
+// "Big & simple" (per phone) makes everything larger with fewer choices.
+var SIMPLE_KEY = "simple_mode_v1", VOICE_KEY = "counter_voice_v1";
+var counterOrder = {}, counterCat = "__top";
+function simpleMode(){ try{ return localStorage.getItem(SIMPLE_KEY)==="1"; }catch(e){ return false; } }
+function setSimpleMode(on){ try{ localStorage.setItem(SIMPLE_KEY, on?"1":"0"); }catch(e){} applySimpleMode(); renderCounter(); }
+function applySimpleMode(){ document.body.classList.toggle("simple", simpleMode()); }
+function voiceOn(){ try{ return localStorage.getItem(VOICE_KEY)!=="0"; }catch(e){ return true; } }
+function setVoice(on){ try{ localStorage.setItem(VOICE_KEY, on?"1":"0"); }catch(e){} }
+function sayHindi(text){
+  if(!voiceOn() || !window.speechSynthesis || typeof SpeechSynthesisUtterance==="undefined") return;
+  try{ speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text); u.lang = "hi-IN"; u.rate = 0.9; speechSynthesis.speak(u); }catch(e){}
+}
+var DISH_ICONS = [[/flask/i,"🫖"],[/chai|tea\b/i,"☕"],[/coffee/i,"☕"],[/lassi|shake|milk|chaas/i,"🥛"],[/mojito|soda|nimbu|lime|lemon|cold drink|juice|cola|water|beverage|drink/i,"🥤"],
+  [/momo/i,"🥟"],[/maggi|noodle|chowmein|hakka/i,"🍜"],[/biryani|pulao|fried rice|rice|khichdi|thali/i,"🍛"],[/paratha|roti|naan|kulcha|puri/i,"🫓"],
+  [/dosa|uttapam|idli|vada/i,"🥞"],[/burger/i,"🍔"],[/sandwich|toast/i,"🥪"],[/roll|wrap|frankie/i,"🌯"],[/pasta/i,"🍝"],[/pizza/i,"🍕"],
+  [/fries|potato|chips/i,"🍟"],[/egg|omelette|anda/i,"🥚"],[/chicken/i,"🍗"],[/soup/i,"🍲"],[/salad|fruit|sprout|healthy|light/i,"🥗"],
+  [/paneer/i,"🧀"],[/manchurian|chilli|spring|chinese/i,"🥡"],[/samosa|pakora|kachori|snack|bites/i,"🥨"],[/ice cream|dessert|sweet|halwa|gulab|kheer/i,"🍨"],[/breakfast/i,"🍳"],[/combo/i,"🍱"]];
+function iconFor(text){ for(var i=0;i<DISH_ICONS.length;i++) if(DISH_ICONS[i][0].test(text||"")) return DISH_ICONS[i][1]; return ""; }
+function dishIcon(m){ return iconFor(m.name) || iconFor(m.category) || "🍽️"; }
+function counterItems(){ return menuItems.filter(function(m){ return m.active!==false && +m.price>0; }); }
+// Most sold in the last 30 days (bills and tallies), else the first dishes on the menu.
+function counterTop(n){
+  var from = fmtDate(new Date(Date.now()-30*86400000)), q = {};
+  dishLog.forEach(function(d){ if(!d.staffMeal && d.date>=from) q[d.menuId] = (q[d.menuId]||0) + (+d.qty||0); });
+  var items = counterItems();
+  var sold = items.filter(function(m){ return q[m.id]>0; }).sort(function(a,b){ return q[b.id]-q[a.id]; });
+  return sold.concat(items.filter(function(m){ return !(q[m.id]>0); })).slice(0, n);
+}
+function counterCats(){ var seen = {}, out = []; counterItems().forEach(function(m){ var c = m.category || "Other"; if(!seen[c]){ seen[c] = 1; out.push(c); } }); return out; }
+function orderLines(){
+  return Object.keys(counterOrder).filter(function(k){ return counterOrder[k]>0 && menuById(k); }).map(function(k){
+    var m = menuById(k); return { m:m, qty:counterOrder[k], amt:counterOrder[k]*(+m.price||0) };
+  });
+}
+function orderTotal(){ return orderLines().reduce(function(a,l){ return a+l.amt; },0); }
+function orderCount(){ return orderLines().reduce(function(a,l){ return a+l.qty; },0); }
+function counterBills(dateStr){ return sales.filter(function(s){ return s.order && s.date===dateStr; }).sort(function(a,b){ return (b.order.no||0)-(a.order.no||0); }); }
+function billedPlates(dateStr){ return dishLog.filter(function(d){ return d.orderId && d.date===dateStr; }).reduce(function(a,d){ return a+(+d.qty||0); },0); }
+function dishLabel(m){ return m.localName ? m.localName : m.name; }
+function tileHtml(m){
+  var q = counterOrder[m.id]||0, simple = simpleMode();
+  return '<button class="ctile'+(q?" has":"")+'" data-add="'+esc(m.id)+'">'+
+    '<div class="cimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="" loading="lazy">' : '<span>'+dishIcon(m)+'</span>')+vegDot(m)+
+      (q ? '<b class="cqty">'+q+'</b>' : '')+'</div>'+
+    (m.localName ? '<div class="cloc">'+esc(m.localName)+'</div>' : '')+
+    ((!simple || !m.localName) ? '<div class="cname">'+esc(m.name)+'</div>' : '')+
+    '<div class="cprice">'+rupee(m.price)+'</div>'+
+    (q ? '<span class="cminus" data-minus="'+esc(m.id)+'" aria-label="one less">−</span>' : '')+'</button>';
+}
+function renderCounter(){
+  var el = document.getElementById("counterView");
+  if(!el) return;
+  applySimpleMode();
+  var simple = simpleMode(), today = fmtDate(new Date()), bills = counterBills(today);
+  var canBill = canWriteKey(SALES_KEY);
+  var html = '<div class="listhead"><h2 class="serif">Counter</h2><div class="monthtot">'+bills.length+' bill'+(bills.length!==1?'s':'')+' today · '+rupee(bills.reduce(function(a,s){ return a+saleTotal(s); },0))+'</div></div>';
+  html += '<div class="ctools">'+
+    '<button id="ct_bills">🧾 Today’s bills</button>'+
+    '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
+    '<button id="ct_voice" class="'+(voiceOn()?"on":"")+'">'+(voiceOn()?"🔊":"🔇")+'</button>'+
+    ((isFullAccess() || myAccess()==="manager") && !simple ? '<button id="ct_upi">⚙️ UPI</button>' : '')+'</div>';
+  if(!canBill) html += '<div class="backupnote">This login can look but cannot make bills.</div>';
+  var items = counterItems();
+  if(!items.length){
+    html += '<div class="empty">No dishes with a price yet. Add the menu first (Records → Menu).</div>';
+    el.innerHTML = html; wireCounterTools(el); return;
+  }
+  var cats = counterCats();
+  if(counterCat!=="__top" && counterCat!=="__all" && cats.indexOf(counterCat)<0) counterCat = "__top";
+  html += '<div class="ccats">'+[["__top","⭐ "+(simple?"Most sold":"Most sold")]].concat(cats.map(function(c){ return [c, (iconFor(c)||"🍽️")+" "+c]; })).concat(simple?[]:[["__all","All"]]).map(function(c){
+    return '<button data-cat="'+esc(c[0])+'" class="'+(counterCat===c[0]?"on":"")+'">'+esc(c[1])+'</button>'; }).join("")+'</div>';
+  var show = counterCat==="__top" ? counterTop(simple ? 8 : 12) : counterCat==="__all" ? items : items.filter(function(m){ return (m.category||"Other")===counterCat; });
+  html += '<div class="cgrid">'+show.map(tileHtml).join("")+'</div>';
+  var n = orderCount(), t = orderTotal();
+  html += '<div class="cbar'+(n?" on":"")+'">'+(n ?
+    '<button class="cclear" id="ct_clear" aria-label="clear">✕</button><div class="ctot"><b>'+rupee(t)+'</b><span>'+n+' item'+(n!==1?'s':'')+'</span></div><button class="cgo" id="ct_go">Bill ➜</button>' :
+    '<div class="chint">Tap a picture to add it</div>')+'</div>';
+  el.innerHTML = html;
+  wireCounterTools(el);
+  Array.prototype.forEach.call(el.querySelectorAll("[data-cat]"), function(b){ b.addEventListener("click", function(){ counterCat = b.getAttribute("data-cat"); renderCounter(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-add]"), function(b){
+    b.addEventListener("click", function(ev){
+      var id = b.getAttribute("data-add");
+      if(ev.target.hasAttribute("data-minus")) counterOrder[id] = Math.max(0, (counterOrder[id]||0)-1);
+      else counterOrder[id] = (counterOrder[id]||0) + 1;
+      renderCounter();
+    });
+  });
+  var go = document.getElementById("ct_go"); if(go) go.addEventListener("click", function(){ if(!canBill){ appAlert("This login cannot make bills."); return; } openCounterPay(); });
+  var cl = document.getElementById("ct_clear"); if(cl) cl.addEventListener("click", function(){ askConfirm("Clear this order?", function(){ counterOrder = {}; renderCounter(); }); });
+}
+function wireCounterTools(el){
+  var b = document.getElementById("ct_bills"); if(b) b.addEventListener("click", function(){ openCounterBills(fmtDate(new Date())); });
+  var s = document.getElementById("ct_simple"); if(s) s.addEventListener("click", function(){ setSimpleMode(!simpleMode()); });
+  var v = document.getElementById("ct_voice"); if(v) v.addEventListener("click", function(){ setVoice(!voiceOn()); renderCounter(); });
+  var u = document.getElementById("ct_upi"); if(u) u.addEventListener("click", openUpiSettings);
+}
+function openUpiSettings(){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">UPI for the counter</h2><div class="backupnote">The Counter shows a QR code with the bill amount filled in, so the customer just scans and pays.</div>'+
+    '<div class="field"><label>UPI ID</label><input id="up_id" placeholder="e.g. rimjhimcafe@okaxis" value="'+esc(settings.upiId||"")+'"></div>'+
+    '<div class="field"><label>Name shown to the customer</label><input id="up_name" placeholder="RimJhim Cafe" value="'+esc(settings.upiName||"")+'"></div>'+
+    '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("up_cancel").addEventListener("click", closeForm);
+  document.getElementById("up_save").addEventListener("click", function(){
+    var id = document.getElementById("up_id").value.trim(), nm = document.getElementById("up_name").value.trim();
+    if(id && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(id)){ var e = document.getElementById("up_err"); e.textContent = "That doesn’t look like a UPI ID (name@bank)."; e.style.display = "block"; return; }
+    settings.upiId = id; settings.upiName = nm; saveSettings(); closeForm(); renderCounter();
+  });
+}
+function upiLink(amount, note){
+  return "upi://pay?pa="+encodeURIComponent(settings.upiId)+"&pn="+encodeURIComponent(settings.upiName||OUTLET.name||"Cafe")+
+         "&am="+(Math.round(amount*100)/100).toFixed(2)+"&cu=INR&tn="+encodeURIComponent(note||"Bill");
+}
+function ensureQrLib(){ return window.qrcode ? Promise.resolve() : loadScript("vendor/qrcode.js"); }
+function qrSvg(text){
+  var q = qrcode(0, "M"); q.addData(text); q.make();
+  return q.createSvgTag({ cellSize:6, margin:2, scalable:true });
+}
+// Bill screen: order with big + / −, total, then how they pay.
+var payStep = "order", payGiven = 0;
+function openCounterPay(){ payStep = "order"; payGiven = 0; renderCounterPay(true); }
+var NOTES = [[10,"#C9A66B"],[20,"#E7C55B"],[50,"#62B6C9"],[100,"#9C8ACB"],[200,"#F2A541"],[500,"#9AA59A"]];
+function renderCounterPay(speak){
+  var lines = orderLines(), total = orderTotal();
+  if(!lines.length){ closeForm(); renderCounter(); return; }
+  var sheet = document.getElementById("sheet"), html = "";
+  if(payStep==="order"){
+    html += '<h2 class="serif">Bill</h2>';
+    html += lines.map(function(l){
+      return '<div class="pline"><span class="picon">'+dishIcon(l.m)+'</span><div class="pname"><b>'+esc(dishLabel(l.m))+'</b>'+(l.m.localName?'<span>'+esc(l.m.name)+'</span>':'')+'</div>'+
+        '<button class="pbtn" data-less="'+esc(l.m.id)+'">−</button><b class="pq">'+l.qty+'</b><button class="pbtn" data-more="'+esc(l.m.id)+'">+</button>'+
+        '<span class="pamt">'+rupee(l.amt)+'</span></div>';
+    }).join("");
+    html += '<div class="ptotal"><span>Total</span><b>'+rupee(total)+'</b><button class="psay" id="pp_say" aria-label="say the total">🔊</button></div>';
+    html += '<div class="ppay"><button class="cash" data-pay="cash"><span>💵</span>Cash</button><button class="upi" data-pay="upi"><span>📱</span>UPI</button><button class="udh" data-pay="udhaar"><span>📒</span>Udhaar</button></div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back" style="flex:1;">← Add more</button></div>';
+  } else if(payStep==="cash"){
+    var back = payGiven - total;
+    html += '<h2 class="serif">💵 Cash · '+rupee(total)+'</h2>';
+    html += '<div class="backupnote" style="margin-bottom:8px;">Tap the notes the customer gave you.</div>';
+    html += '<div class="pnotes">'+NOTES.map(function(n){ return '<button data-note="'+n[0]+'" style="background:'+n[1]+';">₹'+n[0]+'</button>'; }).join("")+'</div>';
+    html += '<div class="pgot">Got <b>'+rupee(payGiven)+'</b>'+(payGiven?' <button class="pbtn small" id="pp_reset">Reset</button>':'')+'</div>';
+    if(payGiven && back>=0) html += '<div class="pchange">Give back<b>'+rupee(back)+'</b></div>';
+    else if(payGiven) html += '<div class="pchange short">'+rupee(-back)+' more needed</div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back">← Back</button>'+
+      '<button class="btn-save" id="pp_done" '+(payGiven && back<0 ? "disabled":"")+'>'+(payGiven ? "✔ Done" : "✔ Exact money")+'</button></div>';
+  } else if(payStep==="upi"){
+    html += '<h2 class="serif">📱 UPI · '+rupee(total)+'</h2>';
+    if(settings.upiId) html += '<div class="pqr" id="pp_qr"><div class="muted">Loading QR…</div></div><div class="pupiid">'+esc(settings.upiId)+'</div>';
+    else html += '<div class="backupnote">No UPI ID set yet. The customer can pay on the shop QR. (Owner or manager: Counter → ⚙️ UPI.)</div>';
+    html += '<div class="backupnote" style="text-align:center;">Wait until the customer’s phone shows <b>Paid</b>.</div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back">← Back</button><button class="btn-save" id="pp_done">✔ Money received</button></div>';
+  } else if(payStep==="udhaar"){
+    html += '<h2 class="serif">📒 Udhaar · '+rupee(total)+'</h2><div class="backupnote">Who is taking it on credit?</div>';
+    var names = {}; customers.forEach(function(c){ if(c.name) names[normItem(c.name)] = c.name; });
+    sales.forEach(function(x){ if(x.mode==="Credit" && x.customer && !/^(walk-?in|counter)$/i.test(x.customer)) names[normItem(x.customer)] = names[normItem(x.customer)] || x.customer; });
+    var nl = Object.keys(names).map(function(k){ return names[k]; }).sort();
+    html += '<div class="pnames">'+nl.map(function(n){ return '<button data-cust="'+esc(n)+'">'+esc(n)+'</button>'; }).join("")+'</div>';
+    html += '<div class="field"><label>Or a new name</label><input id="pp_newcust" placeholder="Name"></div><div class="err" id="pp_err"></div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back">← Back</button><button class="btn-save" id="pp_udh">✔ Save udhaar</button></div>';
+  }
+  sheet.innerHTML = '<div class="paysheet">'+html+'</div>';
+  document.getElementById("sheetBg").classList.add("on");
+  if(speak && payStep==="order") sayHindi("कुल "+Math.round(total)+" रुपये");
+  function on(sel, fn){ Array.prototype.forEach.call(sheet.querySelectorAll(sel), function(b){ b.addEventListener("click", function(){ fn(b); }); }); }
+  on("[data-less]", function(b){ var id = b.getAttribute("data-less"); counterOrder[id] = Math.max(0,(counterOrder[id]||0)-1); renderCounter(); renderCounterPay(); });
+  on("[data-more]", function(b){ var id = b.getAttribute("data-more"); counterOrder[id] = (counterOrder[id]||0)+1; renderCounter(); renderCounterPay(); });
+  on("[data-pay]", function(b){ payStep = b.getAttribute("data-pay"); payGiven = 0; renderCounterPay(); });
+  on("[data-note]", function(b){ payGiven += +b.getAttribute("data-note"); renderCounterPay(); var bk = payGiven - total; if(bk>=0) sayHindi(bk>0 ? Math.round(bk)+" रुपये वापस दें" : "पूरे पैसे मिल गए"); });
+  on("[data-cust]", function(b){ finishCounterBill("Credit", b.getAttribute("data-cust")); });
+  on("#pp_say", function(){ sayHindi("कुल "+Math.round(total)+" रुपये"); });
+  on("#pp_back", function(){ if(payStep==="order"){ closeForm(); } else { payStep = "order"; renderCounterPay(); } });
+  on("#pp_reset", function(){ payGiven = 0; renderCounterPay(); });
+  on("#pp_done", function(){ finishCounterBill(payStep==="upi" ? "UPI" : "Cash", null, payStep==="cash" ? payGiven : 0); });
+  on("#pp_udh", function(){
+    var n = document.getElementById("pp_newcust").value.trim();
+    if(!n){ var e = document.getElementById("pp_err"); e.textContent = "Tap a name or type one."; e.style.display = "block"; return; }
+    finishCounterBill("Credit", n);
+  });
+  if(payStep==="upi" && settings.upiId){
+    var no = nextBillNo(fmtDate(new Date()));
+    ensureQrLib().then(function(){ var box = document.getElementById("pp_qr"); if(box) box.innerHTML = qrSvg(upiLink(total, "Bill "+no)); })
+      .catch(function(){ var box = document.getElementById("pp_qr"); if(box) box.innerHTML = '<div class="muted">QR needs internet the first time. Use the shop QR.</div>'; });
+  }
+}
+function nextBillNo(day){ return 1 + counterBills(day).reduce(function(a,s){ return Math.max(a, +s.order.no||0); },0); }
+function billText(s){ return (s.order.items||[]).map(function(i){ return i.qty+"× "+i.name; }).join(", "); }
+function finishCounterBill(mode, customer, given){
+  var lines = orderLines(); if(!lines.length) return;
+  var day = fmtDate(new Date()), now = new Date(), id = uid(), no = nextBillNo(day);
+  var items = lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:+l.m.price||0 }; });
+  var total = orderTotal();
+  var rec = { id:id, date:day, customer: customer || "Counter", desc:"", amount:total, gst:0, mode:mode,
+              order:{ no:no, time:("0"+now.getHours()).slice(-2)+":"+("0"+now.getMinutes()).slice(-2), items:items, given: given||0 } };
+  rec.desc = "Bill "+no+": "+billText(rec);
+  sales.push(rec);
+  items.forEach(function(i){ dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:id }); });
+  saveSales(); saveDishLog();
+  counterOrder = {};
+  closeForm(); renderAll();
+  var sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<div class="pdone"><div class="tick">✔</div><b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+
+    '<button class="btn-save" id="pd_ok" style="width:100%;margin-top:16px;">Next customer</button></div>';
+  document.getElementById("sheetBg").classList.add("on");
+  sayHindi("धन्यवाद");
+  var t = setTimeout(function(){ if(document.getElementById("pd_ok")) closeForm(); }, 2500);
+  document.getElementById("pd_ok").addEventListener("click", function(){ clearTimeout(t); closeForm(); });
+}
+function openCounterBills(dateStr){
+  var list = counterBills(dateStr), sheet = document.getElementById("sheet");
+  var modes = {}; list.forEach(function(s){ var m = s.mode==="Credit" ? "Udhaar" : s.mode; modes[m] = (modes[m]||0) + saleTotal(s); });
+  var html = '<h2 class="serif">Counter bills · '+parseDate(dateStr).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</h2>';
+  html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>'+list.length+' bill'+(list.length!==1?'s':'')+'</span><b>'+rupee(list.reduce(function(a,s){ return a+saleTotal(s); },0))+'</b></div>'+
+    Object.keys(modes).map(function(k){ return '<div class="psrow"><span>'+({Cash:"💵 ",UPI:"📱 ",Udhaar:"📒 "}[k]||"")+esc(k)+'</span><b>'+rupee(modes[k])+'</b></div>'; }).join("")+'</div>';
+  if(!list.length) html += '<div class="empty">No bills yet.</div>';
+  var canCancel = canWriteKey(SALES_KEY);
+  html += list.map(function(s){
+    return '<div class="entry"><div><div class="who">#'+s.order.no+' · '+esc(s.order.time||"")+' · '+(s.mode==="Credit"?"Udhaar ("+esc(s.customer)+")":esc(s.mode))+'</div>'+
+      '<div class="meta">'+esc(billText(s))+'</div>'+
+      '<div class="meta"><a href="#" data-share="'+esc(s.id)+'">Share</a>'+(canCancel?' · <a href="#" data-void="'+esc(s.id)+'" class="bad">Cancel bill</a>':'')+'</div></div>'+
+      '<div class="amt sale">'+rupee(saleTotal(s))+'</div></div>';
+  }).join("");
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="cb_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("cb_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-share]"), function(a){ a.addEventListener("click", function(ev){
+    ev.preventDefault(); var s = sales.find(function(x){ return x.id===a.getAttribute("data-share"); }); if(!s) return;
+    var txt = (OUTLET.name||"RimJhim Cafe")+"\nBill "+s.order.no+" · "+parseDate(s.date).toLocaleDateString("en-IN")+" "+(s.order.time||"")+"\n"+
+      (s.order.items||[]).map(function(i){ return i.qty+" x "+i.name+"  "+rupee(i.qty*i.price); }).join("\n")+"\nTotal "+rupee(saleTotal(s))+" ("+(s.mode==="Credit"?"Udhaar":s.mode)+")\nThank you!";
+    window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank");
+  }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-void]"), function(a){ a.addEventListener("click", function(ev){
+    ev.preventDefault(); var id = a.getAttribute("data-void"), s = sales.find(function(x){ return x.id===id; }); if(!s) return;
+    askConfirm("Cancel bill "+s.order.no+" ("+rupee(saleTotal(s))+")? Its plates come off the dish counts too.", function(){
+      sales = sales.filter(function(x){ return x.id!==id; }); dishLog = dishLog.filter(function(d){ return d.orderId!==id; });
+      saveSales(); saveDishLog(); renderAll(); openCounterBills(dateStr);
+    });
+  }); });
+}
+// Sales lists: a day's counter bills show as one row (tap for the bills).
+function collapseCounterSales(list){
+  var out = [], byDay = {};
+  list.forEach(function(x){
+    if(!x.order){ out.push(x); return; }
+    var g = byDay[x.date]; if(!g){ g = byDay[x.date] = { counterDay:true, id:"cd_"+x.date, date:x.date, n:0, t:0, modes:{} }; out.push(g); }
+    g.n++; g.t += saleTotal(x); var m = x.mode==="Credit" ? "Udhaar" : x.mode; g.modes[m] = (g.modes[m]||0) + saleTotal(x);
+  });
+  return out;
+}
+function counterDayRow(g){
+  return '<div class="entry" data-cbills="'+g.date+'"><div><div class="who">🧾 Counter bills · '+g.n+'</div><div class="meta">'+
+    Object.keys(g.modes).map(function(k){ return esc(k)+' '+rupee(g.modes[k]); }).join(" · ")+' · tap to see</div></div><div class="amt sale">'+rupee(g.t)+'</div></div>';
+}
+function wireCounterDayRows(el){ Array.prototype.forEach.call(el.querySelectorAll("[data-cbills]"), function(r){ r.addEventListener("click", function(){ openCounterBills(r.getAttribute("data-cbills")); }); }); }
+function saleRowsHtml(list){ return collapseCounterSales(list).map(function(x){ return x.counterDay ? counterDayRow(x) : entryRow(x,"sale"); }).join(""); }
+
 // Rush-hour tally: one tap per item, no typing, no menu navigation.
 var tallyDate = null, tallyCounts = {};
 
 function openTally(dateStr){
   tallyDate = dateStr;
   tallyCounts = {};
-  dishLog.filter(function(d){ return d.date===dateStr && !d.staffMeal; }).forEach(function(d){ tallyCounts[d.menuId] = d.qty; });
+  dishLog.filter(function(d){ return d.date===dateStr && !d.staffMeal && !d.orderId; }).forEach(function(d){ tallyCounts[d.menuId] = (tallyCounts[d.menuId]||0) + (+d.qty||0); });
   renderTally();
 }
 
@@ -8012,6 +8345,8 @@ function renderTally(){
 
   var html = '<div class="tallyhead"><div><b>'+count+' items</b><span>'+rupee(value)+'</span></div>'+
              '<span class="tdate">'+parseDate(tallyDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</span></div>';
+  var billedN = billedPlates(tallyDate);
+  if(billedN) html += '<div class="backupnote" style="margin:0 0 8px;">'+billedN+' plates already billed at the Counter this day are counted automatically. Tally only what went out without a bill.</div>';
   if(items.length===0){ html += '<div class="empty">Add menu items first.</div>'; }
   html += '<div class="tallygrid">'+items.map(function(m){
     var q = tallyCounts[m.id]||0;
@@ -8042,7 +8377,7 @@ function renderTally(){
   });
   document.getElementById("ty_cancel").addEventListener("click", closeForm);
   document.getElementById("ty_save").addEventListener("click", function(){
-    dishLog = dishLog.filter(function(d){ return d.date!==tallyDate || d.staffMeal; });
+    dishLog = dishLog.filter(function(d){ return d.date!==tallyDate || d.staffMeal || d.orderId; });
     Object.keys(tallyCounts).forEach(function(mid){
       if(tallyCounts[mid] > 0) dishLog.push({ id:uid(), date:tallyDate, menuId:mid, qty:tallyCounts[mid] });
     });
@@ -8076,7 +8411,7 @@ function learnedMix(){
 }
 
 function dayRevenue(dateStr){
-  return sales.filter(function(s){ return s.date===dateStr; }).reduce(function(a,s){ return a+saleTotal(s); },0);
+  return sales.filter(function(s){ return s.date===dateStr && !s.order; }).reduce(function(a,s){ return a+saleTotal(s); },0);
 }
 
 function openEstimateSheet(dateStr){
@@ -8123,7 +8458,7 @@ function openEstimateSheet(dateStr){
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("es_close").addEventListener("click", closeForm);
   document.getElementById("es_save").addEventListener("click", function(){
-    dishLog = dishLog.filter(function(d){ return d.date!==dateStr || d.staffMeal; });
+    dishLog = dishLog.filter(function(d){ return d.date!==dateStr || d.staffMeal || d.orderId; });
     Object.keys(est).forEach(function(mid){
       if(est[mid]>0) dishLog.push({ id:uid(), date:dateStr, menuId:mid, qty:est[mid], estimated:true });
     });
@@ -8133,9 +8468,11 @@ function openEstimateSheet(dateStr){
 
 function openDishLogForm(dateStr){
   var existing = {};
-  dishLog.filter(function(d){ return d.date===dateStr && !d.staffMeal; }).forEach(function(d){ existing[d.menuId] = d.qty; });
+  dishLog.filter(function(d){ return d.date===dateStr && !d.staffMeal && !d.orderId; }).forEach(function(d){ existing[d.menuId] = (existing[d.menuId]||0) + (+d.qty||0); });
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">Dishes sold</h2>';
+  var billedN = billedPlates(dateStr);
+  if(billedN) html += '<div class="backupnote">'+billedN+' plates billed at the Counter this day are already counted. Enter only plates sold without a bill.</div>';
   html += '<div class="backupnote">'+parseDate(dateStr).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"})+
           ' - enter how many of each went out. This is what drives ingredient stock and the daily forecast.</div>';
   if(menuItems.length===0){ html += '<div class="empty">Add menu items first.</div>'; }
@@ -8148,7 +8485,7 @@ function openDishLogForm(dateStr){
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("dl_cancel").addEventListener("click", closeForm);
   document.getElementById("dl_save").addEventListener("click", function(){
-    dishLog = dishLog.filter(function(d){ return d.date!==dateStr || d.staffMeal; });
+    dishLog = dishLog.filter(function(d){ return d.date!==dateStr || d.staffMeal || d.orderId; });
     Array.prototype.forEach.call(sheet.querySelectorAll(".dq"), function(inp){
       var q = parseFloat(inp.value);
       if(!isNaN(q) && q>0) dishLog.push({ id:uid(), date:dateStr, menuId:inp.getAttribute("data-m"), qty:q });
@@ -13018,6 +13355,8 @@ function showView(name){
   if(viewsStale) renderAll();
   else if(name==="dashboard") renderDashboard();
   Array.prototype.forEach.call(document.querySelectorAll("nav.tabs button"), function(b){ b.classList.toggle("on", b.getAttribute("data-v")===name); });
+  var fab = document.getElementById("fabAdd"); if(fab) fab.style.display = name==="counter" ? "none" : "";
+  if(name==="counter") renderCounter();
 }
 
 function openAddChooser(){

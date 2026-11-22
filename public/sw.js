@@ -1,8 +1,8 @@
 // Lets the app open without internet. Always tries the network first so a new
 // version shows up straight away; the saved copy is only a fallback. Data calls
 // (/api/...) are never cached here - the app keeps its own offline copy.
-var CACHE = "rimjhim-shell-v1";
-var SHELL = ["./", "index.html", "vendor/chart.umd.js", "manifest.webmanifest", "icon.svg"];
+var CACHE = "rimjhim-shell-v2";
+var SHELL = ["./", "index.html", "vendor/chart.umd.js", "vendor/qrcode.js", "manifest.webmanifest", "icon.svg"];
 
 self.addEventListener("install", function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){ return c.addAll(SHELL); }).then(function(){ return self.skipWaiting(); }));

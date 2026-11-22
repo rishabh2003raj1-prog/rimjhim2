@@ -298,3 +298,21 @@ optional photo, reorderable.
   but keeps its recipe, SOP and photo. Optionally hide every dish not in the list.
 - **On the menu** switch per dish: hidden dishes move to an "Off the menu" group, keep their recipe and history,
   and stop appearing in quick tally and the dish count form.
+
+### Counter: picture billing (Step 6)
+The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
+- Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the
+  price. **⭐ Most sold** (last 30 days) comes first, then one button per menu section. Tap a picture to add it;
+  the small − takes one off.
+- **Bill ➜** shows the order with large + / − buttons and the total in big numbers, and can say the total aloud in
+  Hindi (🔊 turns the voice on / off on that phone).
+- Pay with pictures: **💵 Cash** (tap the notes the customer gave, it shows the change to give back), **📱 UPI**
+  (a QR code with the amount filled in; owner / manager set the UPI ID under ⚙️ UPI) or **📒 Udhaar** (tap a known
+  name or type a new one).
+- Each bill is saved as one sale with its items and bill number, and its plates go straight into the dish counts,
+  so stock and the forecast need no separate tally. Quick tally and typed counts now only add plates sold
+  without a bill.
+- **Today's bills**: every bill with time, items and payment, totals by Cash / UPI / Udhaar, share on WhatsApp, and
+  **Cancel bill** (also removes its plates). In Sales lists, a day's counter bills show as one row; tap it to see them.
+- **🔠 Big & simple** (per phone, for older staff): larger text and buttons everywhere, two big tiles per row,
+  only the Hindi name when there is one, fewer buttons.
