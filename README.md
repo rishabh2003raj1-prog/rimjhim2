@@ -456,6 +456,22 @@ Typing an item's name picks its category (its last purchase, else from the name 
 Harpic → Cleaning, Roohafza → Sauces, syrups & spreads); a category chosen by hand is kept. Notes and purchase orders
 use the same rules.
 
+### Launch readiness (Step 8)
+- **🚀 Get your cafe ready** (Dashboard, owner / partners): a 12-step setup checklist that ticks itself as things
+  get done (menu, photos, recipes, stock, staff, tables, UPI, opening cash, bills); logins, PIN and printed menu are
+  ticked by hand. **Go** opens the right screen; **Hide** leaves a one-line reminder.
+- **हिंदी / English** switch at the top (per phone): tabs, headings, buttons and common words in Hindi; anything not
+  in the word list stays English. Dropdown choices, inputs and saved data are never changed.
+- **Privacy policy** (`/privacy.html`, written to the DPDP Act 2023) and **Terms of use** (`/terms.html`), linked from
+  the sign-in screen and the customer page. The app listing (manifest) has a description and categories.
+- **Error monitoring**: errors on any signed-in phone (staff or customer) are sent to the server (up to 5 per
+  session) and kept (last 300); owner / partners see them in Activity → **⚠️ App errors on phones**.
+- **Tests in the repo**: `tests/*.cjs` (Playwright) with `bash tests/run.sh` (fresh local server per suite); the
+  **Tests** GitHub workflow runs them on work branches and pull requests. Suites that need the cafe's real menu file
+  skip themselves (business data stays out of the repo).
+- **LAUNCH.md**: your own domain on Cloudflare, Play Store listing (PWABuilder / Trusted Web Activity, asset links,
+  data-safety answers), and a pre-opening checklist.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the

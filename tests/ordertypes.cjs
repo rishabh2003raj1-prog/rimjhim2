@@ -1,0 +1,104 @@
+const { chromium } = require(process.env.PW_MODULE || 'playwright');
+const fs = require('fs');
+const HTML = fs.readFileSync('/home/user/rimjhim2/public/index.html','utf8').replace('\n})();\n</script>', '\nwindow.__ev=function(c){return eval(c);};\n})();\n</script>');
+const E = (p, c) => p.evaluate(x => window.__ev(x), c);
+const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode = 1; } else console.log('ok: ' + m); };
+async function open(b, errs){ const p = await (await b.newContext({ viewport:{width:400,height:850} })).newPage();
+  p.on('pageerror', e => errs.push(e.message)); await p.route(u => u.pathname === '/', r => r.fulfill({ status:200, contentType:'text/html', body: HTML }));
+  await p.goto('http://127.0.0.1:8787/'); await p.waitForSelector('#loginBg.on'); await p.fill('#loginPin','1234'); await p.click('#loginGo'); await p.waitForTimeout(1500); return p; }
+(async () => {
+  const b = await chromium.launch(); const errs = []; const p = await open(b, errs);
+  const dis = () => p.click('#dlgBtns button', { timeout:2000 }).catch(()=>{});
+  const step = async (sel) => { await p.click(sel || '[data-lstep]'); await p.waitForTimeout(150); };
+  await E(p, `menuItems=[{id:'chai',name:'Masala Chai',category:'Tea',price:20,veg:'veg',active:true},{id:'thali',name:'Veg Thali',category:'Thali',price:150,veg:'veg',active:true,prepTime:12},{id:'momo',name:'Veg Momos',category:'Momos',price:60,veg:'veg',active:true}];
+    sales=[]; dishLog=[]; liveOrders=[]; settings.platforms=null; settings.tables=null; settings.platformPayouts=[]; saveMenu(); saveSales(); saveDishLog(); saveLive(); saveSettings(); setCounterType('take'); renderAll(); showView('counter');`);
+  const types = await p.$$eval('.ctype button', a => a.map(x => x.getAttribute('data-ctype')));
+  assert(JSON.stringify(types)==='["dine","take","delivery"]', 'three order types on the Counter (Zomato / Swiggy removed)');
+  // TAKEAWAY
+  await p.click('.ctile[data-add="chai"]'); await p.click('.ctile[data-add="chai"]'); await p.click('#ct_go'); await p.click('[data-pay="cash"]'); await p.click('#pp_done'); await p.click('#pd_ok');
+  let r = await E(p, `({ s: sales.map(function(x){ return [x.order.type, x.amount]; }), t: liveOrders.map(function(t){ return [t.type, t.status, t.paid]; }) })`);
+  assert(JSON.stringify(r)==='{"s":[["take",40]],"t":[["take","cooking",true]]}', 'takeaway: paid, sent to kitchen: '+JSON.stringify(r));
+  await p.click('#ct_live'); assert(/Kitchen: make these items/.test(await p.textContent('#sheet')), 'guide: kitchen step');
+  await step(); await step();
+  assert(/Pack ·/.test(await p.textContent('#sheet h2')), 'packing checklist opens');
+  await p.click('#pk_ok'); assert(/Tick every line/.test(await p.textContent('#pk_err')), 'all packing lines must be ticked');
+  for(const x of await p.$$('[data-pk]')) await x.click().catch(()=>{});
+  const rows = await p.$$('[data-pk]'); for(let i=0;i<rows.length;i++){ if(!(await p.$eval(`[data-pk="${i}"]`, e=>e.classList.contains('on')))) await p.click(`[data-pk="${i}"]`); }
+  await p.click('#pk_ok'); await p.waitForTimeout(150);
+  assert(/Call out order/.test(await p.textContent('#sheet')), 'guide: hand over step'); await step();
+  assert(await E(p, `liveOrders[0].status`)==='done', 'takeaway done'); await E(p, 'closeForm()');
+  // DINE-IN
+  await p.click('[data-ctype="dine"]'); await p.click('.ctile[data-add="thali"]'); await p.click('#ct_go');
+  assert(/Pick a table/.test(await p.textContent("#dlgMsg")), "dine-in needs a table"); await dis();
+  await p.click('[data-table="Table 2"]'); await p.click('#ct_go'); await p.waitForTimeout(150); await dis();
+  r = await E(p, `liveOrders.filter(function(t){ return t.type==='dine'; }).map(function(t){ return [t.table, t.status, !!t.paid, t.items.length]; })`);
+  assert(JSON.stringify(r)==='[["Table 2","cooking",false,1]]' && await E(p, `sales.length`)===1, 'dine-in: sent to kitchen, not billed yet');
+  assert(/₹150/.test(await p.textContent('[data-table="Table 2"]')), 'table shows running amount');
+  await p.click('[data-table="Table 2"]'); await p.click('.ctile[data-add="chai"]'); assert(/Add to Table 2/.test(await p.textContent('#ct_go')), 'adding to the same table');
+  await p.click('#ct_go'); await p.waitForTimeout(150); await dis();
+  r = await E(p, `(function(t){ return [t.items.length, t.items[1].round]; })(liveOrders.find(function(t){ return t.type==='dine'; }))`);
+  assert(JSON.stringify(r)==='[2,2]', 'second round added to the same ticket');
+  await p.click('#ct_live'); await p.waitForTimeout(100);
+  const dineCard = await p.$('.ltk.dine'); assert(/1× Masala Chai/.test(await dineCard.textContent()) && await dineCard.$('.ltkitems span.new'), 'new round marked on the ticket');
+  await p.click('.ltk.dine [data-lstep]'); await p.waitForTimeout(100);
+  assert(/Serve it to Table 2/.test(await p.textContent('.ltk.dine')), 'guide: serve to table');
+  await p.click('.ltk.dine [data-lstep]'); await p.waitForTimeout(100);
+  await p.click('.ltk.dine [data-lstep]'); await p.waitForTimeout(300);
+  assert(/₹170/.test(await p.textContent('.ptotal')), 'table bill ₹170 loaded for payment');
+  await p.click('[data-pay="upi"]'); await p.click('#pp_done'); await p.click('#pd_ok');
+  r = await E(p, `(function(){ var s = sales.find(function(x){ return x.order.type==='dine'; }), t = liveOrders.find(function(t){ return t.type==='dine'; }); return [s.amount, s.mode, s.order.table, t.paid, t.saleId===s.id]; })()`);
+  assert(JSON.stringify(r)==='[170,"UPI","Table 2",true,true]', 'dine-in bill saved, ticket paid: '+JSON.stringify(r));
+  // DELIVERY (cash on delivery)
+  await E(p, `showView('counter')`); await p.click('[data-ctype="delivery"]'); await p.click('.ctile[data-add="momo"]'); await p.click('#ct_go');
+  await p.click('#dl_cod'); assert(/address/i.test(await p.textContent('#dl_err')), 'delivery needs an address');
+  await p.fill('#dl_name','Mr Verma'); await p.fill('#dl_phone','9811111111'); await p.fill('#dl_addr','Vinayak Hospital, Room 204'); await p.click('#dl_cod'); await p.waitForTimeout(150); await dis();
+  r = await E(p, `(function(t){ return [t.cod, t.amount, t.paid||false, t.address]; })(liveOrders.find(function(t){ return t.type==='delivery'; }))`);
+  assert(JSON.stringify(r)==='[true,80,false,"Vinayak Hospital, Room 204"]', 'COD ticket ₹80 incl. ₹20 delivery: '+JSON.stringify(r));
+  await p.click('#ct_live'); const dsel = '.ltk.delivery [data-lstep]';
+  await p.click(dsel); await p.waitForTimeout(100); await p.click(dsel); await p.waitForTimeout(100);
+  for(let i=0;i<5;i++) await p.click(`[data-pk="${i}"]`); await p.click('#pk_ok'); await p.waitForTimeout(100);
+  assert(/collect ₹80 cash/.test(await p.textContent('.ltk.delivery')), 'guide: tell rider to collect ₹80');
+  await p.click(dsel); await p.fill('#rd_name','Sonu'); await p.click('#rd_ok'); await p.waitForTimeout(100);
+  await p.click(dsel); await p.waitForTimeout(300);
+  assert(/₹80/.test(await p.textContent('.ptotal')) && /Delivery charge/.test(await p.textContent('#sheet')), 'collect payment shows ₹80 with delivery charge');
+  await p.click('[data-pay="cash"]'); await p.click('#pp_done'); await p.click('#pd_ok');
+  r = await E(p, `(function(){ var s = sales.find(function(x){ return x.order.type==='delivery'; }), t = liveOrders.find(function(t){ return t.type==='delivery'; }); return [s.amount, s.order.deliveryCharge, s.order.address, t.status, t.rider]; })()`);
+  assert(JSON.stringify(r)==='[80,20,"Vinayak Hospital, Room 204","done","Sonu"]', 'delivery sale and ticket done: '+JSON.stringify(r));
+  // ZOMATO
+  await E(p, `platformCfg = function(pl){ var c = (settings.platforms||{})[pl]||{}; return { enabled:true, commission:+c.commission, markup:+c.markup||0, packing:+c.packing||0, prep:15 }; };`);
+  await E(p, `settings.platforms={zomato:{enabled:true,commission:25,markup:10,packing:10,prep:15},swiggy:{enabled:true,commission:22,markup:0,packing:0,prep:15}}; saveSettings(); renderAll(); showView('counter');`);
+  await p.click('[data-ctype="zomato"]');
+  assert(/₹65/.test(await p.textContent('.ctile[data-add="momo"]')), 'Zomato price with 10% markup (60 → 65)');
+  await p.click('.ctile[data-add="momo"]'); await p.click('.ctile[data-add="momo"]'); await p.click('#ct_go');
+  const pt = await p.textContent('#sheet');
+  assert(/Customer pays Zomato₹140/.test(pt.replace(/\s+/g,'')) || /₹140/.test(pt), 'customer pays ₹130 + ₹10 packing = ₹140');
+  await p.click('#pf_ok'); assert(/order ID/.test(await p.textContent('#pf_err')), 'Zomato order ID required');
+  await p.fill('#pf_id','4821'); await p.fill('#pf_name','Anil'); await p.click('#pf_ok'); await p.click('#pd_ok');
+  r = await E(p, `(function(){ var s = sales.find(function(x){ return x.order.platform==='zomato'; }), t = liveOrders.find(function(t){ return t.type==='zomato'; }); return [s.mode, s.amount, s.order.gross, s.order.commission, s.customer, t.status, t.pid]; })()`);
+  assert(JSON.stringify(r)==='["Zomato",105,140,35,"Zomato #4821","new","4821"]', 'Zomato sale at payout ₹105 (₹140 − 25%), ticket waiting for accept: '+JSON.stringify(r));
+  await p.click('#ct_live'); const zs = '.ltk.zomato [data-lstep]';
+  assert(/ACCEPT order #4821/.test(await p.textContent('.ltk.zomato')), 'guide: accept on Zomato app first');
+  await p.click(zs); await p.waitForTimeout(100); assert(/Food ready.*Zomato app/.test(await p.textContent('.ltk.zomato')), 'reminds to press Food ready on Zomato');
+  await p.click(zs); await p.waitForTimeout(100); await p.click(zs); await p.waitForTimeout(100);
+  assert(/Order ID #4821 written on the bag/.test(await p.textContent('#sheet')), 'packing list shows the order ID');
+  for(let i=0;i<5;i++) await p.click(`[data-pk="${i}"]`); await p.click('#pk_ok'); await p.waitForTimeout(100);
+  await p.click(zs); await p.click('#rd_ok'); assert(/Match the order ID/.test(await p.textContent('#rd_err')), 'must match the rider order ID / OTP');
+  await p.check('#rd_match'); await p.click('#rd_ok'); await p.waitForTimeout(100);
+  assert(await E(p, `liveOrders.find(function(t){ return t.type==='zomato'; }).status`)==='done', 'Zomato order handed to rider');
+  await E(p, 'closeForm(); showView("counter")'); await p.click('[data-ctype="zomato"]'); await p.click('.ctile[data-add="momo"]'); await p.click('#ct_go'); await p.fill('#pf_id','4821'); await p.click('#pf_ok');
+  assert(/already entered/.test(await p.textContent('#pf_err')), 'same Zomato order cannot be entered twice'); await E(p, 'closeForm(); counterOrder={}; renderCounter();');
+  // sales list + payout
+  await E(p, `recPeriod='day'; showView('records'); switchRecordsSub('sales');`);
+  const sl = (await p.textContent('#salesList')).replace(/\s+/g,' ');
+  assert(/by order type/.test(sl) && /Dine-in · 1/.test(sl) && /Zomato · 1 ?₹105/.test(sl) && /Zomato payout waiting ?₹105/.test(sl), 'sales by order type + payout waiting: '+sl.slice(0,400));
+  await p.click('[data-payout="zomato"]'); await p.fill('#po_amt','105'); await p.click('#po_s');
+  assert(await E(p, `platformPending('zomato')`)===0 && await E(p, `bankRows().some(function(x){ return /Zomato payout/.test(x.text) && x.amt===105; })`), 'payout recorded: nothing waiting, money in bank');
+  // kitchen
+  await E(p, `setCounterType('dine'); counterOrder={thali:1}; counterTable='Table 1'; counterGo();`); await dis();
+  await E(p, `showView('kitchen'); kView='home'; renderKitchen();`);
+  assert(/1/.test(await p.textContent('.kbig.cook em')), 'Kitchen shows 1 order to cook');
+  await p.click('#k_cook'); assert(/Orders to cook/.test(await p.textContent('#sheet h2')) && /Table 1/.test(await p.textContent('#sheet')), 'kitchen list opens');
+  await p.screenshot({ path: process.env.S+'/kitchen_orders.png' });
+  await E(p, `closeForm(); showView('counter'); setCounterType('zomato'); renderCounter();`); await p.screenshot({ path: process.env.S+'/counter_types.png' });
+  console.log('ERRORS', JSON.stringify(errs)); await b.close();
+})();

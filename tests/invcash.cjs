@@ -1,0 +1,32 @@
+const { chromium } = require(process.env.PW_MODULE || 'playwright');
+const fs = require('fs');
+const HTML = fs.readFileSync('/home/user/rimjhim2/public/index.html','utf8').replace('\n})();\n</script>', '\nwindow.__ev=function(c){return eval(c);};\n})();\n</script>');
+const E = (p, c) => p.evaluate(x => window.__ev(x), c);
+const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode = 1; } else console.log('ok: ' + m); };
+async function open(b, errs){ const p = await (await b.newContext({ viewport:{width:400,height:850} })).newPage();
+  p.on('pageerror', e => errs.push(e.message)); await p.route(u => u.pathname === '/', r => r.fulfill({ status:200, contentType:'text/html', body: HTML }));
+  await p.goto('http://127.0.0.1:8787/'); await p.waitForSelector('#loginBg.on'); await p.fill('#loginPin','1234'); await p.click('#loginGo'); await p.waitForTimeout(1500); return p; }
+(async () => {
+  const b = await chromium.launch(); const errs = []; const p = await open(b, errs);
+  await E(p, `PARTNERS=['Rishabh','Dashrath Bhaiya']; savePartners(); sales=[]; purchases=[]; expenses=[]; cashMoves=[]; creditPayments=[]; cashDays=[];
+    settings.openingCash=1000; settings.openingCashDate='2026-10-01'; settings.bankBalance=0; settings.bankDate='2026-10-01'; saveSettings();
+    investments=[{id:'old',date:'2026-10-05',partner:'Rishabh',invType:'Investment',purpose:'Working capital',amount:999,mode:'Cash',notes:'Paid Kirana bill from own pocket'}];
+    saveEverything(); renderAll();`);
+  await E(p, `openForm('investment', null, '2026-10-10')`);
+  await p.selectOption('#f_invtype','Loan'); await p.selectOption('#f_via','counter'); await p.fill('#f_amount','5000'); await p.click('#f_save'); await p.waitForTimeout(200);
+  assert(await E(p, `cashMovement('2026-10-10').invIn`) === 5000 && await E(p, `expectedCash('2026-10-10')`) === 6000, 'loan into the counter (1,000 + 5,000)');
+  assert(await E(p, `cashMovement('2026-10-05').invIn`) === 0, 'old bill-from-own-pocket entry moves no cash');
+  await E(p, `openForm('investment', null, '2026-10-12')`); await p.selectOption('#f_partner','Dashrath Bhaiya'); await p.selectOption('#f_invtype','Loan');
+  await p.selectOption('#f_via','held:Dashrath Bhaiya'); await p.fill('#f_amount','3000'); await p.click('#f_save'); await p.waitForTimeout(200);
+  const D = JSON.parse(await E(p, `JSON.stringify(handoverLedger('2026-10'))`)).find(r=>r.holder==='Dashrath Bhaiya');
+  assert(D.investIn === 3000 && D.closing === 3000, 'cash kept by Dashrath shows in his handover');
+  await E(p, `openForm('investment', null, '2026-10-15')`); await p.selectOption('#f_invtype','Withdrawal');
+  assert(await p.textContent('#f_vialbl') === 'Paid from' && !(await p.$$eval('#f_via option', o => o.map(x=>x.value))).includes('direct'), 'withdrawals: "Paid from", no "paid directly"');
+  await p.selectOption('#f_via','counter'); await p.fill('#f_amount','2000'); await p.click('#f_save'); await p.waitForTimeout(200);
+  assert(await E(p, `cashMovement('2026-10-15').invOut`) === 2000 && await E(p, `expectedCash('2026-10-15')`) === 4000, 'withdrawal from the counter');
+  await E(p, `openForm('investment', null, '2026-10-16')`); await p.selectOption('#f_invtype','Loan'); await p.selectOption('#f_via','bank'); await p.fill('#f_amount','7000'); await p.click('#f_save'); await p.waitForTimeout(200);
+  assert(await E(p, 'bankMovements().loanin') === 7000, 'loan into the bank');
+  const R = JSON.parse(await E(p, `JSON.stringify(cashReview('2026-10'))`));
+  assert(Math.abs(R.extTotal - R.change) < 0.01 && R.ext.pLoan === 15000 && R.ext.pWithdraw === -2000, 'cash review: loans 15,000, withdrawal 2,000, balances');
+  console.log('ERRORS', JSON.stringify(errs)); await b.close();
+})();

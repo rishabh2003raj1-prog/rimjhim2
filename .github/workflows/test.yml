@@ -1,0 +1,38 @@
+name: Tests
+
+# Runs the app's test suites (tests/*.cjs) against a local test server on every push to a
+# work branch, on pull requests, and by hand. It doesn't block deploys from main; check this
+# before merging work into main.
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      WRANGLER_SEND_METRICS: "false"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - name: Install Playwright and Chromium
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Test PIN for the local test server only
+        run: echo "APP_PIN=1234" > .dev.vars
+      - name: Run all suites
+        run: bash tests/run.sh
+      - name: Keep screenshots and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: tests/out/
+          retention-days: 7

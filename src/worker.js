@@ -47,7 +47,8 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS kv_updated ON kv (outlet, updated_at)",
   "CREATE INDEX IF NOT EXISTS login_fails_ip ON login_fails (ip, ts)",
   "CREATE TABLE IF NOT EXISTS cust_codes (outlet TEXT NOT NULL, customer_id TEXT NOT NULL, phone TEXT NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL, ver INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (outlet, customer_id))",
-  "CREATE INDEX IF NOT EXISTS cust_codes_phone ON cust_codes (phone)"
+  "CREATE INDEX IF NOT EXISTS cust_codes_phone ON cust_codes (phone)",
+  "CREATE TABLE IF NOT EXISTS client_errors (id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, who TEXT NOT NULL, msg TEXT NOT NULL, src TEXT NOT NULL DEFAULT '', ver TEXT NOT NULL DEFAULT '', view TEXT NOT NULL DEFAULT '', ua TEXT NOT NULL DEFAULT '')"
 ];
 
 let schemaReady = null;
@@ -947,6 +948,25 @@ export default {
         return await handlePhotoGet(env, id, { role: "store", outlet: c.outlet, login: "customer", access: "billing" });
       }
       const who = await whoIs(req, env);
+      // Errors that happen in the app on someone's phone, so they can be fixed (signed-in users only).
+      if (path === "/api/clienterror" && req.method === "POST") {
+        const c = who ? null : await custWho(req, env);
+        if (!who && !c) return json({ error: "login required" }, 401);
+        let b = {}; try { b = await req.json(); } catch (e) { /* empty */ }
+        const cut = (v, n) => String(v || "").slice(0, n);
+        const by = who ? (who.role === "owner" ? "owner" : who.login) : "customer";
+        await env.DB.batch([
+          env.DB.prepare("INSERT INTO client_errors (ts, who, msg, src, ver, view, ua) VALUES (?, ?, ?, ?, ?, ?, ?)").bind(Date.now(), by, cut(b.msg, 500), cut(b.src, 200), cut(b.ver, 40), cut(b.view, 40), cut(req.headers.get("User-Agent"), 160)),
+          env.DB.prepare("DELETE FROM client_errors WHERE id <= (SELECT MAX(id) - 300 FROM client_errors)")
+        ]);
+        console.error("app error", by, cut(b.msg, 300), cut(b.src, 120));
+        return json({ ok: true });
+      }
+      if (path === "/api/clienterrors" && req.method === "GET") {
+        if (!isFull(who) || accessOf(who) === "full") return json({ error: "Only the owner or a partner can see app errors." }, 403);
+        const rows = await env.DB.prepare("SELECT ts, who, msg, src, ver, view, ua FROM client_errors ORDER BY id DESC LIMIT 100").all();
+        return json({ errors: rows.results || [] });
+      }
       if (path === "/api/backups" || path.startsWith("/api/backups/")) return await handleBackups(req, env, url, path, who);
       if (path === "/api/audit" && req.method === "GET") {
         if (!isFull(who) || accessOf(who) === "full") return json({ error: "Only the owner or a partner can see the activity log." }, 403);

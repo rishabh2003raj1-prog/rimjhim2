@@ -38,6 +38,7 @@
   #refreshBtn{font-family:inherit;font-size:11.5px;font-weight:600;color:var(--teal-dk);background:var(--teal-bg);border:1px solid var(--line);border-radius:14px;padding:4px 10px;}
   #refreshBtn:disabled{opacity:.6;}
   #saveStatus.warn{color:var(--brick);font-weight:600;}
+  #langBtn{background:#EFE8D8;border:1px solid var(--line);border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:700;padding:3px 9px;margin-right:6px;color:var(--ink);}
   #backupBtn{background:none;border:none;color:var(--ink-soft);font-family:inherit;font-size:11px;font-weight:600;text-decoration:underline;padding:0;}
   .backupnote{font-size:12px;color:var(--ink-soft);line-height:1.5;margin-bottom:14px;}
   .backupnote b{color:var(--ink);}
@@ -256,6 +257,8 @@
   .tblrow{display:flex;gap:6px;align-items:center;margin-bottom:6px;} .tblrow input{flex:1;min-width:0;padding:10px;border-radius:10px;border:1px solid var(--line);font:inherit;font-size:15px;}
   .tblrow button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:16px;} .tblrow button:disabled{opacity:.35;}
   .ctables button.tbedit{border-style:dashed;}
+  .surow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);} .surow > b{width:26px;height:26px;border-radius:13px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;background:#EFE8D8;font-size:13px;}
+  .surow.done > b{background:#2E7D4F;color:#fff;} .surow.done .who{text-decoration:line-through;color:var(--ink-soft);} .surow > div{flex:1;min-width:0;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -577,7 +580,7 @@
     </div>
     <div class="row2">
       <span id="saveStatus">—</span> <span id="roleTag" class="roletag"></span>
-      <span class="topbtns"><button id="refreshBtn" aria-label="Refresh data">↻ Refresh</button><button id="backupBtn">Backup &amp; restore</button></span>
+      <span class="topbtns"><button id="langBtn" class="notr" aria-label="Language">हिंदी</button><button id="refreshBtn" aria-label="Refresh data">↻ Refresh</button><button id="backupBtn">Backup &amp; restore</button></span>
     </div>
   </div>
 
@@ -594,6 +597,7 @@
         <button data-r="custom" id="rangeCustomBtn">Custom…</button>
       </div>
       <div class="rangebar" id="rangeBar"></div>
+      <div id="setupBox"></div>
       <div id="attnBox"></div>
       <div id="mgmtBox"></div>
       <button class="btn-save" id="reportsBtn" style="width:100%;margin-bottom:14px;">📄 Reports — create &amp; share PDF</button>
@@ -816,6 +820,7 @@
     <div class="field"><label>Password / PIN</label><input type="password" id="loginPin" autocomplete="off" placeholder="Password or owner PIN"></div>
     <div class="err" id="loginErr" style="display:block;"></div>
     <button class="btn-save" id="loginGo" style="width:100%;">Open</button>
+    <div class="muted" style="text-align:center;font-size:11.5px;margin-top:10px;"><a href="privacy.html" target="_blank">Privacy policy</a> · <a href="terms.html" target="_blank">Terms of use</a></div>
   </div></div>
   <input type="file" id="restoreFile" accept="application/json,.json" style="display:none;">
   <input type="file" id="billPhotoFile" accept="image/*" style="display:none;">
@@ -830,6 +835,20 @@
 // Build id, stamped at deploy (scripts/stamp-build.mjs). Refresh compares it with
 // public/build.json to notice a newer version of the app and reload it.
 var APP_BUILD = "dev";
+// Send errors that happen on this phone to the server (a few per session), so they can be fixed.
+(function(){
+  var sent = {}, n = 0;
+  function report(msg, src){
+    try{
+      msg = String(msg||"").slice(0, 500); if(!msg || sent[msg] || n >= 5) return; sent[msg] = 1; n++;
+      var v = document.querySelector(".view.active"); 
+      fetch("/api/clienterror", { method:"POST", credentials:"same-origin", keepalive:true, headers:{ "Content-Type":"application/json" },
+        body: JSON.stringify({ msg:msg, src:String(src||"").slice(0,200), ver:APP_BUILD, view: v ? v.id.replace("view-","") : "" }) }).catch(function(){});
+    }catch(e){}
+  }
+  window.addEventListener("error", function(e){ report(e.message, (e.filename||"").split("/").pop()+":"+(e.lineno||"")+":"+(e.colno||"")); });
+  window.addEventListener("unhandledrejection", function(e){ var r = e.reason; report("Unhandled: "+(r && r.message ? r.message : String(r)), r && r.stack ? String(r.stack).split("\n")[1] : ""); });
+})();
 
 // ---- OUTLETS ----
 // Every outlet has its own books on the server (sales, stock, staff, cash...).
@@ -1994,9 +2013,19 @@ function openActivitySheet(){
         html += '<div class="psrow"><span><b>'+esc(e.who)+'</b> <span class="muted">('+esc(ACCESS_LABEL[e.access]||e.access)+')</span> · '+esc(AUDIT_KEY_LABEL[e.key]||e.key)+'<br><span class="muted" style="font-size:11.5px;">'+d.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"})+'</span></span><b style="font-weight:500;font-size:12.5px;text-align:right;">'+bits+'</b></div>';
       });
     }
+    html += '<button class="btn-additem" id="ac_errs" style="margin-top:10px;">⚠️ App errors on phones</button><div id="ac_errlist"></div>';
     html += '<div class="sheetbtns" style="margin-top:10px;"><button class="btn-cancel" id="ac_back" style="flex:1;">Back</button></div>';
     sheet.innerHTML = html;
     document.getElementById("ac_back").addEventListener("click", openOutletSheet);
+    document.getElementById("ac_errs").addEventListener("click", function(){
+      var box = document.getElementById("ac_errlist"); box.innerHTML = '<div class="muted">Loading…</div>';
+      api("GET", "/api/clienterrors").then(function(r){
+        if(!r.ok){ box.innerHTML = '<div class="err" style="display:block;">'+esc((r.data&&r.data.error)||"Couldn't load.")+'</div>'; return; }
+        var list = r.data.errors || [];
+        box.innerHTML = '<div class="backupnote">Errors the app hit on someone\u2019s phone (newest first). Send a screenshot of these to whoever maintains the app.</div>'+(list.length ? list.map(function(e){
+          return '<div class="psrow"><span><b>'+esc(e.msg)+'</b><br><span class="muted" style="font-size:11.5px;">'+esc(new Date(e.ts).toLocaleString("en-IN"))+' · '+esc(e.who)+(e.view?' · '+esc(e.view):'')+' · build '+esc(e.ver)+(e.src?' · '+esc(e.src):'')+'</span></span></div>'; }).join("") : '<div class="empty">No errors. 👍</div>');
+      }).catch(function(){ box.innerHTML = '<div class="err" style="display:block;">Needs internet.</div>'; });
+    });
   }).catch(function(){
     sheet.innerHTML = '<h2 class="serif">Activity</h2><div class="err" style="display:block;">You need internet to see the activity log.</div><div class="sheetbtns"><button class="btn-cancel" id="ac_back" style="flex:1;">Back</button></div>';
     document.getElementById("ac_back").addEventListener("click", openOutletSheet);
@@ -2286,7 +2315,7 @@ function renderAll(){
   renderNotes();
   renderCounter();
   renderKitchen();
-  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } updateNavBadge(); }catch(e){}
+  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } var sb = document.getElementById("setupBox"); if(sb){ sb.innerHTML = setupCard(); wireSetup(sb); } updateNavBadge(); }catch(e){}
 }
 
 // ---------- DASHBOARD ----------
@@ -7458,6 +7487,126 @@ function wireMgmt(el){
   var p = el.querySelector("#mg_prep"); if(p) p.addEventListener("click", function(){ openPrepList(tomorrowForecast().date); });
   wireAttention(el);
 }
+
+// ---------- FIRST-TIME SETUP GUIDE ----------
+// A checklist on the Dashboard (owner / partners) that ticks itself as the app gets set up.
+// Steps the app can't check (logins, PIN) are ticked by hand.
+function setupSteps(){
+  var active = menuItems.filter(function(m){ return m.active!==false; });
+  var photos = active.filter(function(m){ return m.photo; }).length, recipes = active.filter(function(m){ return (m.recipe||[]).length; }).length;
+  var withVendor = ingredients.filter(function(g){ return g.vendor; }).length;
+  var mk = fmtDate(new Date()).slice(0,7), fixed = 0; try{ fixed = plannedFixed(mk); }catch(e){}
+  var manual = settings.setupDone || {};
+  return [
+    { k:"menu", t:"Add your menu", d:"Records → Menu → 📋 Paste a list of dishes (or + Dish).", done: active.length>=5, go:function(){ showView("records"); switchRecordsSub("menu"); } },
+    { k:"photos", t:"Dish photos & Hindi names", d:"Photos of your best sellers make the Counter and printed menu easy to read. "+photos+" of "+active.length+" dishes have a photo.", done: active.length>0 && photos >= Math.min(10, Math.ceil(active.length*0.3)), go:function(){ showView("records"); switchRecordsSub("menu"); } },
+    { k:"recipes", t:"Recipes for your top dishes", d:"Ingredients per plate turn sales into stock use and food cost. "+recipes+" dishes have a recipe.", done: recipes>=10 || (active.length>0 && recipes>=active.length), go:function(){ showView("records"); switchRecordsSub("menu"); } },
+    { k:"stock", t:"Ingredients with vendor & stock", d:"Records → Stock → + Ingredient: usual vendor, stock now, delivery days.", done: ingredients.length>=5 && withVendor >= Math.ceil(ingredients.length/2), go:function(){ showView("records"); switchRecordsSub("stock"); } },
+    { k:"staff", t:"Add your staff", d:"Staff → Team: names, shifts and pay.", done: staff.length>=1, go:function(){ showView("staff"); switchStaffSub("team"); } },
+    { k:"logins", t:"Give each person a login with the right role", d:"Staff → Logins: manager, chef, counter (billing), partner. Each sees only their job.", done: !!manual.logins, manual:true, go:function(){ showView("staff"); try{ openLoginsSheet(); }catch(e){} } },
+    { k:"tables", t:"Set your tables", d:"Counter → Dine-in → ✏️ Edit.", done: Array.isArray(settings.tables) && settings.tables.length>0, go:function(){ openTablesEditor(null); } },
+    { k:"upi", t:"Cafe UPI ID", d:"Counter → ⚙️ Settings. Shows a QR with the bill amount and on the customer page.", done: !!settings.upiId, go:function(){ showView("counter"); openUpiSettings(); } },
+    { k:"cash", t:"Opening cash & nightly float", d:"Records → Cash → Opening balances. Makes the daily cash count exact.", done: settings.openingCash!==undefined && settings.openingCash!==null && settings.openingCash!=="", go:function(){ showView("records"); switchRecordsSub("cash"); try{ openOpeningBalanceForm(); }catch(e){} } },
+    { k:"bills", t:"Monthly bills: rent, electricity, wifi", d:"Records → Bills.", done: fixed>0, go:function(){ showView("records"); switchRecordsSub("fixed"); } },
+    { k:"pin", t:"Change the owner PIN", d:"Set a new APP_PIN in Cloudflare (Workers → rimjhim-cafe → Settings → Variables and Secrets), or ask me to walk you through it. Tick when done.", done: !!manual.pin, manual:true },
+    { k:"print", t:"Print your menu", d:"Records → Menu → 🖨️ Printable menu.", done: !!manual.print, manual:true, go:function(){ showView("records"); switchRecordsSub("menu"); openMenuPdfSheet(); } }
+  ];
+}
+function setupCard(){
+  if(!isFullAccess() || !canWriteKey(SETTINGS_KEY)) return "";
+  var st = setupSteps(), n = st.filter(function(x){ return x.done; }).length;
+  if(n===st.length && !settings.setupShow) return "";
+  if(settings.setupHidden && !settings.setupShow) return '<div class="muted" style="font-size:12.5px;margin:-6px 0 12px;">Setup guide: '+n+' of '+st.length+' done · <a href="#" id="su_show">show</a></div>';
+  var html = '<div class="card setupcard" style="margin-bottom:14px;"><div class="psrow" style="padding-top:0;"><h3 style="margin:0;">🚀 Get your cafe ready · '+n+' of '+st.length+'</h3><a href="#" id="su_hide" class="muted" style="font-size:12.5px;">Hide</a></div>'+
+    '<div class="stockbar" style="margin:6px 0 10px;"><i style="width:'+Math.round(n/st.length*100)+'%;background:#1F5C52;"></i></div>';
+  html += st.map(function(x, i){
+    return '<div class="surow'+(x.done?" done":"")+'"><b>'+(x.done?"✔":(i+1))+'</b><div><div class="who">'+esc(x.t)+'</div><div class="meta">'+esc(x.d)+'</div></div>'+
+      (x.done ? (x.manual ? '<a href="#" data-suundo="'+x.k+'" class="muted" style="font-size:12px;">undo</a>' : '') :
+        (x.manual ? '<button class="btn-additem" data-sumark="'+x.k+'" style="width:auto;padding:6px 10px;">Done</button>' : '')+(x.go ? '<button class="btn-additem" data-sugo="'+i+'" style="width:auto;padding:6px 10px;">Go</button>' : ''))+'</div>';
+  }).join("");
+  return html+'</div>';
+}
+function wireSetup(el){
+  var st = setupSteps();
+  function setFlag(k, v){ settings.setupDone = Object.assign({}, settings.setupDone||{}); if(v) settings.setupDone[k] = true; else delete settings.setupDone[k]; saveSettings(); renderAll(); }
+  Array.prototype.forEach.call(el.querySelectorAll("[data-sugo]"), function(b){ b.addEventListener("click", function(){ var s = st[+b.getAttribute("data-sugo")]; if(s && s.go) s.go(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-sumark]"), function(b){ b.addEventListener("click", function(){ setFlag(b.getAttribute("data-sumark"), true); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-suundo]"), function(b){ b.addEventListener("click", function(ev){ ev.preventDefault(); setFlag(b.getAttribute("data-suundo"), false); }); });
+  var h = el.querySelector("#su_hide"); if(h) h.addEventListener("click", function(ev){ ev.preventDefault(); settings.setupHidden = true; settings.setupShow = false; saveSettings(); renderAll(); });
+  var s = el.querySelector("#su_show"); if(s) s.addEventListener("click", function(ev){ ev.preventDefault(); settings.setupHidden = false; settings.setupShow = true; saveSettings(); renderAll(); });
+}
+
+// ---------- HINDI OPTION ----------
+// A per-phone switch. Exact labels on screen (tabs, headings, buttons, common words) are shown in
+// Hindi; anything not in the list stays in English. Inputs, dropdown choices and numbers are never
+// changed, so nothing that is saved depends on the language.
+var LANG_KEY = "app_lang_v1";
+function appLang(){ try{ return localStorage.getItem(LANG_KEY)==="hi" ? "hi" : "en"; }catch(e){ return "en"; } }
+var HI = {
+  "Counter":"काउंटर","Kitchen":"रसोई","Dashboard":"डैशबोर्ड","Calendar":"कैलेंडर","Master":"मास्टर","Staff":"स्टाफ़","Records":"रिकॉर्ड",
+  "Sales":"बिक्री","Purch.":"ख़रीद","Purchases":"ख़रीदारी","Orders":"ऑर्डर","Invest":"निवेश","Expense":"ख़र्च","Expenses":"ख़र्चे","Bills":"बिल","Customers":"ग्राहक","Assets":"सामान","Vendors":"विक्रेता",
+  "Menu":"मेन्यू","Stock":"स्टॉक","Cash":"कैश","Handover":"हैंडओवर","Bank":"बैंक","Cash review":"कैश जाँच","Loans":"उधार/लोन","Partners":"पार्टनर",
+  "Team":"टीम","Roster":"ड्यूटी","Attend.":"हाज़िरी","Attendance":"हाज़िरी","Tasks":"काम","Salary":"वेतन","Meals":"स्टाफ़ खाना",
+  "Today":"आज","Yesterday":"कल","7 days":"7 दिन","15 days":"15 दिन","30 days":"30 दिन","90 days":"90 दिन","Custom…":"तारीख़ चुनें…","Day":"दिन","Month":"महीना","Year":"साल",
+  "Refresh":"रीफ़्रेश","Backup & restore":"बैकअप","Save":"सेव करें","Cancel":"रद्द करें","Close":"बंद करें","Delete":"हटाएँ","Edit":"बदलें","Back":"वापस","Done":"हो गया","Next":"आगे","Add":"जोड़ें","Remove":"हटाएँ","Yes":"हाँ","No":"नहीं","OK":"ठीक है",
+  "Today’s bills":"आज के बिल","Live orders":"चालू ऑर्डर","Checks":"जाँच","Settings":"सेटिंग","Big & simple":"बड़ा और आसान","Big & simple: ON":"बड़ा और आसान: चालू",
+  "Most sold":"सबसे ज़्यादा बिके","All":"सब","Dine-in":"यहीं खाना","Takeaway":"पैक","Delivery":"डिलीवरी","Tap a picture to add it":"फोटो दबाकर जोड़ें",
+  "Bill ➜":"बिल ➜","Send to kitchen ➜":"रसोई भेजें ➜","Details ➜":"पता ➜","Pick a table ↑":"टेबल चुनें ↑","free":"खाली",
+  "Bill":"बिल","Total":"कुल","Discount":"छूट","Cash":"कैश","UPI":"UPI","Udhaar":"उधार","← Add more":"← और जोड़ें","Give back":"वापस दें","Got":"मिले","Reset":"फिर से",
+  "✔ Exact money":"✔ पूरे पैसे","✔ Done":"✔ हो गया","✔ Money received":"✔ पैसे मिल गए","✔ Save udhaar":"✔ उधार सेव करें","Next customer":"अगला ग्राहक","Before discount":"छूट से पहले",
+  "Quick tally — tap as you serve":"जल्दी गिनती — परोसते समय दबाएँ","Type counts":"गिनती लिखें","Estimate from takings":"कमाई से अंदाज़ा","+ Dish":"+ डिश","Today’s prep list":"आज की तैयारी सूची",
+  "Recipe & SOP book (PDF)":"रेसिपी किताब (PDF)","Menu analysis":"मेन्यू विश्लेषण","Off the menu":"मेन्यू से हटे","Ingredient stock":"सामग्री स्टॉक","Running low":"कम हो रहा है","Use first or throw":"पहले इस्तेमाल करें या फेंकें",
+  "Log wastage":"बर्बादी लिखें","Log cooking batch":"पकाया हुआ लिखें","Physical stock count":"स्टॉक गिनती","+ Ingredient":"+ सामग्री","Wastage":"बर्बादी","Raw":"कच्चा","Cooked":"पका हुआ","Packaging":"पैकिंग","Drinks & water":"ड्रिंक और पानी","Cafe use":"कैफ़े उपयोग",
+  "Today’s checks":"आज की जाँच","Start":"शुरू","Again":"फिर से","Opening":"खोलते समय","Closing":"बंद करते समय","Weekly deep clean":"हफ़्ते की गहरी सफ़ाई","Edit checklists":"जाँच सूची बदलें","+ Add asset":"+ सामान जोड़ें","Equipment":"उपकरण",
+  "Working":"चालू","Needs repair":"मरम्मत चाहिए","Broken":"ख़राब","Check condition now":"अभी हालत जाँचें","Maintenance history":"मरम्मत का इतिहास",
+  "Purchase orders":"ख़रीद ऑर्डर","+ New purchase request":"+ नई ख़रीद माँग","From low stock":"कम स्टॉक से","Make request":"माँग बनाएँ","Needs your action":"आपका काम","Open":"खुले","Last 30 days":"पिछले 30 दिन",
+  "Waiting for manager":"मैनेजर के पास","Waiting for owner":"मालिक के पास","Approved · send to vendor":"मंज़ूर · विक्रेता को भेजें","Ordered · waiting for delivery":"ऑर्डर हुआ · डिलीवरी का इंतज़ार","Part received":"कुछ आया","Received":"आ गया","Rejected":"नामंज़ूर","Cancelled":"रद्द",
+  "✔ Approve":"✔ मंज़ूर करें","Send to owner":"मालिक को भेजें","Reject":"नामंज़ूर करें","Cancel request":"माँग रद्द करें","Ordered by phone":"फ़ोन पर ऑर्डर किया","History":"इतिहास","Status":"स्थिति","Asked by":"माँगा","Needed by":"कब चाहिए","Approved by":"मंज़ूर किया",
+  "Needs attention today":"आज ध्यान दें","Daily summary — send on WhatsApp":"दिन का सार — WhatsApp पर भेजें","Tomorrow":"कल","Expected sales":"अनुमानित बिक्री","Top dishes":"टॉप डिश","Prep list for tomorrow":"कल की तैयारी सूची","Watch out":"सावधान",
+  "Reports — create & share PDF":"रिपोर्ट — PDF बनाएँ","Quick add":"जल्दी जोड़ें","Add note":"नोट जोड़ें","Process notes":"नोट प्रोसेस करें","Fix dates — move records to another day":"तारीख़ ठीक करें",
+  "Add entry":"एंट्री जोड़ें","Sale":"बिक्री","Purchase":"ख़रीद","Partner investment":"पार्टनर निवेश","PDF report":"PDF रिपोर्ट","+ Sale":"+ बिक्री","+ Purchase":"+ ख़रीद","+ Investment":"+ निवेश","+ Expense":"+ ख़र्च",
+  "Date":"तारीख़","Amount":"रक़म","Name":"नाम","Phone":"फ़ोन","Note":"नोट","Notes":"नोट","Category":"श्रेणी","Vendor":"विक्रेता","Qty":"मात्रा","Unit":"इकाई","Price":"दाम","Items":"सामान","Item":"सामान","Customer":"ग्राहक",
+  "Cash & counter":"कैश और काउंटर","Counter cash":"काउंटर कैश","Opening balances":"शुरुआती बैलेंस","Monthly bills":"मासिक बिल","Customers & loyalty":"ग्राहक और लॉयल्टी","Assets & upkeep":"सामान और देखभाल","Vendors & rates":"विक्रेता और रेट","Menu, recipes & SOPs":"मेन्यू, रेसिपी और तरीक़ा",
+  "Cash handover":"कैश हैंडओवर","Bank / UPI account":"बैंक / UPI खाता","Monthly cash review":"मासिक कैश जाँच","Get your cafe ready":"कैफ़े तैयार करें","Go":"जाएँ","Hide":"छिपाएँ","show":"दिखाएँ","undo":"वापस",
+  "Kitchen · रसोई":"रसोई","Your requests · आपकी माँग":"आपकी माँग","Printable menu (PDF) — for the wall, counter or tables":"छपने वाला मेन्यू (PDF)","Preview":"झलक","Make PDF":"PDF बनाएँ",
+  "Logins & roles":"लॉगिन और रोल","Sign out":"साइन आउट","Change my password":"मेरा पासवर्ड बदलें","Activity":"गतिविधि","Reports":"रिपोर्ट","Language":"भाषा","Other":"अन्य","Tea":"चाय"
+};
+// Labels with a number in them.
+var HI_PATTERNS = [[/^(.+?) \((\d+)\)$/, function(m){ return HI[m[1]]!==undefined ? HI[m[1]]+" ("+m[2]+")" : null; }],
+  [/^(\d+) bills? today · (.+)$/, function(m){ return "आज "+m[1]+" बिल · "+m[2]; }],
+  [/^(\d+) items?$/, function(m){ return m[1]+" आइटम"; }]];
+function trText(t){
+  var m = /^([\s←-⯿☀-➿\uD83C-􏰀-\uDFFF️+]*)(.*?)(\s*)$/.exec(t); if(!m) return null;
+  var core = m[2]; if(!core) return null;
+  if(HI[core]!==undefined) return m[1] + HI[core] + m[3];
+  for(var i=0;i<HI_PATTERNS.length;i++){ var mm = HI_PATTERNS[i][0].exec(core); if(mm){ var r = HI_PATTERNS[i][1](mm); if(r) return m[1] + r + m[3]; } }
+  return null;
+}
+function applyLang(root){
+  if(appLang()!=="hi" || !root) return;
+  var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, { acceptNode:function(n){
+    var p = n.parentNode; if(!p) return NodeFilter.FILTER_REJECT;
+    var tag = p.nodeName; if(tag==="SCRIPT" || tag==="STYLE" || tag==="OPTION" || tag==="TEXTAREA" || tag==="SELECT") return NodeFilter.FILTER_REJECT;
+    if(p.closest && p.closest(".notr,select,textarea,[contenteditable]")) return NodeFilter.FILTER_REJECT;
+    return n.nodeValue && n.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT; } });
+  var list = []; while(w.nextNode()) list.push(w.currentNode);
+  list.forEach(function(n){ var r = trText(n.nodeValue); if(r!==null && r!==n.nodeValue) n.nodeValue = r; });
+}
+var langObs = null;
+function startLang(){
+  document.documentElement.lang = appLang()==="hi" ? "hi" : "en";
+  var b = document.getElementById("langBtn"); if(b) b.textContent = appLang()==="hi" ? "English" : "हिंदी";
+  if(appLang()!=="hi") return;
+  applyLang(document.body);
+  if(langObs || !window.MutationObserver) return;
+  var pending = false;
+  langObs = new MutationObserver(function(muts){
+    if(pending) return; pending = true;
+    setTimeout(function(){ pending = false; var roots = {}; muts.forEach(function(m){ (m.addedNodes||[]).forEach(function(n){ if(n.nodeType===1) applyLang(n); else if(n.nodeType===3 && n.parentNode) applyLang(n.parentNode); }); }); }, 0);
+  });
+  langObs.observe(document.body, { childList:true, subtree:true });
+}
+function toggleLang(){ try{ localStorage.setItem(LANG_KEY, appLang()==="hi" ? "en" : "hi"); }catch(e){} location.reload(); }
 
 function poAttention(){
   var out = [], mine = pos.filter(poNeedsMe);
@@ -15292,6 +15441,8 @@ document.addEventListener("DOMContentLoaded", function(){
     b.addEventListener("click", function(){ showView(b.getAttribute("data-v")); });
   });
   document.getElementById("fabAdd").addEventListener("click", openAddChooser);
+  document.getElementById("langBtn").addEventListener("click", toggleLang);
+  try{ startLang(); }catch(e){}
   document.getElementById("sheetBg").addEventListener("click", function(e){ if(e.target===document.getElementById("sheetBg")) closeForm(); });
 
   function calShift(n){ shiftAppMonth(n); renderAll(); }
