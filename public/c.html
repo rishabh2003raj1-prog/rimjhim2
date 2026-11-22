@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1F5C52">
+<title>My Cafe Account</title>
+<link rel="icon" href="icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#F4EFE3; --panel:#FFFDF8; --ink:#241A12; --soft:#6F6253; --line:#E2D8C4; --teal:#1F5C52; --tealbg:#E4F0EC; --warn:#B5651D; --bad:#A6402D; --ok:#2E7D4F; }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Work Sans',system-ui,sans-serif;font-size:15px;-webkit-text-size-adjust:100%;}
+  .wrap{max-width:480px;margin:0 auto;padding:16px 16px 40px;}
+  h1,h2,.serif{font-family:'Fraunces',Georgia,serif;font-weight:600;margin:0;}
+  h1{font-size:24px;} h2{font-size:18px;margin-bottom:8px;}
+  .top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+  .top a{color:var(--soft);font-size:13px;}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px;}
+  .muted{color:var(--soft);font-size:13px;}
+  .row{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:1px solid var(--line);align-items:flex-start;}
+  .row:last-child{border-bottom:none;}
+  .big{font-size:34px;font-weight:700;}
+  .due{color:var(--bad);} .ok{color:var(--ok);}
+  label{display:block;font-size:13px;font-weight:600;margin:10px 0 4px;}
+  input{width:100%;padding:13px;border-radius:12px;border:1.5px solid var(--line);font:inherit;font-size:18px;background:#fff;}
+  button{font:inherit;cursor:pointer;}
+  .btn{width:100%;padding:14px;border:none;border-radius:14px;background:var(--teal);color:#fff;font-size:17px;font-weight:700;margin-top:14px;}
+  .btn.light{background:var(--panel);color:var(--ink);border:1.5px solid var(--line);}
+  .err{color:var(--bad);font-size:14px;margin-top:8px;min-height:18px;}
+  .tier{display:inline-block;padding:3px 10px;border-radius:999px;background:var(--tealbg);color:var(--teal);font-weight:700;font-size:13px;}
+  .bar{height:10px;border-radius:5px;background:#EFE8D8;overflow:hidden;margin:8px 0 4px;} .bar i{display:block;height:100%;background:var(--teal);}
+  .qr{width:220px;max-width:80%;margin:10px auto 4px;background:#fff;padding:6px;border-radius:12px;} .qr svg{width:100%;height:auto;display:block;}
+  .tabs{display:flex;gap:6px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;}
+  .tabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 12px;font-size:13.5px;color:var(--ink);white-space:nowrap;}
+  .tabs button.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .dish{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);}
+  .dish:last-child{border-bottom:none;}
+  .dimg{width:52px;height:52px;border-radius:10px;background:#EFE8D8;flex:0 0 52px;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:24px;}
+  .dimg img{width:100%;height:100%;object-fit:cover;}
+  .dname{flex:1;min-width:0;} .dname b{display:block;font-weight:600;} .dname span{font-size:12.5px;color:var(--soft);}
+  .price{font-weight:700;white-space:nowrap;}
+  .veg{display:inline-flex;width:12px;height:12px;border:1.5px solid;border-radius:3px;align-items:center;justify-content:center;vertical-align:middle;margin-right:4px;} .veg i{width:6px;height:6px;border-radius:50%;}
+  .sold{color:var(--bad);font-size:12px;font-weight:700;}
+  .offer{display:flex;justify-content:space-between;padding:10px 12px;border-radius:12px;background:#FFF4E0;border:1px dashed #C9A66B;margin-bottom:8px;font-weight:600;}
+  .hidden{display:none;}
+  .foot{text-align:center;color:var(--soft);font-size:12px;margin-top:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div id="login" class="hidden">
+    <div style="text-align:center;margin:24px 0 18px;">
+      <img src="icon.svg" alt="" width="64" height="64">
+      <h1 style="margin-top:8px;">My cafe account</h1>
+      <div class="muted">Your udhaar, bills, visits and the menu · आपका खाता</div>
+    </div>
+    <div class="card">
+      <label for="ph">Phone number · फ़ोन नंबर</label>
+      <input id="ph" type="tel" inputmode="numeric" autocomplete="tel" placeholder="98xxxxxxxx" maxlength="20">
+      <label for="cd">6-digit code from the cafe · कैफ़े से मिला कोड</label>
+      <input id="cd" type="text" inputmode="numeric" autocomplete="one-time-code" placeholder="••••••" maxlength="6">
+      <button class="btn" id="go">Open my account</button>
+      <div class="err" id="err"></div>
+      <div class="muted" style="margin-top:6px;">No code? Ask at the counter. They can send it to you on WhatsApp.</div>
+    </div>
+  </div>
+
+  <div id="app" class="hidden">
+    <div class="top"><div><div class="muted" id="cafe"></div><h1 id="hello"></h1></div><a href="#" id="out">Sign out</a></div>
+    <div id="body"></div>
+    <div class="foot">Only you can see this page. · यह पेज सिर्फ़ आपके लिए है।</div>
+  </div>
+</div>
+<script>
+(function(){
+  "use strict";
+  var data = null, cat = null;
+  function $(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]; }); }
+  function rupee(n){ return "₹"+Math.round(+n||0).toLocaleString("en-IN"); }
+  function day(d){ try{ var p = d.split("-"); return new Date(+p[0], +p[1]-1, +p[2]).toLocaleDateString("en-IN",{ day:"numeric", month:"short", year:"numeric" }); }catch(e){ return d; } }
+  function api(method, path, body){
+    return fetch(path, { method:method, credentials:"same-origin", headers: body ? { "Content-Type":"application/json" } : {}, body: body ? JSON.stringify(body) : undefined })
+      .then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ return { ok:r.ok, status:r.status, data:j }; }); });
+  }
+  var VEG = { veg:"#2E7D4F", egg:"#C9A227", nonveg:"#A6402D" };
+  function icon(n){ var t = [[/chai|tea/i,"☕"],[/coffee/i,"☕"],[/shake|lassi/i,"🥛"],[/mojito|soda|nimbu|lime|cold/i,"🥤"],[/momo/i,"🥟"],[/noodle|maggi|chowmein/i,"🍜"],[/biryani|rice|thali|khichdi/i,"🍛"],[/paratha|roti/i,"🫓"],[/dosa|uttapam|idli/i,"🥞"],[/burger/i,"🍔"],[/sandwich|toast/i,"🥪"],[/roll|wrap/i,"🌯"],[/pasta/i,"🍝"],[/fries|potato/i,"🍟"],[/egg|omelette/i,"🥚"],[/chicken/i,"🍗"],[/paneer/i,"🧀"],[/soup/i,"🍲"],[/salad|fruit/i,"🥗"]];
+    for(var i=0;i<t.length;i++) if(t[i][0].test(n)) return t[i][1]; return "🍽️"; }
+  function show(which){ $("login").classList.toggle("hidden", which!=="login"); $("app").classList.toggle("hidden", which!=="app"); }
+  function load(){
+    api("GET", "/api/cust/me").then(function(r){
+      if(!r.ok){ show("login"); return; }
+      data = r.data; render(); show("app");
+    }).catch(function(){ show("login"); $("err").textContent = "No internet connection."; });
+  }
+  function render(){
+    var d = data, h = "";
+    $("cafe").textContent = d.cafe || "";
+    $("hello").textContent = "Namaste, "+(d.me.name||"")+" 🙏";
+    document.title = (d.cafe||"Cafe")+" · My account";
+    // Udhaar
+    h += '<div class="card"><h2>Udhaar · उधार</h2>';
+    if(d.due>0){
+      h += '<div class="big due">'+rupee(d.due)+'</div><div class="muted">to pay · बकाया</div>';
+      if(d.upi){ h += '<div class="qr" id="qr"></div><div class="muted" style="text-align:center;">Scan to pay '+rupee(d.due)+' to '+esc(d.upi.name||d.upi.id)+'<br>'+esc(d.upi.id)+'</div>'+
+        '<a class="btn" style="display:block;text-align:center;text-decoration:none;" href="'+upiLink(d.due)+'">Pay '+rupee(d.due)+' with a UPI app</a>'+
+        '<div class="muted" style="margin-top:6px;">After paying, tell the counter so they can mark it paid.</div>'; }
+    } else h += '<div class="big ok">₹0</div><div class="muted">Nothing to pay. Thank you! · कोई बकाया नहीं</div>';
+    if(d.payments.length) h += '<div class="muted" style="margin-top:10px;font-weight:600;">Payments · भुगतान</div>'+d.payments.slice(0,8).map(function(p){ return '<div class="row"><span>'+day(p.date)+(p.mode?' · '+esc(p.mode):'')+'</span><b class="ok">'+rupee(p.amount)+'</b></div>'; }).join("");
+    h += '</div>';
+    // Loyalty
+    var pct = Math.round((10 - d.rewardIn) / 10 * 100);
+    h += '<div class="card"><h2>Visits · विज़िट</h2><span class="tier">'+esc(d.tier)+'</span> <span class="muted">'+d.visits+' visit'+(d.visits!==1?'s':'')+(d.last?' · last '+day(d.last):'')+'</span>'+
+      (d.perk ? '<div style="margin-top:6px;">'+esc(d.perk)+'</div>' : '')+
+      '<div class="bar"><i style="width:'+pct+'%"></i></div><div class="muted">'+d.rewardIn+' more visit'+(d.rewardIn!==1?'s':'')+' to your next reward</div>'+
+      (d.nextTier ? '<div class="muted">'+d.nextTier.visits+' more to reach '+esc(d.nextTier.name)+'</div>' : '')+'</div>';
+    if(d.offers.length) h += '<div class="card"><h2>Offers · ऑफ़र</h2>'+d.offers.map(function(o){ return '<div class="offer"><span>'+esc(o.name)+'</span><span>'+(o.kind==="pct" ? o.value+'% off' : '₹'+o.value+' off')+'</span></div>'; }).join("")+'<div class="muted">Ask at the counter.</div></div>';
+    // Bills
+    h += '<div class="card"><h2>Your bills · आपके बिल</h2>';
+    if(!d.bills.length) h += '<div class="muted">No bills yet.</div>';
+    h += d.bills.map(function(b){ return '<div class="row"><span>'+day(b.date)+' · '+esc(b.mode)+(b.items.length ? '<br><span class="muted">'+b.items.map(function(i){ return i.qty+'× '+esc(i.name); }).join(", ")+'</span>' : '')+(b.discount ? '<br><span class="muted">discount '+rupee(b.discount)+'</span>' : '')+'</span><b>'+rupee(b.amount)+'</b></div>'; }).join("");
+    h += '</div>';
+    // Menu
+    var cats = []; d.menu.forEach(function(m){ if(cats.indexOf(m.category)<0) cats.push(m.category); });
+    if(!cat || cats.indexOf(cat)<0) cat = cats[0];
+    if(d.menu.length){
+      h += '<div class="card"><h2>Menu · मेन्यू</h2><div class="tabs">'+cats.map(function(c){ return '<button data-c="'+esc(c)+'" class="'+(c===cat?"on":"")+'">'+esc(c)+'</button>'; }).join("")+'</div>';
+      h += d.menu.filter(function(m){ return m.category===cat; }).map(function(m){
+        var v = VEG[m.veg];
+        return '<div class="dish"><div class="dimg">'+(m.photo ? '<img loading="lazy" alt="" src="'+esc(m.photo.replace("/api/photos/","/api/cust/photo/"))+'">' : icon(m.name))+'</div>'+
+          '<div class="dname"><b>'+(v?'<span class="veg" style="border-color:'+v+'"><i style="background:'+v+'"></i></span>':'')+esc(m.name)+'</b>'+(m.localName?'<span>'+esc(m.localName)+'</span>':'')+(m.soldOut?' <span class="sold">Sold out today</span>':'')+'</div>'+
+          '<div class="price">'+rupee(m.price)+'</div></div>';
+      }).join("")+'</div>';
+    }
+    $("body").innerHTML = h;
+    Array.prototype.forEach.call(document.querySelectorAll("[data-c]"), function(b){ b.addEventListener("click", function(){ cat = b.getAttribute("data-c"); render(); }); });
+    if(d.due>0 && d.upi){
+      var s = document.createElement("script"); s.src = "vendor/qrcode.js";
+      s.onload = function(){ try{ var q = qrcode(0, "M"); q.addData(upiLink(d.due)); q.make(); $("qr").innerHTML = q.createSvgTag({ cellSize:6, margin:2, scalable:true }); }catch(e){} };
+      document.head.appendChild(s);
+    }
+  }
+  function upiLink(amt){ return "upi://pay?pa="+encodeURIComponent(data.upi.id)+"&pn="+encodeURIComponent(data.upi.name||data.cafe||"Cafe")+"&am="+(Math.round(amt*100)/100).toFixed(2)+"&cu=INR&tn="+encodeURIComponent("Udhaar "+(data.me.name||"")); }
+  $("go").addEventListener("click", function(){
+    var ph = $("ph").value, cd = $("cd").value.replace(/\D/g,"");
+    $("err").textContent = "";
+    if(ph.replace(/\D/g,"").length < 10){ $("err").textContent = "Enter your 10-digit phone number."; return; }
+    if(cd.length !== 6){ $("err").textContent = "The code has 6 digits."; return; }
+    $("go").disabled = true; $("go").textContent = "Opening…";
+    api("POST", "/api/cust/login", { phone:ph, code:cd }).then(function(r){
+      $("go").disabled = false; $("go").textContent = "Open my account";
+      if(!r.ok){ $("err").textContent = (r.data && r.data.error) || "Couldn't sign in."; return; }
+      $("cd").value = ""; load();
+    }).catch(function(){ $("go").disabled = false; $("go").textContent = "Open my account"; $("err").textContent = "No internet connection."; });
+  });
+  $("cd").addEventListener("keydown", function(e){ if(e.key==="Enter") $("go").click(); });
+  $("out").addEventListener("click", function(e){ e.preventDefault(); api("POST", "/api/cust/logout").then(function(){ data = null; show("login"); }); });
+  try{ var q = new URLSearchParams(location.search); if(q.get("p")) $("ph").value = q.get("p"); }catch(e){}
+  load();
+})();
+</script>
+</body>
+</html>

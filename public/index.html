@@ -233,6 +233,7 @@
   .krow{border:2px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;background:var(--panel);} .krow.ok{border-color:#2E7D4F;background:#EEF7F1;} .krow.short{border-color:#C9772B;background:#FFF4E0;}
   .krowh{display:flex;align-items:center;gap:8px;} .krate{font-size:13.5px;margin-top:6px;text-align:center;} .krate input{width:90px;padding:7px;border-radius:8px;border:1px solid var(--line);font:inherit;}
   .sumtext{white-space:pre-wrap;font:inherit;font-size:13.5px;line-height:1.5;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;max-height:52vh;overflow:auto;}
+  .custcode{font-size:38px;font-weight:800;letter-spacing:6px;text-align:center;margin:10px 0 2px;font-variant-numeric:tabular-nums;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -7409,6 +7410,7 @@ function renderCustomersView(){
   var today = fmtDate(new Date());
 
   var html = '<div class="addrow"><button class="sale" id="cust_add">+ Add customer</button><button class="purch" id="cust_offer">Send an offer</button></div>';
+  html += '<div class="backupnote">📱 Customers can see their own udhaar, bills, visits and the menu at <b>'+esc(location.host)+'/c</b>. Open a customer and tap <b>Give app access</b> for their code.</div>';
 
   var withDue = customers.filter(function(c){ return customerStats(c).due > 0; });
   if(withDue.length){
@@ -7502,6 +7504,49 @@ function openCustomerForm(custId){
   });
 }
 
+// ---- customer app access ----
+// Gives a customer a 6-digit code for their own page (/c): their udhaar, bills, visits and the
+// menu, nothing else. The server keeps only a scrambled copy of the code.
+function custAppUrl(c){ return location.origin + "/c" + (c && c.phone ? "?p=" + encodeURIComponent((c.phone||"").replace(/\D/g,"").slice(-10)) : ""); }
+function custAppSection(c){
+  var st = document.getElementById("cd_appst"), bt = document.getElementById("cd_appbtns");
+  function draw(has, since){
+    if(!st) return;
+    st.innerHTML = has ? '✅ Has app access'+(since?' since '+new Date(since).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):'')+'. They sign in at <b>'+esc(location.host)+'/c</b> with their phone number and code.' :
+      'Let '+esc(c.name)+' see their own udhaar, bills, visits and the menu on their phone. They see nothing else.';
+    bt.innerHTML = '<div class="addrow" style="margin-top:8px;"><button class="sale" id="ca_give">'+(has?"New code":"Give app access")+'</button>'+(has?'<button class="purch" id="ca_rm">Remove access</button>':'')+'</div>';
+    document.getElementById("ca_give").addEventListener("click", function(){ giveCustCode(c); });
+    var rm = document.getElementById("ca_rm"); if(rm) rm.addEventListener("click", function(){ askConfirm("Remove "+c.name+"'s app access? Their phone is signed out.", function(){
+      api("POST", "/api/cust/revoke"+API_Q, { customerId:c.id }).then(function(r){ if(r.ok) draw(false); else appAlert((r.data&&r.data.error)||"Couldn't remove access."); }); }); });
+  }
+  api("GET", "/api/cust/codes"+API_Q).then(function(r){
+    if(!r.ok){ if(st) st.textContent = "Needs internet to check."; return; }
+    var a = (r.data.access||[]).find(function(x){ return x.customerId===c.id; });
+    draw(!!a, a && a.since);
+  }).catch(function(){ if(st) st.textContent = "Needs internet."; });
+}
+function giveCustCode(c){
+  if(((c.phone||"").replace(/\D/g,"")).length < 10){ appAlert("Add "+c.name+"'s 10-digit phone number first (Edit details)."); return; }
+  var st = document.getElementById("cd_appst"); if(st) st.textContent = "Making a code…";
+  // The server checks the customer, so make sure the latest customer list has reached it.
+  var tries = 0;
+  (function go(){
+    if(cloud.dirty[CUST_KEY] && tries++ < 20){ scheduleFlush(0); setTimeout(go, 500); return; }
+    api("POST", "/api/cust/code"+API_Q, { customerId:c.id }).then(function(r){
+      if(!r.ok){ appAlert((r.data&&r.data.error)||"Couldn't make a code."); custAppSection(c); return; }
+      var code = r.data.code, url = custAppUrl(c);
+      var msg = "Namaste "+c.name+" 🙏\nYour "+(OUTLET.name||"RimJhim Cafe")+" account: see your udhaar, bills, visits and our menu.\nOpen: "+url+"\nPhone: "+r.data.phone+"\nCode: "+code+"\nKeep this code to yourself.";
+      var box = document.getElementById("cd_appbtns");
+      if(box){
+        box.innerHTML = '<div class="custcode">'+code.slice(0,3)+' '+code.slice(3)+'</div><div class="muted" style="text-align:center;">Shown only now. Give it to '+esc(c.name)+' or send it on WhatsApp.</div>'+
+          '<div class="addrow" style="margin-top:8px;"><button class="sale" id="ca_wa">📲 Send on WhatsApp</button><button class="purch" id="ca_done">Done</button></div>';
+        document.getElementById("ca_wa").addEventListener("click", function(){ openWhatsApp(c.phone, msg); });
+        document.getElementById("ca_done").addEventListener("click", function(){ custAppSection(c); });
+      }
+      if(st) st.innerHTML = '✅ Code ready. Any older code no longer works.';
+    }).catch(function(){ appAlert("Needs internet to make a code."); custAppSection(c); });
+  })();
+}
 function openCustomerDetail(custId){
   var c = custById(custId);
   if(!c) return;
@@ -7534,6 +7579,7 @@ function openCustomerDetail(custId){
   }
 
   html += '<div class="addrow" style="margin-top:10px;"><button class="sale" id="cd_offer">Send an offer</button><button class="expense" id="cd_edit">Edit details</button></div>';
+  if(canWriteKey(CUST_KEY)) html += '<div class="card" id="cd_app" style="margin:10px 0;"><h3>📱 Customer app</h3><div class="muted" id="cd_appst">Checking…</div><div id="cd_appbtns"></div></div>';
 
   var rows = customerSales(c).slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0,10);
   if(rows.length){
@@ -7556,6 +7602,7 @@ function openCustomerDetail(custId){
   sheet.scrollTop = 0;
   document.getElementById("cd_close").addEventListener("click", closeForm);
   document.getElementById("cd_edit").addEventListener("click", function(){ openCustomerForm(c.id); });
+  if(document.getElementById("cd_app")) custAppSection(c);
   document.getElementById("cd_offer").addEventListener("click", function(){ openOfferSheet(c.id); });
   var pb = document.getElementById("cd_pay");
   if(pb) pb.addEventListener("click", function(){ openCreditPayForm(c.id); });

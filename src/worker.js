@@ -45,7 +45,9 @@ const SCHEMA = [
   "CREATE INDEX IF NOT EXISTS audit_ts ON audit (outlet, ts)",
   "CREATE TABLE IF NOT EXISTS backups (outlet TEXT NOT NULL, day TEXT NOT NULL, idx INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY (outlet, day, idx))",
   "CREATE INDEX IF NOT EXISTS kv_updated ON kv (outlet, updated_at)",
-  "CREATE INDEX IF NOT EXISTS login_fails_ip ON login_fails (ip, ts)"
+  "CREATE INDEX IF NOT EXISTS login_fails_ip ON login_fails (ip, ts)",
+  "CREATE TABLE IF NOT EXISTS cust_codes (outlet TEXT NOT NULL, customer_id TEXT NOT NULL, phone TEXT NOT NULL, salt TEXT NOT NULL, hash TEXT NOT NULL, ver INTEGER NOT NULL DEFAULT 1, created_at INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (outlet, customer_id))",
+  "CREATE INDEX IF NOT EXISTS cust_codes_phone ON cust_codes (phone)"
 ];
 
 let schemaReady = null;
@@ -406,6 +408,125 @@ async function handleLogin(req, env) {
   }
   await env.DB.prepare("DELETE FROM login_fails WHERE ip = ?").bind(ip).run();
   return json(Object.assign({ ok: true }, who), 200, { "Set-Cookie": sessionCookie(req, token, exp) });
+}
+
+// ---- customer accounts: completely separate from staff logins ----
+// A customer signs in with their phone number and a 6-digit code the cafe gives them.
+// They get their own cookie (never accepted by the staff API) and the server builds
+// their view itself: only their own udhaar, payments, bills and loyalty, plus the menu
+// and offers. They never receive any business list.
+const CUST_COOKIE = "rj_cust";
+const CUST_DAYS = 30;
+const CUST_TIERS = [{ name: "Gold", minVisits: 25, perk: "10% off / free drink every 5 visits" }, { name: "Silver", minVisits: 10, perk: "5% off on bills above Rs 300" }, { name: "Regular", minVisits: 3, perk: "free chai on every 10th visit" }, { name: "New", minVisits: 0, perk: "" }];
+const CUST_REWARD_EVERY = 10;
+function phoneKey(v) { const d = String(v || "").replace(/\D/g, ""); return d.length >= 10 ? d.slice(-10) : ""; }
+async function custToken(env, outlet, cid, ver, exp) {
+  return "c." + outlet + "." + cid + "." + ver + "." + exp + "." + await hmacHex(env.APP_PIN, "rimjhim-cust-v1|" + outlet + "|" + cid + "|" + ver + "|" + exp);
+}
+function custCookie(req, token, exp) {
+  const secure = new URL(req.url).protocol === "https:" ? "; Secure" : "";
+  return `${CUST_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${Math.max(0, Math.floor((exp - Date.now()) / 1000))}${secure}`;
+}
+async function custWho(req, env) {
+  const got = readCookie(req, CUST_COOKIE);
+  const m = got && /^c\.([A-Za-z0-9_-]{1,40})\.([A-Za-z0-9_-]{1,64})\.(\d+)\.(\d{10,15})\.[a-f0-9]{64}$/.exec(got);
+  if (!m || +m[4] <= Date.now()) return null;
+  const row = await env.DB.prepare("SELECT outlet, customer_id, ver FROM cust_codes WHERE outlet = ? AND customer_id = ?").bind(m[1], m[2]).first();
+  if (!row || String(row.ver) !== m[3]) return null;
+  if (!safeEqual(got, await custToken(env, m[1], m[2], m[3], +m[4]))) return null;
+  return { outlet: m[1], cid: m[2] };
+}
+async function handleCustLogin(req, env) {
+  const ip = "c:" + (req.headers.get("CF-Connecting-IP") || "unknown");
+  const since = Date.now() - LOGIN_WINDOW_MS;
+  const f = await env.DB.prepare("SELECT COUNT(*) AS n FROM login_fails WHERE ip = ? AND ts > ?").bind(ip, since).first();
+  if (f && f.n >= LOGIN_MAX_FAILS) return json({ error: "Too many wrong attempts. Wait 15 minutes and try again." }, 429);
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* empty */ }
+  const phone = phoneKey(body.phone), code = String(body.code || "").replace(/\D/g, "");
+  let hit = null;
+  if (phone && code.length === 6) {
+    const rows = (await env.DB.prepare("SELECT outlet, customer_id, salt, hash, ver FROM cust_codes WHERE phone = ?").bind(phone).all()).results || [];
+    for (const r of rows) { if (safeEqual(await hashPassword(code, r.salt), r.hash)) { hit = r; break; } }
+    if (!rows.length) await hashPassword(code, "00000000000000000000000000000000");   // same timing either way
+  }
+  if (!hit) {
+    await env.DB.batch([env.DB.prepare("INSERT INTO login_fails (ip, ts) VALUES (?, ?)").bind(ip, Date.now()), env.DB.prepare("DELETE FROM login_fails WHERE ts < ?").bind(since)]);
+    return json({ error: "Wrong phone number or code. Ask the cafe for your code." }, 401);
+  }
+  await env.DB.prepare("DELETE FROM login_fails WHERE ip = ?").bind(ip).run();
+  const exp = Date.now() + CUST_DAYS * 86400000;
+  return json({ ok: true }, 200, { "Set-Cookie": custCookie(req, await custToken(env, hit.outlet, hit.customer_id, hit.ver, exp), exp) });
+}
+function saleAmt(s) { return (+s.amount || 0) * (1 + (+s.gst || 0) / 100); }
+async function handleCustMe(env, c) {
+  const val = async (k) => (await readOne(env, c.outlet, k)).value;
+  const cust = arr(await val("customers_v1")).find((x) => x && String(x.id) === c.cid);
+  if (!cust) return json({ error: "Your account was removed. Ask the cafe." }, 401);
+  const name = String(cust.name || "").trim().toLowerCase();
+  const mine = arr(await val("sales_v1")).filter((s) => s && String(s.customer || "").trim().toLowerCase() === name && name);
+  const pays = arr(await val("creditpayments_v1")).filter((p) => p && p.customerId === cust.id);
+  const days = [...new Set(mine.map((s) => s.date))].sort();
+  const credit = mine.filter((s) => s.mode === "Credit").reduce((a, s) => a + saleAmt(s), 0);
+  const paid = pays.reduce((a, p) => a + (+p.amount || 0), 0);
+  const visits = days.length, tier = CUST_TIERS.find((t) => visits >= t.minVisits) || CUST_TIERS[CUST_TIERS.length - 1];
+  const nextTier = CUST_TIERS.slice().reverse().find((t) => t.minVisits > visits) || null;
+  const menu = arr(await val("menu_v1")).filter((m) => m && m.active !== false && +m.price > 0).map((m) => ({
+    name: m.name, localName: m.localName || "", category: m.category || "Other", price: +m.price, veg: m.veg || "",
+    photo: typeof m.photo === "string" && m.photo.indexOf("/api/photos/") === 0 ? m.photo : "", soldOut: m.soldOut === istDay(0)
+  }));
+  const settings = (await val("settings_v1")) || {};
+  const offers = arr(await val("offers_v1")).filter((o) => o && o.active !== false && +o.value > 0).map((o) => ({ name: o.name, kind: o.kind, value: +o.value }));
+  return json({
+    cafe: await outletNameOf(env, c.outlet),
+    me: { name: cust.name, phone: cust.phone || "" },
+    due: Math.max(0, Math.round((credit - paid) * 100) / 100), credit: Math.round(credit * 100) / 100, paid: Math.round(paid * 100) / 100,
+    visits, spend: Math.round(mine.reduce((a, s) => a + saleAmt(s), 0)), last: days[days.length - 1] || null,
+    tier: tier.name, perk: tier.perk, nextTier: nextTier ? { name: nextTier.name, visits: nextTier.minVisits - visits } : null,
+    rewardIn: CUST_REWARD_EVERY - (visits % CUST_REWARD_EVERY),
+    bills: mine.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 30).map((s) => ({
+      date: s.date, amount: Math.round(saleAmt(s) * 100) / 100, mode: s.mode === "Credit" ? "Udhaar" : s.mode,
+      items: s.order && Array.isArray(s.order.items) ? s.order.items.map((i) => ({ name: i.name, qty: i.qty })) : [],
+      discount: s.order && s.order.discount ? +s.order.discount : 0
+    })),
+    payments: pays.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 30).map((p) => ({ date: p.date, amount: +p.amount || 0, mode: p.mode || "" })),
+    menu, offers, upi: settings.upiId ? { id: settings.upiId, name: settings.upiName || "" } : null
+  });
+}
+// Staff: give a customer app access (returns the code once), or take it away.
+async function handleCustCodes(req, env, url, path, who) {
+  const outlet = outletOf(url);
+  if (!outlet || !canUseOutlet(who, outlet)) return json({ error: "not allowed" }, 403);
+  const rule = ruleFor(who, "customers_v1");
+  if (req.method === "GET") {
+    if (!rule) return json({ error: "not allowed" }, 403);
+    const rows = (await env.DB.prepare("SELECT customer_id, created_at FROM cust_codes WHERE outlet = ?").bind(outlet).all()).results || [];
+    return json({ access: rows.map((r) => ({ customerId: r.customer_id, since: r.created_at })) });
+  }
+  if (!(rule === "rw" || rule === "append")) return json({ error: "This login can't give customers app access." }, 403);
+  let body = {};
+  try { body = await req.json(); } catch (e) { /* empty */ }
+  const cid = String(body.customerId || "");
+  if (path === "/api/cust/revoke") {
+    await env.DB.prepare("DELETE FROM cust_codes WHERE outlet = ? AND customer_id = ?").bind(outlet, cid).run();
+    return json({ ok: true });
+  }
+  const cust = arr((await readOne(env, outlet, "customers_v1")).value).find((x) => x && String(x.id) === cid);
+  if (!cust) return json({ error: "Save the customer first." }, 400);
+  const phone = phoneKey(cust.phone);
+  if (!phone) return json({ error: "Add the customer's 10-digit phone number first." }, 400);
+  const clash = await env.DB.prepare("SELECT customer_id FROM cust_codes WHERE outlet = ? AND phone = ? AND customer_id != ?").bind(outlet, phone, cid).first();
+  if (clash) return json({ error: "Another customer here already has app access with this phone number." }, 400);
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000, code = String(n).padStart(6, "0"), salt = newSalt();
+  const old = await env.DB.prepare("SELECT ver FROM cust_codes WHERE outlet = ? AND customer_id = ?").bind(outlet, cid).first();
+  await env.DB.prepare("INSERT OR REPLACE INTO cust_codes (outlet, customer_id, phone, salt, hash, ver, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(outlet, cid, phone, salt, await hashPassword(code, salt), old ? (+old.ver + 1) : 1, Date.now()).run();
+  return json({ ok: true, code, phone });
+}
+// Menu photos (only ones an active dish uses) can be shown to a signed-in customer.
+async function custPhotoAllowed(env, c, id) {
+  const menu = arr((await readOne(env, c.outlet, "menu_v1")).value);
+  return menu.some((m) => m && m.active !== false && m.photo === "/api/photos/" + id);
 }
 
 // ---- store logins (owner only) ----
@@ -812,6 +933,18 @@ export default {
       if (path === "/api/logout" && req.method === "POST") {
         return json({ ok: true }, 200, { "Set-Cookie": `${COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
       }
+      // Customer accounts: their own sign-in, cookie and view.
+      if (path === "/api/cust/login" && req.method === "POST") return await handleCustLogin(req, env);
+      if (path === "/api/cust/logout" && req.method === "POST") return json({ ok: true }, 200, { "Set-Cookie": `${CUST_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0` });
+      if (path === "/api/cust/me" && req.method === "GET") {
+        const c = await custWho(req, env);
+        return c ? await handleCustMe(env, c) : json({ error: "login required" }, 401);
+      }
+      if (path.startsWith("/api/cust/photo/") && req.method === "GET") {
+        const c = await custWho(req, env), id = path.slice(16);
+        if (!c || !/^[A-Za-z0-9_-]{1,80}$/.test(id) || !(await custPhotoAllowed(env, c, id))) return json({ error: "not found" }, 404);
+        return await handlePhotoGet(env, id, { role: "store", outlet: c.outlet, login: "customer", access: "billing" });
+      }
       const who = await whoIs(req, env);
       if (path === "/api/backups" || path.startsWith("/api/backups/")) return await handleBackups(req, env, url, path, who);
       if (path === "/api/audit" && req.method === "GET") {
@@ -844,6 +977,7 @@ export default {
         if (who.role !== "owner") return json({ error: "Only the owner can manage logins." }, 403);
         return await handleUsers(req, env, path);
       }
+      if (path === "/api/cust/codes" || path === "/api/cust/code" || path === "/api/cust/revoke") return await handleCustCodes(req, env, url, path, who);
       if (path.startsWith("/api/photos/") && req.method === "GET") return await handlePhotoGet(env, path.slice(12), who);
       if (path === "/api/ai" && req.method === "POST") return await handleAi(req, env);
       return json({ error: "not found" }, 404);

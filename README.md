@@ -380,6 +380,20 @@ On the Dashboard (owner, partners, manager):
 - A cancelled Counter bill now leaves a record (bill number, items, amount, who, when), shown in Today's bills and
   the daily summary.
 
+### Customer accounts (Step 2)
+Customers get their own page at **/c** (e.g. `https://<your-site>/c`), completely separate from the staff app.
+- **Sign-in**: phone number + a 6-digit code from the cafe (free — no SMS). Open a customer (Records → Customers),
+  tap **Give app access**, and send the code on WhatsApp. **New code** replaces it (signing out the old phone);
+  **Remove access** turns it off. Owner, partners, manager and counter can give codes; chef can't. The server keeps
+  only a scrambled copy of the code; wrong codes are limited to 10 per 15 minutes.
+- **What they see**: their udhaar due (with a UPI QR / pay button for the exact amount when a cafe UPI ID is set),
+  their payments, visits and loyalty tier with how many visits to the next reward, offers, their bills (with items for
+  Counter bills) and the menu with photos, veg marks and "sold out today".
+- **What they can't**: customers have their own cookie that the staff API never accepts, and the server builds their
+  page itself from the stored data — they receive nothing else (no other customers, sales totals, money or settings).
+  Only menu photos of dishes on the menu can be opened by a customer.
+- Matching is by the customer's name on bills (as in Customers & loyalty) and payments recorded against them.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the
