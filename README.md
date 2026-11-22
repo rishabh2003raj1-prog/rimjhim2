@@ -292,6 +292,12 @@ optional photo, reorderable.
   suggested price. The menu warns when dishes cost more than target + 5%.
 - Chefs edit dishes but don't see costs or margins; billing can only view.
 - Fixed: typing in the dish form no longer redraws it (which lost the next field being typed into).
+- **🖨️ Printable menu (PDF)**: a ready-to-print menu of the dishes on the menu — title, a line for address /
+  timings, phone for orders, a note at the bottom; **A4** (2 columns, wall / counter) or **A5** (table card); three
+  looks (classic cream, dark & gold, clean white); Hindi names and veg / egg / non-veg marks optional; pick which
+  sections; optional UPI QR. Half / Full portions share one line ("Hakka Noodles … ₹79 / 129"), and a section that
+  runs onto the next column or page is labelled "(contd.)". Pages are drawn on the phone so Hindi prints correctly.
+  Preview first, then Make PDF to share or save. Choices are remembered on that phone.
 - **Paste a list of dishes** (add or update many at once): one dish per line as
   `Category | Name | Price | veg/egg/nonveg | Hindi name` (only Name and Price are required). A preview shows new
   dishes and price changes before importing. A dish whose name already exists gets the new price, category and mark
