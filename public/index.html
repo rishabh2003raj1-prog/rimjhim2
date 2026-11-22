@@ -259,6 +259,9 @@
   .ctables button.tbedit{border-style:dashed;}
   .surow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);} .surow > b{width:26px;height:26px;border-radius:13px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;background:#EFE8D8;font-size:13px;}
   .surow.done > b{background:#2E7D4F;color:#fff;} .surow.done .who{text-decoration:line-through;color:var(--ink-soft);} .surow > div{flex:1;min-width:0;}
+  .rentsw{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0 2px;padding:8px 10px;border-radius:10px;background:#F6F1E6;font-size:13.5px;}
+  .rentsw div{display:flex;gap:6px;} .rentsw button{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;color:var(--ink);}
+  .rentsw button.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .rentsw button.off{background:#A6402D;border-color:#A6402D;color:#fff;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -12459,13 +12462,23 @@ function scoreBand(score){
 // (allowMonths), or new amounts from a month onward (allowHistory). Food and travel
 // can be a fixed amount a month or an amount per day worked.
 var ALLOW_KEYS = ["houseRent","foodAllowance","travelAllowance","foodBasis","travelBasis"];
-function allowConfig(st, mKey){
+// House rent can be switched on / off for a month: st.rentMonths[mKey] = true / false.
+// st.rentMode "monthly" means it is only given in months switched on. raw = without the switch.
+function rentOn(st, mKey){ var m = st.rentMonths && st.rentMonths[mKey]; return st.rentMode==="monthly" ? m===true : m!==false; }
+function allowConfig(st, mKey, raw){
   var c = { houseRent:+st.houseRent||0, foodAllowance:+st.foodAllowance||0, travelAllowance:+st.travelAllowance||0,
             foodBasis: st.foodBasis==="day" ? "day" : "month", travelBasis: st.travelBasis==="day" ? "day" : "month" };
   function take(e){ ALLOW_KEYS.forEach(function(k){ if(e[k]!==undefined && e[k]!==null && e[k]!=="") c[k] = (k.indexOf("Basis")>0) ? e[k] : (+e[k]||0); }); }
   (Array.isArray(st.allowHistory) ? st.allowHistory.slice().sort(function(a,b){ return a.from.localeCompare(b.from); }) : []).forEach(function(e){ if(e.from <= mKey) take(e); });
   if(st.allowMonths && st.allowMonths[mKey]) take(st.allowMonths[mKey]);
+  c.rentBase = c.houseRent; c.rentOn = rentOn(st, mKey);
+  if(!raw && !c.rentOn) c.houseRent = 0;
   return c;
+}
+function setRentMonth(st, mKey, on){
+  var idx = staff.findIndex(function(x){ return x.id===st.id; }); if(idx<0) return;
+  var cur = Object.assign({}, staff[idx]); cur.rentMonths = Object.assign({}, cur.rentMonths||{}); cur.rentMonths[mKey] = !!on;
+  staff[idx] = cur; saveStaff(); renderAll();
 }
 function allowIsOneOff(st, mKey){ return !!(st.allowMonths && st.allowMonths[mKey]); }
 // New allowances from mKey onward; earlier months keep what they had.
@@ -12477,7 +12490,7 @@ function setAllowFrom(st, mKey, vals){
   h.push(e);
   st.allowHistory = h.sort(function(a,b){ return a.from.localeCompare(b.from); });
   if(st.allowMonths) delete st.allowMonths[mKey];
-  var now = allowConfig(st, fmtDate(new Date()).slice(0,7));
+  var now = allowConfig(st, fmtDate(new Date()).slice(0,7), true);
   ALLOW_KEYS.forEach(function(k){ st[k] = now[k]; });
 }
 function setAllowMonth(st, mKey, vals){
@@ -12600,6 +12613,13 @@ function renderSalaryView(){
     var timing = payTiming(s);
     if(timing) html += '<div class="barsub" style="margin-top:4px;">'+esc(timing)+'</div>';
     if(gw.balance>0) html += '<div class="barsub" style="margin-top:4px;">Goodwill kept so far: <b>'+rupeeP(gw.balance)+'</b> — can be given back as a bonus.</div>';
+    var rc = allowConfig(st, salMonth, true);
+    if(!settled && (rc.rentBase>0 || st.rentMode==="monthly")){
+      var on = rentOn(st, salMonth);
+      html += '<div class="rentsw"><span>🏠 House rent · '+esc(monthLabel(salMonth))+'</span><div>'+
+        '<button data-rent="'+st.id+'" data-on="1" class="'+(on?"on":"")+'">'+(rc.rentBase>0?"Given "+rupeeP(rc.rentBase):"Given")+'</button>'+
+        '<button data-rent="'+st.id+'" data-on="0" class="'+(on?"":"off")+'">Not given</button></div></div>';
+    }
     html += '<div class="salbtns">'+
       (s.balance>0 ? '<button class="sale" data-slpay="'+st.id+'">Pay '+rupeeP(s.balance)+'</button>' : '')+
       '<button data-sladv="'+st.id+'">Advance</button>'+
@@ -12624,6 +12644,11 @@ function renderSalaryView(){
   wire("data-slbonus", openBonusForm);
   wire("data-sladv", function(st){ openAdvanceForm(st, salMonth); });
   wire("data-sledit", function(st){ openSalaryMonthForm(st, salMonth); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rent]"), function(b){ b.addEventListener("click", function(){
+    var st = staffById(b.getAttribute("data-rent")); if(!st) return; var on = b.getAttribute("data-on")==="1";
+    if(on && !(allowConfig(st, salMonth, true).rentBase>0)){ appAlert("Set the house rent amount first: Edit month → House rent."); openSalaryMonthForm(st, salMonth); return; }
+    setRentMonth(st, salMonth, on);
+  }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-slleave]"), function(b){
     b.addEventListener("click", function(){ var st = staffById(b.getAttribute("data-slleave")); if(st){ setLeaveChoice(st, salMonth, b.getAttribute("data-ch")); renderAll(); } });
   });
@@ -12734,6 +12759,7 @@ function openSalaryMonthForm(st, mKey){
                  foodBasis: document.getElementById("sm_foodb").value, travelBasis: document.getElementById("sm_travelb").value };
       var changed = ALLOW_KEYS.some(function(k){ return String(c[k]) !== String(nv[k]); });
       if(changed){ if(scope==="from") setAllowFrom(cur, mKey, nv); else setAllowMonth(cur, mKey, nv); }
+      if(String(c.houseRent) !== String(nv.houseRent)){ cur.rentMonths = Object.assign({}, cur.rentMonths||{}); cur.rentMonths[mKey] = nv.houseRent > 0; }
       staff[idx] = cur; saveStaff();
       var r = payrollRec(st, mKey);
       r.adjust = adj.filter(function(a){ return a.amount; }).map(function(a){ return { label:a.label.trim(), amount:r2(a.amount) }; });
@@ -13980,10 +14006,11 @@ function openStaffForm(staffId){
   html += '<div><label>Usual shift</label><select id="s_shift">'+shiftList().map(function(sh){ return sh.name; }).concat(shiftList().length>1 ? ["Both shifts"] : []).concat(["Flexible"]).map(function(n){ return '<option '+(s&&s.defaultShift===n?"selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div></div>';
   html += '<div class="field two"><div'+(isFullAccess()?'':' style="display:none;"')+'><label>Monthly salary (₹)</label><input type="number" inputmode="decimal" id="s_salary" value="'+(s?s.salary:"")+'"></div>';
   html += '<div><label>Phone</label><input type="text" inputmode="tel" id="s_phone" value="'+esc(s?s.phone:"")+'"></div></div>';
-  var acNow = s ? allowConfig(s, fmtDate(new Date()).slice(0,7)) : { houseRent:0, foodAllowance:0, travelAllowance:0, foodBasis:"month", travelBasis:"month" };
+  var acNow = s ? allowConfig(s, fmtDate(new Date()).slice(0,7), true) : { houseRent:0, foodAllowance:0, travelAllowance:0, foodBasis:"month", travelBasis:"month" };
   function basisSel(id, v){ return '<select id="'+id+'"><option value="month"'+(v!=="day"?" selected":"")+'>per month</option><option value="day"'+(v==="day"?" selected":"")+'>per day worked</option></select>'; }
   html += '<div'+(isFullAccess()?'':' style="display:none;"')+'>';
-  html += '<div class="field"><label>House rent allowance (₹ per month)</label><input type="number" inputmode="decimal" id="s_rent" value="'+(acNow.houseRent||"")+'"></div>';
+  html += '<div class="field two"><div><label>House rent allowance (₹ per month)</label><input type="number" inputmode="decimal" id="s_rent" value="'+(acNow.houseRent||"")+'"></div>'+
+    '<div><label>House rent is given</label><select id="s_rentmode"><option value="always"'+(s&&s.rentMode==="monthly"?"":" selected")+'>Every month (switch off any month)</option><option value="monthly"'+(s&&s.rentMode==="monthly"?" selected":"")+'>Only in months I switch on</option></select></div></div>';
   html += '<div class="field two"><div><label>Food allowance (₹)</label><input type="number" inputmode="decimal" id="s_food" value="'+(acNow.foodAllowance||"")+'"></div><div><label>Food is paid</label>'+basisSel("s_foodb", acNow.foodBasis)+'</div></div>';
   html += '<div class="field two"><div><label>Travel allowance (₹)</label><input type="number" inputmode="decimal" id="s_travel" value="'+(acNow.travelAllowance||"")+'"></div><div><label>Travel is paid</label>'+basisSel("s_travelb", acNow.travelBasis)+'</div></div>';
   html += '<div class="backupnote" style="margin-top:-4px;">Cash allowances paid on top of salary. “Per day worked” pays the amount for every day not marked absent or on leave. Changes here apply from this month on; to change one month only, use Staff → Salary → Edit month. Meals cooked in the cafe are tracked separately under Staff meals.</div>';
@@ -14027,6 +14054,7 @@ function openStaffForm(staffId){
     var rec = { id: s?s.id:uid(), name:name, role:document.getElementById("s_role").value,
                 defaultShift:document.getElementById("s_shift").value, salary:sal,
                 houseRent: parseFloat(document.getElementById("s_rent").value)||0,
+                rentMode: document.getElementById("s_rentmode").value,
                 foodAllowance: parseFloat(document.getElementById("s_food").value)||0,
                 travelAllowance: parseFloat(document.getElementById("s_travel").value)||0,
                 foodBasis: document.getElementById("s_foodb").value, travelBasis: document.getElementById("s_travelb").value,
@@ -14047,8 +14075,9 @@ function openStaffForm(staffId){
       var merged = Object.assign({}, s, rec), thisM = fmtDate(new Date()).slice(0,7);
       if(sal !== (+s.salary||0)){ merged.salary = s.salary; setSalaryFrom(merged, thisM, sal); }
       // New allowances apply from this month; earlier months keep theirs.
-      var oldAc = allowConfig(s, thisM), changed = isFullAccess() && ALLOW_KEYS.some(function(k){ return String(oldAc[k]) !== String(rec[k]); });
+      var oldAc = allowConfig(s, thisM, true), changed = isFullAccess() && ALLOW_KEYS.some(function(k){ return String(oldAc[k]) !== String(rec[k]); });
       ALLOW_KEYS.forEach(function(k){ merged[k] = s[k]; });
+      if(!isFullAccess()) merged.rentMode = s.rentMode;
       if(changed){ var nv = {}; ALLOW_KEYS.forEach(function(k){ nv[k] = rec[k]; }); setAllowFrom(merged, thisM, nv); }
       staff[staff.findIndex(function(x){return x.id===s.id;})] = merged;
     }

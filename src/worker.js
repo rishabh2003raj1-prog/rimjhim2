@@ -167,7 +167,7 @@ async function whoIs(req, env) {
 const ACCESS_LEVELS = ["partner", "manager", "chef", "billing", "full"];
 const FULL_ACCESS = { owner: true, partner: true, full: true };
 // Pay details are hidden from staff logins.
-const PAY_FIELDS = ["salary", "salaryHistory", "salaryMonths", "houseRent", "foodAllowance", "travelAllowance", "foodBasis", "travelBasis", "allowHistory", "allowMonths", "upi"];
+const PAY_FIELDS = ["salary", "salaryHistory", "salaryMonths", "houseRent", "foodAllowance", "travelAllowance", "foodBasis", "travelBasis", "allowHistory", "allowMonths", "upi", "rentMode", "rentMonths"];
 const STAFF_PUBLIC = ["id", "name", "role", "defaultShift", "status", "joinDate", "leftDate"];
 const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
 // Readable by the manager but only the owner / partners can change them.

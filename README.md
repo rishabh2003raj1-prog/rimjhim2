@@ -442,6 +442,12 @@ Swiggy order types were built and then switched off at the owner's request; the 
 - A direct link to the Zomato / Swiggy accounts (orders arriving automatically) needs an approved integration
   (e.g. through a middleware such as UrbanPiper); the app is ready to take such orders as Live orders.
 
+### House rent per month
+House rent allowance can differ month to month. In the staff form choose **House rent is given: Every month** (switch it
+off for any month) or **Only in months I switch on**. Each salary card (Staff → Salary) shows **🏠 House rent · month:
+Given ₹X / Not given** — one tap changes that month only; other months are untouched. Typing a different amount in
+**Edit month** gives rent at that amount for the month. Managers can't see or change these pay settings.
+
 ### Purchase categories
 Grouped in the purchase form (older entries keep their category):
 - **Food ingredients**: Dairy · Vegetables & fruits · Meat, chicken & eggs · Grocery & staples · Oil & ghee · Spices &
