@@ -299,6 +299,33 @@ optional photo, reorderable.
 - **On the menu** switch per dish: hidden dishes move to an "Off the menu" group, keep their recipe and history,
   and stop appearing in quick tally and the dish count form.
 
+### Smart stock, daily checks & asset checks (Step 3)
+**Stock** (Records → Stock) now learns from what is actually used: dishes sold (counter bills and tallies) through
+their recipes, cooking batches, cafe use and wastage over the last 14 days.
+- Each item shows **use per day** and **days left**. An item is **running low** when it is finished, at or below its
+  minimum, or won't last until a new delivery arrives (set "Days for a delivery to arrive" per item; default 1).
+- **🛒 Order list**: everything running low, grouped by usual vendor, with a suggested quantity (enough for the
+  delivery time plus 2 days of normal use; the number of days can be changed). Edit any quantity and send each
+  vendor their list on WhatsApp.
+- **🧠 Set minimums from what we actually use**: one tap sets each item's minimum to its daily use × (delivery
+  days + 1).
+- **Use first or throw**: cooked / prepared items past their "Keeps for (days)" since the last cooking batch.
+- **Dishes you may not be able to make**: dishes whose recipe is short of an item, with **Mark sold out** — the
+  Counter then shows the dish greyed out as "Sold out" for the rest of the day.
+
+**Daily checks** (Records → Assets, and **✅ Checks** on the Counter): Opening, Closing and a Weekly deep clean, each
+line ticked ✔ or ✖ with a note for what's wrong (e.g. "fridge at 9°C"). Owner / manager can edit the lists, the
+"done by" time after which a list shows as missed, and how often weekly lists are due. Who did each check and when
+is saved.
+
+**Asset checks**: set "Check its condition every N days" on an asset (e.g. 1 for the fridge); anyone on shift taps
+**Check condition now** → Working / Needs repair / Broken, with a note. The asset list shows each one's condition.
+
+**Needs attention today** (top of the Dashboard, and a red number on the Records tab): items running low, cooked
+items to use first, missed or failed checks, broken / needs-repair equipment, checks and services due. Tap a line
+to go there. Chef and billing logins can file checks but can't change or delete anyone else's; they only see the
+last two days of checks.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the

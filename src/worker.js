@@ -167,7 +167,7 @@ const FULL_ACCESS = { owner: true, partner: true, full: true };
 const PAY_FIELDS = ["salary", "salaryHistory", "salaryMonths", "houseRent", "foodAllowance", "travelAllowance", "foodBasis", "travelBasis", "allowHistory", "allowMonths", "upi"];
 const STAFF_PUBLIC = ["id", "name", "role", "defaultShift", "status", "joinDate", "leftDate"];
 const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
-const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct"];
+const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays"];
 const STAFF_PAY_CATS = ["Staff Salary", "Staff House Rent", "Staff Food Allowance", "Staff Travel Allowance", "Staff Bonus"];
 const CASH_MGR_TYPES = ["counter", "atm", "atmheld", "taken", "pass", "bank"];
 const CASH_BILL_TYPES = ["counter", "atm", "taken"];
@@ -201,6 +201,7 @@ const POLICY = {
   tasks_v1:          { manager: "rw", chef: "r", billing: "r" },
   conduct_v1:        { manager: "rw" },
   settings_v1:       { manager: "settings", chef: "settingspub", billing: "settingspub" },
+  checks_v1:         { manager: "rw", chef: "append2", billing: "append2" },
   partners_v1:       { manager: "r", chef: "r", billing: "r" }
   // investments, loans, payroll and anything new: owner / partner / full only.
 };

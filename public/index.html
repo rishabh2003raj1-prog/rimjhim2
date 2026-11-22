@@ -163,6 +163,7 @@
   .cname{font-size:11.5px;line-height:1.2;color:var(--ink-soft);margin-top:2px;}
   .cloc + .cname{margin-top:0;}
   .cprice{font-size:15px;font-weight:700;margin-top:2px;}
+  .ctile.soldout{opacity:.5;} .csold{position:absolute;inset:auto 0 40% 0;background:#A6402D;color:#fff;font-size:14px;padding:4px 0;transform:rotate(-8deg);}
   .cminus{position:absolute;left:4px;bottom:4px;width:34px;height:34px;border-radius:17px;background:#fff;border:1.5px solid var(--line);font-size:22px;line-height:30px;font-weight:700;color:var(--ink);}
   .cbar{position:fixed;left:0;right:0;max-width:480px;margin:0 auto;bottom:calc(58px + env(safe-area-inset-bottom));z-index:14;display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--panel);border-top:1px solid var(--line);box-shadow:0 -4px 14px rgba(0,0,0,.06);}
   .cbar .chint{flex:1;text-align:center;color:var(--ink-soft);font-size:13px;padding:6px;}
@@ -191,6 +192,18 @@
   .dbtns button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 6px;font:inherit;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:2px;}
   .dbtns button b{font-size:16px;} .dbtns button span{font-size:12px;color:var(--ink-soft);}
   body.simple .pdisc{font-size:18px;padding:15px;} body.simple .dbtns button b{font-size:20px;}
+  .ctools button.warn{border-color:#C9772B;background:#FFF1E0;}
+  .chkrow{border:1.5px solid var(--line);border-radius:12px;padding:10px;margin-bottom:8px;display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--panel);}
+  .chkrow.ok{border-color:#2E7D4F;background:#EEF7F1;} .chkrow.bad{border-color:#A6402D;background:#FBEDEA;}
+  .chkt{flex:1;min-width:150px;font-size:14.5px;} .chkb{display:flex;gap:6px;}
+  .chkb button{width:48px;height:44px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-size:20px;}
+  .chkb button[data-ok].on{background:#2E7D4F;color:#fff;border-color:#2E7D4F;} .chkb button[data-no].on{background:#A6402D;color:#fff;border-color:#A6402D;}
+  .chkn{flex-basis:100%;padding:9px;border-radius:8px;border:1px solid var(--line);font:inherit;}
+  body.simple .chkt{font-size:18px;} body.simple .chkb button{width:58px;height:54px;font-size:24px;}
+  .ppay .ast{background:#8C8C8C;opacity:.75;} .ppay .ast.on{opacity:1;box-shadow:0 0 0 3px #241A12;}
+  .ppay .ast.ok.on{background:#2E7D4F;} .ppay .ast.repair.on{background:#C9772B;} .ppay .ast.broken.on{background:#A6402D;}
+  nav.tabs button{position:relative;}
+  .navbadge{position:absolute;top:4px;left:calc(50% + 6px);min-width:18px;height:18px;border-radius:9px;background:#A6402D;color:#fff;font-size:10.5px;font-weight:700;line-height:18px;padding:0 5px;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -529,6 +542,7 @@
         <button data-r="custom" id="rangeCustomBtn">Custom…</button>
       </div>
       <div class="rangebar" id="rangeBar"></div>
+      <div id="attnBox"></div>
       <button class="btn-save" id="reportsBtn" style="width:100%;margin-bottom:14px;">📄 Reports — create &amp; share PDF</button>
 
       <div class="kpis">
@@ -819,7 +833,7 @@ function appAlert(msg){
 
 function storeKey(k){ return OUTLET.id==="rimjhim" ? k : (OUTLET.id + "__" + k); }
 
-var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1", LOANS_KEY = "loans_v1";
+var SALES_KEY = "sales_v1", PURCH_KEY = "purchases_v1", NOTES_KEY = "notes_v1", INVEST_KEY = "investments_v1", EXPENSE_KEY = "expenses_v1", PARTNERS_KEY = "partners_v1", BILLS_KEY = "bills_v1", CASH_KEY = "cashdays_v1", CAFEUSE_KEY = "cafeuse_v1", RETAIL_KEY = "retail_v1", RSALE_KEY = "retailsales_v1", WASTE_KEY = "wastage_v1", PREP_KEY = "prepbatches_v1", AUDIT_KEY = "stockaudits_v1", CUST_KEY = "customers_v1", CUSTPAY_KEY = "custpayments_v1", OFFERS_KEY = "offers_v1", CREDPAY_KEY = "creditpayments_v1", ASSETS_KEY = "assets_v1", VENDORS_KEY = "vendors_v1", MENU_KEY = "menu_v1", ING_KEY = "ingredients_v1", DISH_KEY = "dishlog_v1", SETTINGS_KEY = "settings_v1", STAFF_KEY = "staff_v1", ROSTER_KEY = "roster_v1", ATTEND_KEY = "attendance_v1", TASKS_KEY = "tasks_v1", CONDUCT_KEY = "conduct_v1", PAYROLL_KEY = "payroll_v1", CASHMOVE_KEY = "cashmoves_v1", LOANS_KEY = "loans_v1", CHECKS_KEY = "checks_v1";
 var sales = [], purchases = [], notes = [], investments = [], expenses = [], bills = [];
 var staff = [], roster = [], attendance = [], tasks = [], conduct = [], cashDays = [];
 var menuItems = [], ingredients = [], dishLog = [], vendors = [], assets = [], customers = [], creditPayments = [];
@@ -830,7 +844,7 @@ var loans = []; // loans the cafe took from / gave to anyone other than a partne
 var retailItems = [], retailSales = [];
 var cafeUse = [];
 var stockSub = "all";
-var custPayments = [], offers = [];
+var custPayments = [], offers = [], checks = [];
 var assetDraft = null;
 var vendorSub = "list", vendorPeriod = 30, vendorFrom = null, vendorTo = null;
 var settings = {};
@@ -986,7 +1000,7 @@ function seedData(){
 var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
-  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY];
+  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
@@ -1226,7 +1240,7 @@ function setKeyValue(key, v){
     case RETAIL_KEY: retailItems = arr; break;      case RSALE_KEY: retailSales = arr; break;
     case WASTE_KEY: wastage = arr; break;           case PREP_KEY: prepBatches = arr; break;
     case AUDIT_KEY: stockAudits = arr; break;       case CUST_KEY: customers = arr; break;
-    case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;
+    case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;
     case CREDPAY_KEY: creditPayments = arr; break;  case ASSETS_KEY: assets = arr; break;
     case VENDORS_KEY: vendors = arr; break;         case MENU_KEY: menuItems = arr; break;
     case ING_KEY: ingredients = arr; break;         case DISH_KEY: dishLog = arr; break;
@@ -2036,6 +2050,7 @@ function readLists(){
   retailSales = Array.isArray(rs) ? rs : [];
   var cu2 = lsGet(CAFEUSE_KEY);
   cafeUse = Array.isArray(cu2) ? cu2 : [];
+  var ck0 = lsGet(CHECKS_KEY); checks = Array.isArray(ck0) ? ck0 : [];
   var cu = lsGet(CUST_KEY), cp = lsGet(CUSTPAY_KEY), of = lsGet(OFFERS_KEY);
   customers = Array.isArray(cu) ? cu : [];
   custPayments = Array.isArray(cp) ? cp : [];
@@ -2080,6 +2095,7 @@ function saveRetailSales(){ return lsSet(RSALE_KEY, retailSales); }
 function saveCafeUse(){ return lsSet(CAFEUSE_KEY, cafeUse); }
 function saveCustPayments(){ return lsSet(CUSTPAY_KEY, custPayments); }
 function saveOffers(){ return lsSet(OFFERS_KEY, offers); }
+function saveChecks(){ return lsSet(CHECKS_KEY, checks); }
 
 function initAfterLoad(){
   // Seed only what is genuinely missing. Wiping a store that loaded fine just
@@ -2205,6 +2221,7 @@ function renderAll(){
   renderStaffSection();
   renderNotes();
   renderCounter();
+  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } updateNavBadge(); }catch(e){}
 }
 
 // ---------- DASHBOARD ----------
@@ -4242,7 +4259,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks };
 }
 
 function exportBackup(){
@@ -4422,7 +4439,7 @@ function applyBackupData(data, errEl, partial){
     payroll = take("payroll", payroll);
     cashMoves = take("cashMoves", cashMoves);
     loans = take("loans", loans);
-    offers = take("offers", offers);
+    offers = take("offers", offers); checks = take("checks", checks);
     if(Array.isArray(data.partners) && data.partners.length){
       PARTNERS = partial ? PARTNERS.concat(data.partners.filter(function(p){ return PARTNERS.indexOf(p)<0; })) : data.partners;
     } else if(!partial){ PARTNERS = OUTLET.defaultPartners.slice(); }
@@ -4439,7 +4456,7 @@ function saveEverything(){
   saveSales(); savePurch(); saveInvest(); saveExpense(); saveNotes(); savePartners(); saveBills();
   saveStaff(); saveRoster(); saveAttend(); saveTasks(); saveConduct(); saveCashDays(); saveSettings();
   saveMenu(); saveIngredients(); saveDishLog(); saveVendors(); saveAssets(); saveCustomers(); saveCreditPayments();
-  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); savePayroll(); saveCashMoves(); saveLoans();
+  saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); saveChecks(); savePayroll(); saveCashMoves(); saveLoans();
 }
 
 function importBackup(file){
@@ -5167,7 +5184,7 @@ function renderMenuView(){
       var fcCls = d.fc===null ? "" : d.fc <= targetFoodCost() ? "ok" : d.fc <= targetFoodCost()+10 ? "warnamt" : "bad";
       return '<button class="dishtile" data-menu="'+esc(m.id)+'">'+
         '<div class="dishimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="" loading="lazy">' : '<span>'+esc((m.name||"?").charAt(0).toUpperCase())+'</span>')+vegDot(m)+'</div>'+
-        '<div class="dishname">'+esc(m.name)+'</div>'+(m.localName?'<div class="dishlocal">'+esc(m.localName)+'</div>':'')+
+        '<div class="dishname">'+esc(m.name)+'</div>'+(m.localName?'<div class="dishlocal">'+esc(m.localName)+'</div>':'')+(soldOutToday(m)?'<div class="dishlocal bad">Sold out today</div>':'')+
         '<div class="dishmeta"><b>'+rupee(d.price)+'</b>'+(costs && d.fc!==null ? ' <span class="'+fcCls+'">'+Math.round(d.fc)+'%</span>' : '')+'</div>'+
         (gaps.length ? '<div class="dishgap">needs '+esc(gaps.join(", "))+'</div>' : '')+'</button>';
     }).join("")+'</div>';
@@ -6031,17 +6048,12 @@ function renderStockView(){
   });
 
   var rows = list.map(function(i){
-    return { ing:i, level: stockLevel(i.id), low: stockLevel(i.id) <= (i.minStock||0) };
+    var si = stockInfo(i);
+    return { ing:i, level: si.level, low: si.status!=="ok", si:si };
   }).sort(function(a,b){ return (b.low?1:0)-(a.low?1:0); });
 
-  var lowOnes = rows.filter(function(r){ return r.low; });
-  if(lowOnes.length){
-    html += '<div class="card owedcard" style="margin:12px 0 14px;"><h3>Reorder now <span class="muted">· at or below minimum</span></h3>'+
-      lowOnes.map(function(r){
-        return '<div class="psrow"><span>'+esc(r.ing.name)+(r.ing.vendor?' · '+esc(r.ing.vendor):'')+'</span><b class="bad">'+fmtQty(r.level)+' '+esc(r.ing.unit)+'</b></div>';
-      }).join("")+'</div>';
-  }
-
+  if(stockSub!==CAFE_USE_TYPE) html += smartStockCard();
+  if(canWriteKey(ING_KEY) && ingredients.length) html += '<button class="btn-additem" id="ss_learn" style="margin-bottom:10px;">🧠 Set minimums from what we actually use</button>';
   html += rows.map(function(r){
     var pct = (r.ing.minStock||0)>0 ? Math.min(100, Math.round(r.level/(r.ing.minStock*2)*100)) : 100;
     var c = costPerUnit(r.ing);
@@ -6049,7 +6061,7 @@ function renderStockView(){
     var wasted = wastedQty(r.ing.id, mStart, today);
     return '<div class="entry" data-ing="'+r.ing.id+'"><div style="flex:1;min-width:0;"><div class="who">'+esc(r.ing.name)+
       ' <span class="pill'+(t==="Cooked / prepared"?" ok":"")+'" style="font-size:9px;">'+(t==="Cooked / prepared"?"cooked":(t==="Packaging"?"packaging":"raw"))+'</span></div>'+
-      '<div class="meta">min '+fmtQty(r.ing.minStock||0)+' '+esc(r.ing.unit)+(r.ing.vendor?' · '+esc(r.ing.vendor):'')+
+      '<div class="meta">min '+fmtQty(r.ing.minStock||0)+' '+esc(r.ing.unit)+(r.si.use?' · uses '+niceQty(r.si.use, r.ing.unit)+'/day':'')+(daysLeftText(r.si)?' · <span class="'+(r.low?"warnline":"")+'">'+daysLeftText(r.si)+'</span>':'')+(r.ing.vendor?' · '+esc(r.ing.vendor):'')+
       (c.cost!==null?' · '+rupeeFine(c.cost)+'/'+esc(r.ing.unit):' · no rate yet')+'</div>'+
       (wasted>0?'<div class="meta warnline">'+fmtQty(wasted)+' '+esc(r.ing.unit)+' wasted this month</div>':'')+
       ((r.ing.type===CAFE_USE_TYPE && cafeUsedQty(r.ing.id, mStart, today)>0)?'<div class="meta">'+fmtQty(cafeUsedQty(r.ing.id, mStart, today))+' '+esc(r.ing.unit)+' used this month</div>':'')+
@@ -6063,6 +6075,8 @@ function renderStockView(){
     b.addEventListener("click", function(){ stockSub = b.getAttribute("data-sk"); renderStockView(); });
   });
   document.getElementById("ing_add").addEventListener("click", function(){ openIngredientForm(null); });
+  wireSmartStock(el);
+  var sl = document.getElementById("ss_learn"); if(sl) sl.addEventListener("click", function(){ askConfirm("Set each item’s minimum stock from its use over the last "+USE_DAYS+" days (enough until the next delivery, plus a day spare)?", applyLearnedMins); });
   var ua = document.getElementById("use_add"); if(ua) ua.addEventListener("click", openCafeUseForm);
   var ia2 = document.getElementById("ing_add2"); if(ia2) ia2.addEventListener("click", function(){ openIngredientForm(null, CAFE_USE_TYPE); });
   document.getElementById("waste_add").addEventListener("click", function(){ openWastageForm(); });
@@ -6072,6 +6086,327 @@ function renderStockView(){
     b.addEventListener("click", function(){ openIngredientForm(b.getAttribute("data-ing")); });
   });
   if(recSub==="stock") updateRecordsTotal();
+}
+
+// ---------- SMART STOCK ----------
+// Learns how much of each item the cafe really uses a day (dishes sold incl. counter bills,
+// cooking batches, cafe use and wastage over the last 14 days), then says how many days
+// each item lasts, what to reorder and how much, per vendor.
+var USE_DAYS = 14;
+function avgDailyUse(ingId){
+  var today = fmtDate(new Date()), from = addDays(today, -USE_DAYS), to = addDays(today, -1);
+  var used = consumedQty(ingId, from, to) + wastedQty(ingId, from, to) + cafeUsedQty(ingId, from, to);
+  prepBatches.forEach(function(b){ if(b.date>=from && b.date<=to) (b.inputs||[]).forEach(function(i){ if(i.ingredientId===ingId) used += (+i.qty||0); }); });
+  // Count from the first day anything was recorded, so a new app isn't averaged over empty days.
+  var first = null;
+  dishLog.forEach(function(d){ if(d.date>=from && d.date<=to && (!first || d.date<first)) first = d.date; });
+  if(!first || used<=0) return null;
+  var days = Math.max(3, Math.round((parseDate(today) - parseDate(first))/86400000));
+  return used / Math.min(days, USE_DAYS);
+}
+function leadDays(ing){ var v = ing.leadDays; return (v===0 || +v>0) ? +v : 1; }
+function coverDays(){ var v = +settings.stockCoverDays; return v>0 ? v : 2; }
+// Learned minimum: enough for the days until a new delivery arrives, plus one day spare.
+function learnedMin(ing){ var u = avgDailyUse(ing.id); return u===null ? null : Math.ceil(u*(leadDays(ing)+1)); }
+function stockInfo(ing){
+  var level = stockLevel(ing.id), use = avgDailyUse(ing.id), min = +ing.minStock||0;
+  var daysLeft = use ? level/use : null;
+  var status = level<=0 && (use || min>0) ? "out" : (level<=min && min>0) || (daysLeft!==null && daysLeft < leadDays(ing)+1) ? "low" : "ok";
+  var target = Math.max(min, use ? use*(leadDays(ing)+coverDays()) : min*2);
+  var order = status==="ok" ? 0 : Math.max(0, target - Math.max(0, level));
+  return { ing:ing, level:level, use:use, daysLeft:daysLeft, status:status, order:order, learnedMin:learnedMin(ing) };
+}
+function stockAlerts(){ return ingredients.map(stockInfo).filter(function(s){ return s.status!=="ok"; }).sort(function(a,b){ return (a.status==="out"?0:1)-(b.status==="out"?0:1) || (a.daysLeft||0)-(b.daysLeft||0); }); }
+// Show grams as kg and ml as litres once they get big; round order quantities up sensibly.
+function niceQty(q, unit){
+  q = +q||0;
+  if(unit==="g" && Math.abs(q)>=1000) return fmtQty(Math.round(q/100)/10)+" kg";
+  if(unit==="ml" && Math.abs(q)>=1000) return fmtQty(Math.round(q/100)/10)+" litre";
+  return fmtQty(q)+" "+unit;
+}
+function roundOrder(q, unit){
+  if(unit==="g" || unit==="ml") return q>=1000 ? Math.ceil(q/500)*500 : Math.ceil(q/100)*100;
+  return Math.ceil(q);
+}
+function daysLeftText(s){
+  if(s.status==="out") return "finished";
+  if(s.daysLeft===null) return "";
+  if(s.daysLeft<1) return "less than a day left";
+  return "about "+Math.floor(s.daysLeft)+" day"+(Math.floor(s.daysLeft)!==1?"s":"")+" left";
+}
+// Cooked / prepared items past their holding time (set "Keeps for" on the item).
+function expiringBatches(){
+  var today = fmtDate(new Date()), out = [];
+  ingredients.forEach(function(ing){
+    var keep = +ing.shelfDays; if(!(keep>0)) return;
+    var level = stockLevel(ing.id); if(level<=0) return;
+    var last = prepBatches.filter(function(b){ return b.outputId===ing.id; }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
+    if(!last) return;
+    var until = addDays(last.date, keep);
+    if(until <= addDays(today, 0)) out.push({ ing:ing, made:last.date, until:until, level:level, over: until < today });
+  });
+  return out;
+}
+// Dishes that can't be made right now because a recipe item has run out.
+function dishesBlocked(){
+  var out = [];
+  menuItems.forEach(function(m){
+    if(m.active===false) return;
+    var miss = (m.recipe||[]).map(function(r){ var g = ingById(r.ingredientId); return g && stockLevel(g.id) < (+r.qty||0) ? g.name : null; }).filter(Boolean);
+    if(miss.length) out.push({ m:m, miss:miss });
+  });
+  return out;
+}
+function soldOutToday(m){ return m && m.soldOut===fmtDate(new Date()); }
+function setSoldOut(id, on){
+  var m = menuById(id); if(!m) return;
+  if(on) m.soldOut = fmtDate(new Date()); else delete m.soldOut;
+  saveMenu(); renderAll();
+}
+function smartStockCard(){
+  var al = stockAlerts(), exp = expiringBatches(), html = "";
+  if(al.length){
+    html += '<div class="card owedcard" style="margin:12px 0 10px;"><h3>Running low <span class="muted">· '+al.length+' item'+(al.length!==1?'s':'')+'</span></h3>'+
+      al.slice(0,10).map(function(s){
+        return '<div class="psrow"><span>'+esc(s.ing.name)+(s.ing.vendor?' <span class="muted">· '+esc(s.ing.vendor)+'</span>':'')+'<br><span class="muted" style="font-size:11.5px;">'+
+          (s.level<0 ? 'none left · more used than bought, a purchase may be missing' : niceQty(s.level, s.ing.unit)+' in stock')+(s.use?' · uses '+niceQty(s.use, s.ing.unit)+'/day':'')+'</span></span>'+
+          '<b class="'+(s.status==="out"?"bad":"warnamt")+'">'+esc(daysLeftText(s) || "below minimum")+'</b></div>';
+      }).join("")+(al.length>10?'<div class="muted" style="font-size:12px;padding-top:4px;">and '+(al.length-10)+' more in the order list</div>':'')+
+      '<button class="btn-big green" id="ss_order" style="margin:10px 0 0;">🛒 Order list — what to buy, by vendor</button></div>';
+  } else if(ingredients.length){
+    html += '<div class="card" style="margin:12px 0 10px;"><div class="psrow"><span>✅ Nothing running low</span><button class="btn-additem" id="ss_order" style="width:auto;padding:6px 12px;">Order list</button></div></div>';
+  }
+  if(exp.length){
+    html += '<div class="card owedcard" style="margin-bottom:10px;"><h3>Use first or throw</h3>'+exp.map(function(x){
+      return '<div class="psrow"><span>'+esc(x.ing.name)+' · '+niceQty(x.level, x.ing.unit)+'<br><span class="muted" style="font-size:11.5px;">made '+parseDate(x.made).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+', keeps '+x.ing.shelfDays+' day'+(x.ing.shelfDays!=1?'s':'')+'</span></span><b class="'+(x.over?"bad":"warnamt")+'">'+(x.over?"past its time":"use today")+'</b></div>';
+    }).join("")+'</div>';
+  }
+  var bl = dishesBlocked(), canMenu = canWriteKey(MENU_KEY);
+  if(bl.length){
+    html += '<div class="card" style="margin-bottom:10px;"><h3>Dishes you may not be able to make</h3>'+bl.slice(0,12).map(function(x){
+      var so = soldOutToday(x.m);
+      return '<div class="psrow"><span>'+esc(x.m.name)+'<br><span class="muted" style="font-size:11.5px;">short of '+esc(x.miss.join(", "))+'</span></span>'+
+        (canMenu ? '<button class="btn-additem" style="width:auto;padding:6px 10px;" data-soldout="'+esc(x.m.id)+'" data-on="'+(so?0:1)+'">'+(so?"Back on":"Mark sold out")+'</button>' : (so?'<b class="bad">sold out</b>':''))+'</div>';
+    }).join("")+'<div class="backupnote" style="margin:6px 0 0;">Sold out shows on the Counter for today only, so staff don’t bill it.</div></div>';
+  }
+  return html;
+}
+function wireSmartStock(el){
+  var o = el.querySelector("#ss_order"); if(o) o.addEventListener("click", openOrderList);
+  Array.prototype.forEach.call(el.querySelectorAll("[data-soldout]"), function(b){ b.addEventListener("click", function(){ setSoldOut(b.getAttribute("data-soldout"), b.getAttribute("data-on")==="1"); }); });
+}
+// What to buy, grouped by vendor, with quantities you can change, shared on WhatsApp.
+function openOrderList(){
+  var rows = ingredients.map(stockInfo).filter(function(s){ return s.status!=="ok"; });
+  var qty = {}; rows.forEach(function(s){ qty[s.ing.id] = roundOrder(s.order, s.ing.unit); });
+  var sheet = document.getElementById("sheet");
+  function draw(){
+    var by = {};
+    rows.forEach(function(s){ var v = s.ing.vendor || "No usual vendor"; (by[v] = by[v] || []).push(s); });
+    var html = '<h2 class="serif">🛒 Order list</h2><div class="backupnote">Enough for delivery time plus '+coverDays()+' day'+(coverDays()!==1?'s':'')+' of normal use (change below). Edit any quantity, then send each vendor their list.</div>';
+    if(!rows.length) html += '<div class="empty">Nothing needs ordering right now.</div>';
+    Object.keys(by).sort().forEach(function(v){
+      html += '<div class="daygroup">'+esc(v)+'</div>';
+      html += by[v].map(function(s){
+        return '<div class="dishrow"><div><b>'+esc(s.ing.name)+'</b><span>'+niceQty(s.level, s.ing.unit)+' left'+(s.use?' · '+niceQty(s.use, s.ing.unit)+'/day':'')+'</span></div>'+
+          '<div style="display:flex;align-items:center;gap:6px;"><input type="number" inputmode="decimal" class="dq" data-oq="'+esc(s.ing.id)+'" value="'+(qty[s.ing.id]||"")+'" style="width:84px;"><span class="runit">'+esc(s.ing.unit)+'</span></div></div>';
+      }).join("");
+      html += '<button class="btn-additem" data-wa="'+esc(v)+'" style="margin:6px 0 4px;">📲 Send '+esc(v)+'’s list on WhatsApp</button>';
+    });
+    html += '<div class="field" style="margin-top:12px;"><label>Days of stock to keep after a delivery</label><input type="number" inputmode="numeric" id="ol_cover" value="'+coverDays()+'"'+(canWriteKey(SETTINGS_KEY)?'':' disabled')+'></div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="ol_close" style="flex:1;">Close</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-oq]"), function(inp){ inp.addEventListener("input", function(){ qty[inp.getAttribute("data-oq")] = parseFloat(inp.value)||0; }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-wa]"), function(b){ b.addEventListener("click", function(){
+      var v = b.getAttribute("data-wa"), lines = rows.filter(function(s){ return (s.ing.vendor || "No usual vendor")===v && qty[s.ing.id]>0; });
+      if(!lines.length){ appAlert("Nothing to order from "+v+"."); return; }
+      var txt = (OUTLET.name||"RimJhim Cafe")+" — order "+parseDate(fmtDate(new Date())).toLocaleDateString("en-IN")+"\n"+lines.map(function(s){ return "• "+s.ing.name+" — "+niceQty(qty[s.ing.id], s.ing.unit); }).join("\n")+"\nPlease confirm. Thank you!";
+      window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank");
+    }); });
+    var cv = document.getElementById("ol_cover");
+    cv.addEventListener("change", function(){ var n = parseFloat(cv.value); if(n>0 && canWriteKey(SETTINGS_KEY)){ settings.stockCoverDays = n; saveSettings();
+      rows.forEach(function(s){ var f = stockInfo(s.ing); qty[s.ing.id] = roundOrder(f.order, s.ing.unit); }); draw(); } });
+    document.getElementById("ol_close").addEventListener("click", closeForm);
+  }
+  draw();
+}
+// One tap: set every item's minimum to what the cafe actually uses.
+function applyLearnedMins(){
+  var changed = 0;
+  ingredients.forEach(function(g){ var m = learnedMin(g); if(m!==null && m!==(+g.minStock||0)){ g.minStock = m; changed++; } });
+  if(!changed){ appAlert("Minimums already match what you use (or there isn’t enough history yet: it needs dishes sold over a few days)."); return; }
+  saveIngredients(); renderAll(); appAlert(changed+" minimum"+(changed!==1?"s":"")+" updated from the last "+USE_DAYS+" days of use.");
+}
+
+// ---------- DAILY CHECKS & ASSET CHECKS ----------
+// Opening / closing checklists (tick each line, note what is wrong) and asset condition
+// checks (working / needs repair / broken). Anyone on shift can file them; the owner and
+// manager see what was missed and what is broken.
+var DEFAULT_CHECKLISTS = [
+  { id:"open", name:"Opening", due:"11:00", items:["Gas cylinder and pipe checked, no smell","Fridge cold (below 5°C), nothing spoiled","Freezer cold, items frozen hard","Drinking water / RO filled","Counter, tables and chairs clean","Cash float counted","Hands washed, caps / aprons on"] },
+  { id:"close", name:"Closing", due:"23:59", items:["Gas regulator OFF, burners off","Leftovers covered, labelled, in fridge","Fridge and freezer doors shut","Dustbins emptied, floor cleaned","Lights, fans, AC and geyser off","Cash counted and handed over","Shutter locked"] },
+  { id:"week", name:"Weekly deep clean", every:7, items:["Chimney / exhaust filter cleaned","Fridge cleaned inside, old items removed","Pest / rodent check, no droppings","Drains cleaned","Fire extinguisher in place and in date"] }
+];
+function checklistDefs(){ var c = settings.checklists; return Array.isArray(c) && c.length ? c : DEFAULT_CHECKLISTS; }
+function checksOn(day, listId){ return checks.filter(function(c){ return c.kind==="list" && c.date===day && (!listId || c.listId===listId); }); }
+function lastListCheck(listId){ return checks.filter(function(c){ return c.kind==="list" && c.listId===listId; }).sort(function(a,b){ return (b.date+b.time).localeCompare(a.date+a.time); })[0] || null; }
+function lastAssetCheck(assetId){ return checks.filter(function(c){ return c.kind==="asset" && c.assetId===assetId; }).sort(function(a,b){ return (b.date+b.time).localeCompare(a.date+a.time); })[0] || null; }
+function nowHM(){ var d = new Date(); return ("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2); }
+// What each checklist needs today: done / missed (past its time) / due.
+function checklistStatus(){
+  var today = fmtDate(new Date()), hm = nowHM();
+  return checklistDefs().map(function(l){
+    if(l.every){
+      var last = lastListCheck(l.id), dueOn = last ? addDays(last.date, l.every) : today;
+      return { l:l, done: dueOn > today, last:last, missed: dueOn < today, label: dueOn > today ? "done "+parseDate(last.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) : (dueOn < today ? "overdue" : "due today") };
+    }
+    var c = checksOn(today, l.id).slice(-1)[0];
+    var bad = c ? (c.items||[]).filter(function(i){ return i.ok===false; }).length : 0;
+    return { l:l, done:!!c, last:c, missed: !c && l.due && hm > l.due, bad:bad, label: c ? "done "+c.time+(c.byName?" · "+c.byName:"")+(bad?" · "+bad+" problem"+(bad!==1?"s":""):"") : (l.due && hm > l.due ? "missed" : "not done yet") };
+  });
+}
+var ASSET_STATUS = { ok:{ t:"Working", c:"ok", i:"✅" }, repair:{ t:"Needs repair", c:"warnamt", i:"🛠️" }, broken:{ t:"Broken", c:"bad", i:"⛔" } };
+function assetStatus(a){ var c = lastAssetCheck(a.id); return c ? c.status : null; }
+function assetCheckDue(a){
+  var every = +a.checkEvery; if(!(every>0)) return false;
+  var c = lastAssetCheck(a.id); return !c || addDays(c.date, every) <= fmtDate(new Date());
+}
+function assetAlerts(){
+  var today = fmtDate(new Date());
+  return assets.map(function(a){
+    var st = assetStatus(a), why = [];
+    if(st==="broken" || st==="repair") why.push(ASSET_STATUS[st].t);
+    if(assetCheckDue(a)) why.push("check due");
+    if(a.nextService && a.nextService <= today) why.push(a.nextService < today ? "service overdue" : "service today");
+    return why.length ? { a:a, why:why, st:st } : null;
+  }).filter(Boolean);
+}
+function myName(){ var w = cloud.who; return w ? (w.name || w.login || "") : "Owner"; }
+function openChecklist(listId){
+  var l = checklistDefs().find(function(x){ return x.id===listId; }); if(!l) return;
+  var marks = l.items.map(function(){ return null; }), notes = l.items.map(function(){ return ""; });
+  var sheet = document.getElementById("sheet");
+  function draw(){
+    var html = '<h2 class="serif">✅ '+esc(l.name)+' check</h2><div class="backupnote">Tap ✔ if it is fine, ✖ if not (say what is wrong).</div>';
+    html += l.items.map(function(t, i){
+      return '<div class="chkrow'+(marks[i]===true?" ok":marks[i]===false?" bad":"")+'"><div class="chkt">'+esc(t)+'</div>'+
+        '<div class="chkb"><button data-ok="'+i+'" class="'+(marks[i]===true?"on":"")+'">✔</button><button data-no="'+i+'" class="'+(marks[i]===false?"on":"")+'">✖</button></div>'+
+        (marks[i]===false ? '<input class="chkn" data-n="'+i+'" placeholder="What is wrong?" value="'+esc(notes[i])+'">' : '')+'</div>';
+    }).join("");
+    var left = marks.filter(function(m){ return m===null; }).length;
+    html += '<button class="btn-additem" id="ck_all" style="margin:8px 0;">All fine ✔</button>';
+    html += '<div class="err" id="ck_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ck_cancel">Cancel</button><button class="btn-save" id="ck_save">Save'+(left?' ('+left+' left)':'')+'</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    function on(sel, fn){ Array.prototype.forEach.call(sheet.querySelectorAll(sel), function(b){ b.addEventListener("click", function(){ fn(b); }); }); }
+    on("[data-ok]", function(b){ marks[+b.getAttribute("data-ok")] = true; draw(); });
+    on("[data-no]", function(b){ marks[+b.getAttribute("data-no")] = false; draw(); var n = sheet.querySelector('[data-n="'+b.getAttribute("data-no")+'"]'); if(n) n.focus(); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-n]"), function(inp){ inp.addEventListener("input", function(){ notes[+inp.getAttribute("data-n")] = inp.value; }); });
+    on("#ck_all", function(){ marks = marks.map(function(m){ return m===null ? true : m; }); draw(); });
+    on("#ck_cancel", closeForm);
+    on("#ck_save", function(){
+      if(marks.some(function(m){ return m===null; })){ var e = document.getElementById("ck_err"); e.textContent = "Tick ✔ or ✖ on every line."; e.style.display = "block"; return; }
+      checks.push({ id:uid(), kind:"list", listId:l.id, listName:l.name, date:fmtDate(new Date()), time:nowHM(), byName:myName(),
+                    items:l.items.map(function(t, i){ return { t:t, ok:marks[i], note:marks[i]===false ? notes[i].trim() : "" }; }) });
+      saveChecks(); closeForm(); renderAll();
+      var bad = marks.filter(function(m){ return m===false; }).length;
+      appAlert(bad ? l.name+" check saved. "+bad+" problem"+(bad!==1?"s":"")+" will show to the manager." : l.name+" check saved. All fine ✔");
+    });
+  }
+  draw();
+}
+function openAssetCheck(assetId){
+  var a = assetById(assetId); if(!a) return;
+  var sheet = document.getElementById("sheet"), pick = null;
+  function draw(){
+    var last = lastAssetCheck(a.id);
+    var html = '<h2 class="serif">Check: '+esc(a.name)+'</h2>'+(last?'<div class="backupnote">Last checked '+parseDate(last.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+' · '+ASSET_STATUS[last.status].t+(last.note?' · '+esc(last.note):'')+'</div>':'');
+    html += '<div class="ppay" style="margin-top:6px;">'+["ok","repair","broken"].map(function(k){ var s = ASSET_STATUS[k];
+      return '<button data-st="'+k+'" class="ast '+k+(pick===k?" on":"")+'"><span>'+s.i+'</span>'+s.t+'</button>'; }).join("")+'</div>';
+    html += '<div class="field"><label>Note (optional)</label><input id="ac_note" placeholder="e.g. fridge 8°C, door seal loose"></div>';
+    html += '<div class="err" id="ac_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ac_cancel">Cancel</button><button class="btn-save" id="ac_save">Save</button></div>';
+    var keep = document.getElementById("ac_note") ? document.getElementById("ac_note").value : "";
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    document.getElementById("ac_note").value = keep;
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-st]"), function(b){ b.addEventListener("click", function(){ pick = b.getAttribute("data-st"); draw(); }); });
+    document.getElementById("ac_cancel").addEventListener("click", closeForm);
+    document.getElementById("ac_save").addEventListener("click", function(){
+      if(!pick){ var e = document.getElementById("ac_err"); e.textContent = "Tap Working, Needs repair or Broken."; e.style.display = "block"; return; }
+      checks.push({ id:uid(), kind:"asset", assetId:a.id, assetName:a.name, status:pick, note:document.getElementById("ac_note").value.trim(), date:fmtDate(new Date()), time:nowHM(), byName:myName() });
+      saveChecks(); closeForm(); renderAll();
+    });
+  }
+  draw();
+}
+// The "Today's checks" card (Assets screen, Counter, Dashboard).
+function checksCard(withAssets){
+  var st = checklistStatus(), html = '<div class="card" style="margin-bottom:12px;"><h3>Today’s checks</h3>';
+  html += st.map(function(x){
+    return '<div class="psrow"><span>'+(x.done ? "✅" : x.missed ? "⚠️" : "⬜")+' '+esc(x.l.name)+'<br><span class="muted" style="font-size:11.5px;">'+esc(x.label)+'</span></span>'+
+      (canWriteKey(CHECKS_KEY) ? '<button class="btn-additem" style="width:auto;padding:7px 12px;" data-chk="'+esc(x.l.id)+'">'+(x.done?"Again":"Start")+'</button>' : '')+'</div>';
+  }).join("");
+  var probs = [];
+  checksOn(fmtDate(new Date())).forEach(function(c){ (c.items||[]).forEach(function(i){ if(i.ok===false) probs.push(c.listName+": "+i.t+(i.note?" — "+i.note:"")); }); });
+  if(probs.length) html += '<div class="attmwarn" style="margin-top:8px;">'+probs.map(esc).join("<br>")+'</div>';
+  if(withAssets){
+    var aa = assetAlerts();
+    if(aa.length) html += '<div class="dgroup">Equipment</div>'+aa.map(function(x){
+      return '<div class="psrow"><span>'+(x.st && ASSET_STATUS[x.st] ? ASSET_STATUS[x.st].i+" " : "")+esc(x.a.name)+'</span><b class="'+(x.st==="broken"?"bad":"warnamt")+'">'+esc(x.why.join(" · "))+'</b></div>'; }).join("");
+  }
+  return html+'</div>';
+}
+function wireChecksCard(el){ Array.prototype.forEach.call(el.querySelectorAll("[data-chk]"), function(b){ b.addEventListener("click", function(){ openChecklist(b.getAttribute("data-chk")); }); }); }
+function openChecklistEditor(){
+  var lists = JSON.parse(JSON.stringify(checklistDefs())), sheet = document.getElementById("sheet");
+  function draw(){
+    var html = '<h2 class="serif">Edit checklists</h2><div class="backupnote">One line per check. "Done by" is the time after which it shows as missed. Weekly lists are due every N days instead.</div>';
+    html += lists.map(function(l, i){
+      return '<div class="card" style="margin-bottom:10px;"><div class="field two"><div><label>Name</label><input data-f="name" data-i="'+i+'" value="'+esc(l.name)+'"></div>'+
+        '<div>'+(l.every ? '<label>Every (days)</label><input type="number" data-f="every" data-i="'+i+'" value="'+esc(l.every)+'">' : '<label>Done by</label><input type="time" data-f="due" data-i="'+i+'" value="'+esc(l.due||"")+'">')+'</div></div>'+
+        '<div class="field"><textarea rows="6" data-f="items" data-i="'+i+'">'+esc(l.items.join("\n"))+'</textarea></div>'+
+        '<button class="btn-additem" data-rml="'+i+'">Remove this list</button></div>';
+    }).join("");
+    html += '<div class="addrow"><button class="sale" id="ce_daily">+ Daily list</button><button class="expense" id="ce_weekly">+ Weekly list</button></div>';
+    html += '<div class="err" id="ce_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ce_cancel">Cancel</button><button class="btn-save" id="ce_save">Save</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-f]"), function(inp){ inp.addEventListener("input", function(){
+      var l = lists[+inp.getAttribute("data-i")], f = inp.getAttribute("data-f");
+      l[f] = f==="items" ? inp.value.split("\n").map(function(x){ return x.trim(); }).filter(Boolean) : f==="every" ? (parseFloat(inp.value)||7) : inp.value;
+    }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-rml]"), function(b){ b.addEventListener("click", function(){ lists.splice(+b.getAttribute("data-rml"),1); draw(); }); });
+    document.getElementById("ce_daily").addEventListener("click", function(){ lists.push({ id:uid(), name:"New list", due:"", items:[] }); draw(); });
+    document.getElementById("ce_weekly").addEventListener("click", function(){ lists.push({ id:uid(), name:"Weekly", every:7, items:[] }); draw(); });
+    document.getElementById("ce_cancel").addEventListener("click", closeForm);
+    document.getElementById("ce_save").addEventListener("click", function(){
+      if(lists.some(function(l){ return !l.name.trim() || !l.items.length; })){ var e = document.getElementById("ce_err"); e.textContent = "Each list needs a name and at least one line."; e.style.display = "block"; return; }
+      settings.checklists = lists; saveSettings(); closeForm(); renderAll();
+    });
+  }
+  draw();
+}
+// Everything that needs attention today, for the Dashboard and the nav badge.
+function attentionItems(){
+  var out = [];
+  if(canReadKey(ING_KEY) && canReadKey(PURCH_KEY)){
+    var al = stockAlerts(); if(al.length) out.push({ t:"🛒 "+al.length+" stock item"+(al.length!==1?"s":"")+" running low ("+al.slice(0,3).map(function(s){ return s.ing.name; }).join(", ")+(al.length>3?"…":"")+")", go:"stock" });
+    var ex = expiringBatches(); if(ex.length) out.push({ t:"⏰ "+ex.length+" cooked item"+(ex.length!==1?"s":"")+" to use first or throw", go:"stock" });
+  }
+  checklistStatus().forEach(function(x){ if(x.missed) out.push({ t:"⚠️ "+x.l.name+" check "+x.label, go:"assets" }); else if(x.bad) out.push({ t:"⚠️ "+x.l.name+" check found "+x.bad+" problem"+(x.bad!==1?"s":""), go:"assets" }); });
+  if(canReadKey(ASSETS_KEY)) assetAlerts().forEach(function(x){ out.push({ t:(x.st==="broken"?"⛔ ":"🛠️ ")+x.a.name+": "+x.why.join(", "), go:"assets" }); });
+  return out;
+}
+function attentionCard(){
+  var it = attentionItems(); if(!it.length) return "";
+  return '<div class="card owedcard" style="margin-bottom:14px;"><h3>Needs attention today</h3>'+it.map(function(x){
+    return '<div class="psrow attnrow" data-attn="'+x.go+'" style="cursor:pointer;"><span>'+esc(x.t)+'</span><b>›</b></div>'; }).join("")+'</div>';
+}
+function wireAttention(el){ Array.prototype.forEach.call(el.querySelectorAll("[data-attn]"), function(r){ r.addEventListener("click", function(){ showView("records"); switchRecordsSub(r.getAttribute("data-attn")); }); }); }
+function updateNavBadge(){
+  var b = document.querySelector('nav.tabs button[data-v="records"]'); if(!b) return;
+  var n = 0; try{ if(myAccess()!=="billing") n = attentionItems().length; }catch(e){}
+  var dot = b.querySelector(".navbadge");
+  if(!n){ if(dot) dot.remove(); return; }
+  if(!dot){ dot = document.createElement("span"); dot.className = "navbadge"; b.appendChild(dot); }
+  dot.textContent = n;
 }
 
 function openWastageForm(){
@@ -6271,6 +6606,9 @@ function openIngredientForm(ingId, presetType){
   html += '<div class="backupnote">Use the small unit you actually cook with (g, ml, pcs). Buying in kg or litre is handled automatically. Mark items you cook and store — gravy, boiled potato — as "Cooked / prepared".</div>';
   html += '<div class="field two"><div><label>Minimum stock</label><input type="number" inputmode="decimal" id="i_min" value="'+(g?g.minStock:"")+'"></div>';
   html += '<div><label>Usual vendor</label><input type="text" id="i_vendor" value="'+esc(g?g.vendor:"")+'"></div></div>';
+  html += '<div class="field two"><div><label>Days for a delivery to arrive</label><input type="number" inputmode="numeric" id="i_lead" value="'+(g && g.leadDays!==undefined ? esc(g.leadDays) : "1")+'"></div>';
+  html += '<div><label>Keeps for (days, cooked items)</label><input type="number" inputmode="numeric" id="i_shelf" placeholder="optional" value="'+(g && g.shelfDays ? esc(g.shelfDays) : "")+'"></div></div>';
+  if(g){ var gsi = stockInfo(g); if(gsi.use) html += '<div class="backupnote">Uses about <b>'+niceQty(gsi.use, g.unit)+'</b> a day (last '+USE_DAYS+' days) · '+esc(daysLeftText(gsi)||"")+' · suggested minimum <b>'+niceQty(gsi.learnedMin, g.unit)+'</b>.</div>'; }
   html += '<div class="field two"><div><label>Stock on hand now</label><input type="number" inputmode="decimal" id="i_open" value="'+(g?g.openingStock:"")+'"></div>';
   html += '<div><label>As on</label><input type="date" id="i_opendate" value="'+(g&&g.openingDate?g.openingDate:fmtDate(new Date()))+'"></div></div>';
   if(g){
@@ -6308,6 +6646,9 @@ function openIngredientForm(ingId, presetType){
                 openingStock: parseFloat(document.getElementById("i_open").value)||0,
                 openingDate: document.getElementById("i_opendate").value || fmtDate(new Date()),
                 costOverride: co===""?null:parseFloat(co) };
+    var ld = parseFloat(document.getElementById("i_lead").value), sh = parseFloat(document.getElementById("i_shelf").value);
+    rec.leadDays = ld>=0 ? ld : 1; rec.shelfDays = sh>0 ? sh : null;
+    if(g) rec = Object.assign({}, g, rec);
     var idx = ingredients.findIndex(function(x){ return x.id===rec.id; });
     if(idx>=0) ingredients[idx]=rec; else ingredients.push(rec);
     saveIngredients(); closeForm(); renderAll();
@@ -6681,7 +7022,9 @@ function renderAssetsView(){
   var el = document.getElementById("assetsView");
   if(!el) return;
   var today = fmtDate(new Date());
-  var html = '<button class="btn-save" id="asset_add" style="width:100%;margin-bottom:12px;">+ Add asset</button>';
+  var html = checksCard(true);
+  if(canWriteKey(SETTINGS_KEY)) html += '<button class="btn-additem" id="chk_edit" style="margin:-4px 0 12px;">Edit checklists</button>';
+  if(canWriteKey(ASSETS_KEY)) html += '<button class="btn-big" id="asset_add" style="margin-bottom:12px;">+ Add asset</button>';
 
   var totalCost = assets.reduce(function(a,x){ return a + (+x.cost||0); },0);
   var totalNow = totalAssetValue();
@@ -6715,12 +7058,15 @@ function renderAssetsView(){
       '<div class="assetthumb">'+(a.photo? '<img src="'+a.photo+'" alt="">' : '<span>'+esc((a.name||"?").charAt(0).toUpperCase())+'</span>')+'</div>'+
       '<div class="assetbody"><div class="who">'+esc(a.name)+'</div>'+
       '<div class="meta">'+esc(a.category||"Other")+(a.purchaseDate?' · bought '+parseDate(a.purchaseDate).toLocaleDateString("en-IN",{month:"short",year:"numeric"}):'')+'</div>'+
-      '<div class="meta">Upkeep so far '+rupee(maint)+(soon?' · <span class="warnline">service due</span>':'')+'</div></div>'+
+      '<div class="meta">Upkeep so far '+rupee(maint)+(soon?' · <span class="warnline">service due</span>':'')+'</div>'+
+      (assetStatus(a) ? '<div class="meta '+ASSET_STATUS[assetStatus(a)].c+'">'+ASSET_STATUS[assetStatus(a)].i+' '+ASSET_STATUS[assetStatus(a)].t+(assetCheckDue(a)?' · check due':'')+'</div>' : (assetCheckDue(a)?'<div class="meta warnline">check due</div>':''))+'</div>'+
       '<div class="assetval"><b>'+rupee(val)+'</b><span>of '+rupee(a.cost||0)+'</span></div></div>';
   }).join("");
 
   el.innerHTML = html;
-  document.getElementById("asset_add").addEventListener("click", function(){ openAssetForm(null); });
+  var aadd = document.getElementById("asset_add"); if(aadd) aadd.addEventListener("click", function(){ openAssetForm(null); });
+  wireChecksCard(el);
+  var ce = document.getElementById("chk_edit"); if(ce) ce.addEventListener("click", openChecklistEditor);
   Array.prototype.forEach.call(el.querySelectorAll("[data-asset]"), function(b){
     b.addEventListener("click", function(){ openAssetDetail(b.getAttribute("data-asset")); });
   });
@@ -6763,7 +7109,8 @@ function renderAssetForm(isEdit){
   html += '<div><label>Warranty until</label><input type="date" id="a_warranty" value="'+(d.warranty||"")+'"></div></div>';
   html += '<div class="field two"><div><label>Next service due</label><input type="date" id="a_service" value="'+(d.nextService||"")+'"></div>';
   html += '<div><label>Notes</label><input type="text" id="a_notes" placeholder="model, serial no." value="'+esc(d.notes||"")+'"></div></div>';
-  html += '<div class="backupnote" style="margin-top:-4px;">A service date shows up on that day in the Calendar, and as an alert here.</div>';
+  html += '<div class="field"><label>Check its condition every (days, optional)</label><input type="number" inputmode="numeric" id="a_every" placeholder="e.g. 1 for the fridge, 7 for the AC" value="'+esc(d.checkEvery||"")+'"></div>';
+  html += '<div class="backupnote" style="margin-top:-4px;">A service date shows up on that day in the Calendar, and as an alert here. A check shows as due until someone checks it.</div>';
 
   html += '<div class="err" id="a_err"></div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="a_cancel">Cancel</button>';
@@ -6784,6 +7131,7 @@ function renderAssetForm(isEdit){
     d.warranty = document.getElementById("a_warranty").value;
     d.nextService = document.getElementById("a_service").value;
     d.notes = document.getElementById("a_notes").value;
+    d.checkEvery = document.getElementById("a_every").value;
   }
   ["a_cost","a_date","a_dep","a_manual"].forEach(function(id){
     document.getElementById(id).addEventListener("change", function(){ sync(); renderAssetForm(isEdit); });
@@ -6812,7 +7160,7 @@ function renderAssetForm(isEdit){
                 depRate: d.depRate===""?15:parseFloat(d.depRate),
                 manualValue: d.manualValue===""?null:parseFloat(d.manualValue),
                 vendor:(d.vendor||"").trim(), warranty:d.warranty||"", nextService:d.nextService||"",
-                notes:(d.notes||"").trim(), maintenance:d.maintenance||[] };
+                notes:(d.notes||"").trim(), maintenance:d.maintenance||[], checkEvery: parseFloat(d.checkEvery)>0 ? parseFloat(d.checkEvery) : null };
     var idx = assets.findIndex(function(x){ return x.id===rec.id; });
     if(idx>=0) assets[idx]=rec; else assets.push(rec);
     var ok = saveAssets();
@@ -6853,6 +7201,9 @@ function openAssetDetail(assetId){
     html += '<div class="psrow"><span>Next service</span><b class="'+(od?"bad":"")+'">'+parseDate(a.nextService).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+(od?" · overdue":"")+'</b></div>';
   }
 
+  var lac = lastAssetCheck(a.id);
+  html += '<div class="psrow"><span>Condition</span><b class="'+(lac?ASSET_STATUS[lac.status].c:"")+'">'+(lac ? ASSET_STATUS[lac.status].i+' '+ASSET_STATUS[lac.status].t+' · '+parseDate(lac.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+(lac.byName?' · '+esc(lac.byName):'')+(lac.note?'<br><span class="muted" style="font-weight:400;">'+esc(lac.note)+'</span>':'') : 'not checked yet')+'</b></div>';
+  if(canWriteKey(CHECKS_KEY)) html += '<button class="btn-big green" id="ad_check" style="margin-top:8px;">Check condition now</button>';
   html += '<h3 style="margin:18px 0 8px;font-size:14px;">Maintenance history</h3>';
   html += '<button class="btn-additem" id="ad_addmaint" style="margin-bottom:10px;">+ Log maintenance / repair</button>';
   var ms = (a.maintenance||[]).slice().sort(function(x,y){ return y.date.localeCompare(x.date); });
@@ -6869,6 +7220,7 @@ function openAssetDetail(assetId){
   document.getElementById("ad_close").addEventListener("click", closeForm);
   document.getElementById("ad_edit").addEventListener("click", function(){ openAssetForm(a.id); });
   document.getElementById("ad_addmaint").addEventListener("click", function(){ openMaintForm(a.id); });
+  var adc = document.getElementById("ad_check"); if(adc) adc.addEventListener("click", function(){ openAssetCheck(a.id); });
 }
 
 function openMaintForm(assetId){
@@ -8143,6 +8495,8 @@ function billedPlates(dateStr){ return dishLog.filter(function(d){ return d.orde
 function dishLabel(m){ return m.localName ? m.localName : m.name; }
 function tileHtml(m){
   var q = counterOrder[m.id]||0, simple = simpleMode();
+  if(soldOutToday(m)) return '<button class="ctile soldout" disabled><div class="cimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="">' : '<span>'+dishIcon(m)+'</span>')+'<b class="csold">Sold out</b></div>'+
+    '<div class="cloc">'+esc(dishLabel(m))+'</div><div class="cprice">'+rupee(m.price)+'</div></button>';
   return '<button class="ctile'+(q?" has":"")+'" data-add="'+esc(m.id)+'">'+
     '<div class="cimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="" loading="lazy">' : '<span>'+dishIcon(m)+'</span>')+vegDot(m)+
       (q ? '<b class="cqty">'+q+'</b>' : '')+'</div>'+
@@ -8160,6 +8514,7 @@ function renderCounter(){
   var html = '<div class="listhead"><h2 class="serif">Counter</h2><div class="monthtot">'+bills.length+' bill'+(bills.length!==1?'s':'')+' today · '+rupee(bills.reduce(function(a,s){ return a+saleTotal(s); },0))+'</div></div>';
   html += '<div class="ctools">'+
     '<button id="ct_bills">🧾 Today’s bills</button>'+
+    (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
     '<button id="ct_voice" class="'+(voiceOn()?"on":"")+'">'+(voiceOn()?"🔊":"🔇")+'</button>'+
     ((isFullAccess() || myAccess()==="manager") && !simple ? '<button id="ct_upi">⚙️ UPI & discounts</button>' : '')+'</div>';
@@ -8198,6 +8553,10 @@ function wireCounterTools(el){
   var s = document.getElementById("ct_simple"); if(s) s.addEventListener("click", function(){ setSimpleMode(!simpleMode()); });
   var v = document.getElementById("ct_voice"); if(v) v.addEventListener("click", function(){ setVoice(!voiceOn()); renderCounter(); });
   var u = document.getElementById("ct_upi"); if(u) u.addEventListener("click", openUpiSettings);
+  var ck = document.getElementById("ct_checks"); if(ck) ck.addEventListener("click", function(){
+    var sheet = document.getElementById("sheet"); sheet.innerHTML = checksCard(false)+'<div class="sheetbtns"><button class="btn-cancel" id="cc_close" style="flex:1;">Close</button></div>';
+    document.getElementById("sheetBg").classList.add("on"); wireChecksCard(sheet); document.getElementById("cc_close").addEventListener("click", closeForm);
+  });
 }
 function openUpiSettings(){
   var sheet = document.getElementById("sheet"), offs = offers.slice(), canOffers = canWriteKey(OFFERS_KEY);
