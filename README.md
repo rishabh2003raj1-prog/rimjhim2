@@ -366,6 +366,20 @@ mode and voice.
 - Each ingredient now has a **Hindi name** and a **photo** (Records → Stock → tap the item).
 - Counter logins only see Need to buy (and checks), because they can't record purchases, wastage or counts.
 
+### Smart management (Step 7)
+On the Dashboard (owner, partners, manager):
+- **📲 Daily summary — send on WhatsApp**: today or yesterday in a few lines — sales vs a usual day like it, bills,
+  Cash / UPI / Udhaar, discounts, cancelled bills, purchases, expenses, cash count (matched / short / over and who was
+  in charge), wastage, absent staff, low stock, overdue and due-soon bills, checks not done and problems, broken
+  equipment, orders waiting for approval, watch-outs and tomorrow's forecast. Send or copy it.
+- **Tomorrow**: expected sales (same weekday, last 4 weeks) and the top dishes with plates, with a prep list button.
+- **Watch out** (also in Needs attention): cash short 3+ times (or ₹500+) in 30 days with the same person in charge;
+  a vendor's latest price 10%+ above what you usually pay; one login giving discounts above 5% of their sales
+  (₹300+ in 30 days); 3+ bills cancelled by one person in a week; wastage this week more than double the usual;
+  yesterday's sales 30%+ below a usual day like it.
+- A cancelled Counter bill now leaves a record (bill number, items, amount, who, when), shown in Today's bills and
+  the daily summary.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the

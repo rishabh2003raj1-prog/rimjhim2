@@ -232,6 +232,7 @@
   .kpoitems{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;} .kpoitems i{font-style:normal;background:#EFE8D8;border-radius:8px;padding:4px 8px;font-size:13.5px;}
   .krow{border:2px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;background:var(--panel);} .krow.ok{border-color:#2E7D4F;background:#EEF7F1;} .krow.short{border-color:#C9772B;background:#FFF4E0;}
   .krowh{display:flex;align-items:center;gap:8px;} .krate{font-size:13.5px;margin-top:6px;text-align:center;} .krate input{width:90px;padding:7px;border-radius:8px;border:1px solid var(--line);font:inherit;}
+  .sumtext{white-space:pre-wrap;font:inherit;font-size:13.5px;line-height:1.5;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px;margin:10px 0;max-height:52vh;overflow:auto;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -571,6 +572,7 @@
       </div>
       <div class="rangebar" id="rangeBar"></div>
       <div id="attnBox"></div>
+      <div id="mgmtBox"></div>
       <button class="btn-save" id="reportsBtn" style="width:100%;margin-bottom:14px;">📄 Reports — create &amp; share PDF</button>
 
       <div class="kpis">
@@ -2260,7 +2262,7 @@ function renderAll(){
   renderNotes();
   renderCounter();
   renderKitchen();
-  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } updateNavBadge(); }catch(e){}
+  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } updateNavBadge(); }catch(e){}
 }
 
 // ---------- DASHBOARD ----------
@@ -6439,6 +6441,7 @@ function attentionItems(){
   }
   checklistStatus().forEach(function(x){ if(x.missed) out.push({ t:"⚠️ "+x.l.name+" check "+x.label, go:"assets" }); else if(x.bad) out.push({ t:"⚠️ "+x.l.name+" check found "+x.bad+" problem"+(x.bad!==1?"s":""), go:"assets" }); });
   if(canReadKey(POS_KEY)) out = out.concat(poAttention());
+  if(canSummary()) out = out.concat(patternAlerts());
   if(canReadKey(ASSETS_KEY)) assetAlerts().forEach(function(x){ out.push({ t:(x.st==="broken"?"⛔ ":"🛠️ ")+x.a.name+": "+x.why.join(", "), go:"assets" }); });
   return out;
 }
@@ -6956,6 +6959,136 @@ function kReceive(id){
     });
   }
   draw();
+}
+
+// ---------- SMART MANAGEMENT ----------
+// A daily summary to send on WhatsApp, pattern alerts that spot leaks early (cash
+// shortages under the same person, vendor price jumps, heavy discounts, cancelled bills,
+// wastage spikes, sales drops) and tomorrow's forecast.
+function sameWeekdayAvg(d, fn){ var v = [1,2,3,4].map(function(w){ return fn(addDays(d, -7*w)); }).filter(function(x){ return x>0; }); return v.length ? v.reduce(function(a,b){ return a+b; },0)/v.length : 0; }
+function salesOn(d){ return sales.filter(function(s){ return s.date===d; }).reduce(function(a,s){ return a+saleTotal(s); },0); }
+function cashDiffOn(d){ var c = cashDayFor(d); if(!c || c.counted===null || c.counted===undefined || c.counted==="") return null; return { diff: +c.counted - expectedCash(d), who: c.incharge || "?" }; }
+function wasteValueBetween(from, to){ return wastageValue(from, to, null); }
+function normRate(p){ var r = +p.rate||0, u = normUnit(p.unit); if(u==="g") return { r:r*1000, u:"kg" }; if(u==="ml") return { r:r*1000, u:"litre" }; if(u==="l") return { r:r, u:"litre" }; return { r:r, u:u||"unit" }; }
+var PATTERN_CACHE = { at:0, v:[] };
+function patternAlerts(){
+  if(Date.now() - PATTERN_CACHE.at < 4000) return PATTERN_CACHE.v;
+  var out = [], today = fmtDate(new Date()), from30 = addDays(today, -30);
+  try{
+    // 1. Cash short again and again under the same person.
+    if(canReadKey(CASH_KEY) && canReadKey(SALES_KEY)){
+      var by = {};
+      cashDays.filter(function(c){ return c.date>=from30 && c.date<today; }).forEach(function(c){ var x = cashDiffOn(c.date); if(x && x.diff < -50){ var g = by[x.who] || (by[x.who] = { n:0, amt:0 }); g.n++; g.amt += -x.diff; } });
+      Object.keys(by).forEach(function(w){ if(by[w].n>=3 || by[w].amt>=500) out.push({ t:"🔎 Cash short "+by[w].n+" time"+(by[w].n!==1?"s":"")+" in 30 days with "+w+" in charge ("+rupee(by[w].amt)+" in all)", go:"cash", kind:"cash" }); });
+    }
+    // 2. A vendor's latest price well above what we usually pay.
+    if(canReadKey(PURCH_KEY)){
+      var items = {};
+      purchases.filter(function(p){ return !p.isDelivery && p.item && +p.rate>0 && p.date>=addDays(today,-120); }).forEach(function(p){ (items[normItem(p.item)] = items[normItem(p.item)] || []).push(p); });
+      Object.keys(items).forEach(function(k){
+        var list = items[k].sort(function(a,b){ return a.date.localeCompare(b.date); }), last = list[list.length-1];
+        if(last.date < addDays(today,-14) || list.length<3) return;
+        var lr = normRate(last), prev = list.slice(0,-1).map(normRate).filter(function(x){ return x.u===lr.u; });
+        if(prev.length<2) return;
+        var avg = prev.reduce(function(a,x){ return a+x.r; },0)/prev.length;
+        if(avg>0 && lr.r > avg*1.10 && (lr.r-avg) >= 2) out.push({ t:"📈 "+last.item+" now "+rupeeFine(lr.r)+"/"+lr.u+" from "+(last.vendor||"vendor")+", "+Math.round((lr.r/avg-1)*100)+"% above the usual "+rupeeFine(avg), go:"purchases", kind:"price" });
+      });
+    }
+    // 3. One person giving a lot of discount.
+    if(canReadKey(SALES_KEY)){
+      var dz = {};
+      sales.filter(function(s){ return s.order && s.date>=from30; }).forEach(function(s){ var w = s.by || "owner", g = dz[w] || (dz[w] = { sub:0, disc:0, n:0, name:s.order.byName||w }); g.sub += +(s.order.subtotal || s.amount) || 0; g.disc += +s.order.discount||0; if(s.order.discount) g.n++; });
+      Object.keys(dz).forEach(function(w){ var g = dz[w]; if(g.disc>=300 && g.disc > g.sub*0.05)  out.push({ t:"🏷️ "+(w==="owner"?"Owner":(g.name||w))+" gave "+rupee(g.disc)+" discount on "+g.n+" bills in 30 days ("+Math.round(g.disc/g.sub*100)+"% of their sales)", go:"sales", kind:"disc" }); });
+    }
+    // 4. Bills cancelled again and again by one person.
+    var vz = {};
+    checks.filter(function(c){ return c.kind==="void" && c.date>=addDays(today,-7); }).forEach(function(c){ var g = vz[c.byName||"?"] || (vz[c.byName||"?"] = { n:0, amt:0 }); g.n++; g.amt += +c.amount||0; });
+    Object.keys(vz).forEach(function(w){ if(vz[w].n>=3) out.push({ t:"❌ "+w+" cancelled "+vz[w].n+" bills this week ("+rupee(vz[w].amt)+")", go:"sales", kind:"void" }); });
+    // 5. Wastage this week far above normal.
+    if(canReadKey(WASTE_KEY) && canReadKey(PURCH_KEY)){
+      var wk = wasteValueBetween(addDays(today,-6), today), past = [1,2,3,4].map(function(i){ return wasteValueBetween(addDays(today,-6-7*i), addDays(today,-7*i)); });
+      var pavg = past.reduce(function(a,b){ return a+b; },0)/4;
+      if(wk>=300 && pavg>0 && wk > pavg*2) out.push({ t:"🗑️ Wastage this week "+rupee(wk)+", more than double the usual "+rupee(pavg), go:"stock", kind:"waste" });
+    }
+    // 6. Yesterday's sales well below a normal day like it.
+    if(canReadKey(SALES_KEY)){
+      var y = addDays(today,-1), ys = salesOn(y), norm = sameWeekdayAvg(y, salesOn);
+      if(norm>=1000 && ys < norm*0.7) out.push({ t:"📉 Sales yesterday "+rupee(ys)+", "+Math.round((1-ys/norm)*100)+"% below a usual "+parseDate(y).toLocaleDateString("en-IN",{weekday:"long"})+" ("+rupee(norm)+")", go:"sales", kind:"sales" });
+    }
+  }catch(e){}
+  PATTERN_CACHE = { at:Date.now(), v:out };
+  return out;
+}
+function tomorrowForecast(){
+  var t = addDays(fmtDate(new Date()), 1), dishes = [];
+  menuItems.forEach(function(m){ if(m.active===false) return; var q = expectedPlates(m.id, t); if(q>0) dishes.push({ m:m, q:q }); });
+  dishes.sort(function(a,b){ return b.q-a.q; });
+  return { date:t, sales: Math.round(sameWeekdayAvg(t, salesOn)), dishes:dishes };
+}
+function canSummary(){ return isFullAccess() || myAccess()==="manager"; }
+// The day in a few lines, ready for WhatsApp.
+function dailySummary(d){
+  var L = [], when = parseDate(d).toLocaleDateString("en-IN",{ weekday:"long", day:"numeric", month:"short" });
+  L.push("*"+(OUTLET.name||"RimJhim Cafe")+" — "+when+"*");
+  var ds = sales.filter(function(s){ return s.date===d; }), tot = ds.reduce(function(a,s){ return a+saleTotal(s); },0);
+  var modes = {}; ds.forEach(function(s){ var m = s.mode==="Credit" ? "Udhaar" : s.mode; modes[m] = (modes[m]||0) + saleTotal(s); });
+  var bills = ds.filter(function(s){ return s.order; }), disc = bills.reduce(function(a,s){ return a+(+s.order.discount||0); },0), norm = sameWeekdayAvg(d, salesOn);
+  L.push("💰 Sales "+rupee(tot)+(bills.length?" · "+bills.length+" bills":"")+(norm>0 ? " ("+(tot>=norm?"+":"")+Math.round((tot/norm-1)*100)+"% vs usual "+rupee(norm)+")" : ""));
+  if(Object.keys(modes).length) L.push("   "+Object.keys(modes).map(function(k){ return k+" "+rupee(modes[k]); }).join(" · ")+(disc?" · discounts "+rupee(disc):""));
+  var voids = checks.filter(function(c){ return c.kind==="void" && c.date===d; });
+  if(voids.length) L.push("❌ "+voids.length+" bill"+(voids.length!==1?"s":"")+" cancelled ("+rupee(voids.reduce(function(a,c){ return a+(+c.amount||0); },0))+")");
+  if(canReadKey(PURCH_KEY)){ var pt = purchases.filter(function(p){ return p.date===d; }).reduce(function(a,p){ return a+purchTotal(p); },0); if(pt) L.push("🛒 Purchases "+rupee(pt)); }
+  if(canReadKey(EXPENSE_KEY)){ var et = expenses.filter(function(x){ return expBookDate(x)===d; }).reduce(function(a,x){ return a+expAmt(x); },0); if(et) L.push("🧾 Expenses "+rupee(et)); }
+  if(canReadKey(CASH_KEY)){ var cd = cashDiffOn(d);
+    L.push(cd===null ? "💵 Cash not counted yet" : "💵 Cash "+(Math.abs(cd.diff)<1 ? "matched ✔" : cd.diff<0 ? "SHORT "+rupee(-cd.diff) : "over "+rupee(cd.diff))+" · in charge "+cd.who); }
+  var wv = canReadKey(WASTE_KEY) && canReadKey(PURCH_KEY) ? wastageValue(d, d, null) : 0; if(wv>0) L.push("🗑️ Wastage "+rupee(wv));
+  var away = attendance.filter(function(a){ return a.date===d && (a.status==="Absent" || a.status==="Leave" || a.status==="Half day"); }).map(function(a){ var st = staff.find(function(x){ return x.id===a.staffId; }); return (st?st.name:"?")+" ("+a.status.toLowerCase()+")"; });
+  if(away.length) L.push("👥 "+away.join(", "));
+  if(canReadKey(PURCH_KEY)){ var al = stockAlerts(); if(al.length) L.push("📦 Low: "+al.slice(0,6).map(function(s){ return s.ing.name; }).join(", ")+(al.length>6?" +"+(al.length-6):"")); }
+  if(canReadKey(SETTINGS_KEY) && isFullAccess()){ try{ var fm = fixedMonthSummary(d.slice(0,7)), od = fm.rows.filter(function(r){ return r.overdue; }), soon = fm.rows.filter(function(r){ return r.due>0 && r.dueDate && !r.overdue && r.dueDate <= addDays(d,3); });
+    if(od.length) L.push("⏰ Bills overdue: "+od.map(function(r){ return r.name+" "+rupee(r.due); }).join(", "));
+    if(soon.length) L.push("📅 Due soon: "+soon.map(function(r){ return r.name+" "+rupee(r.due)+" ("+parseDate(r.dueDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+")"; }).join(", ")); }catch(e){} }
+  var cs = checksOn(d), probs = []; cs.forEach(function(c){ (c.items||[]).forEach(function(i){ if(i.ok===false) probs.push(i.t+(i.note?" ("+i.note+")":"")); }); });
+  var missed = d===fmtDate(new Date()) ? checklistStatus().filter(function(x){ return x.missed; }).map(function(x){ return x.l.name; }) : checklistDefs().filter(function(l){ return !l.every && !checksOn(d, l.id).length; }).map(function(l){ return l.name; });
+  if(missed.length) L.push("⚠️ Checks not done: "+missed.join(", "));
+  if(probs.length) L.push("⚠️ Problems: "+probs.slice(0,4).join("; "));
+  var broken = assetAlerts().filter(function(x){ return x.st==="broken" || x.st==="repair"; }); if(broken.length) L.push("🛠️ "+broken.map(function(x){ return x.a.name+" "+ASSET_STATUS[x.st].t.toLowerCase(); }).join(", "));
+  var waitPo = pos.filter(function(p){ return p.status==="review" || p.status==="requested"; }); if(waitPo.length) L.push("📝 "+waitPo.length+" purchase order"+(waitPo.length!==1?"s":"")+" waiting for approval");
+  var pa = patternAlerts(); if(pa.length){ L.push("🔎 Watch out:"); pa.forEach(function(x){ L.push("   • "+x.t.replace(/^\S+\s/,"")); }); }
+  if(d===fmtDate(new Date())){ var f = tomorrowForecast(); if(f.sales || f.dishes.length) L.push("🔮 Tomorrow: "+(f.sales ? "about "+rupee(f.sales)+" · " : "")+(f.dishes.length ? "top "+f.dishes.slice(0,4).map(function(x){ return x.m.name+" "+x.q; }).join(", ") : "")); }
+  return L.join("\n");
+}
+function openDailySummary(d){
+  d = d || fmtDate(new Date());
+  var txt = dailySummary(d), sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<h2 class="serif">📲 Daily summary</h2><div class="kqchips" style="justify-content:flex-start;">'+
+    [[fmtDate(new Date()),"Today"],[addDays(fmtDate(new Date()),-1),"Yesterday"]].map(function(x){ return '<button data-sd="'+x[0]+'" class="'+(x[0]===d?"on":"")+'">'+x[1]+'</button>'; }).join("")+'</div>'+
+    '<pre class="sumtext">'+esc(txt)+'</pre>'+
+    '<div class="sheetbtns"><button class="btn-cancel" id="ds_copy">Copy</button><button class="btn-save" id="ds_wa">📲 Send on WhatsApp</button></div>'+
+    '<div class="sheetbtns" style="margin-top:6px;"><button class="btn-cancel" id="ds_close" style="flex:1;">Close</button></div>';
+  document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sd]"), function(b){ b.addEventListener("click", function(){ openDailySummary(b.getAttribute("data-sd")); }); });
+  document.getElementById("ds_wa").addEventListener("click", function(){ window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank"); try{ localStorage.setItem("summary_sent_v1", d); }catch(e){} });
+  document.getElementById("ds_copy").addEventListener("click", function(){ try{ navigator.clipboard.writeText(txt).then(function(){ appAlert("Copied."); }); }catch(e){ appAlert("Couldn’t copy on this phone."); } });
+  document.getElementById("ds_close").addEventListener("click", closeForm);
+}
+function mgmtCard(){
+  if(!canSummary()) return "";
+  var f = tomorrowForecast(), pa = patternAlerts(), html = '<div class="card" style="margin-bottom:14px;">';
+  html += '<button class="btn-big green" id="mg_sum" style="margin:0 0 10px;">📲 Daily summary — send on WhatsApp</button>';
+  if(f.sales || f.dishes.length){
+    html += '<h3>Tomorrow · '+parseDate(f.date).toLocaleDateString("en-IN",{weekday:"long"})+'</h3>'+
+      (f.sales ? '<div class="psrow"><span>Expected sales</span><b>about '+rupee(f.sales)+'</b></div>' : '')+
+      (f.dishes.length ? '<div class="psrow"><span>Top dishes</span><b style="font-weight:500;text-align:right;">'+f.dishes.slice(0,5).map(function(x){ return esc(x.m.name)+' '+x.q; }).join(", ")+'</b></div>' : '')+
+      '<button class="btn-additem" id="mg_prep" style="margin-top:8px;">Prep list for tomorrow</button>';
+  }
+  if(pa.length) html += '<div class="dgroup">Watch out</div>'+pa.map(function(x){ return '<div class="psrow attnrow" data-attn="'+x.go+'" style="cursor:pointer;"><span>'+esc(x.t)+'</span><b>›</b></div>'; }).join("");
+  return html+'</div>';
+}
+function wireMgmt(el){
+  var s = el.querySelector("#mg_sum"); if(s) s.addEventListener("click", function(){ openDailySummary(); });
+  var p = el.querySelector("#mg_prep"); if(p) p.addEventListener("click", function(){ openPrepList(tomorrowForecast().date); });
+  wireAttention(el);
 }
 
 function poAttention(){
@@ -9300,7 +9433,8 @@ function openCounterBills(dateStr){
   var html = '<h2 class="serif">Counter bills · '+parseDate(dateStr).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+'</h2>';
   html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>'+list.length+' bill'+(list.length!==1?'s':'')+'</span><b>'+rupee(list.reduce(function(a,s){ return a+saleTotal(s); },0))+'</b></div>'+
     Object.keys(modes).map(function(k){ return '<div class="psrow"><span>'+({Cash:"💵 ",UPI:"📱 ",Udhaar:"📒 "}[k]||"")+esc(k)+'</span><b>'+rupee(modes[k])+'</b></div>'; }).join("")+
-    (discTot ? '<div class="psrow"><span>🏷️ Discounts given ('+discN+' bill'+(discN!==1?'s':'')+')</span><b class="warnamt">− '+rupee(discTot)+'</b></div>' : '')+'</div>';
+    (discTot ? '<div class="psrow"><span>🏷️ Discounts given ('+discN+' bill'+(discN!==1?'s':'')+')</span><b class="warnamt">− '+rupee(discTot)+'</b></div>' : '')+
+    checks.filter(function(c){ return c.kind==="void" && c.date===dateStr; }).map(function(c){ return '<div class="psrow"><span>❌ Bill '+esc(c.billNo)+' cancelled · '+esc(c.time||"")+' · '+esc(c.byName||"")+'<br><span class="muted" style="font-size:11.5px;">'+esc(c.items||"")+'</span></span><b class="bad">'+rupee(c.amount)+'</b></div>'; }).join("")+'</div>';
   if(!list.length) html += '<div class="empty">No bills yet.</div>';
   var canCancel = canWriteKey(SALES_KEY);
   html += list.map(function(s){
@@ -9323,6 +9457,8 @@ function openCounterBills(dateStr){
     ev.preventDefault(); var id = a.getAttribute("data-void"), s = sales.find(function(x){ return x.id===id; }); if(!s) return;
     askConfirm("Cancel bill "+s.order.no+" ("+rupee(saleTotal(s))+")? Its plates come off the dish counts too.", function(){
       sales = sales.filter(function(x){ return x.id!==id; }); dishLog = dishLog.filter(function(d){ return d.orderId!==id; });
+      if(canWriteKey(CHECKS_KEY)){ checks.push({ id:uid(), kind:"void", date:s.date, time:nowHM(), billNo:s.order.no, amount:saleTotal(s), items:billText(s), mode:s.mode, byName:myName() }); saveChecks(); }
+      PATTERN_CACHE.at = 0;
       saveSales(); saveDishLog(); renderAll(); openCounterBills(dateStr);
     });
   }); });
