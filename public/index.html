@@ -368,6 +368,18 @@
   .notechips{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
   .notechip{border:1px solid var(--line);background:var(--panel);border-radius:16px;padding:5px 10px;font:inherit;font-size:12px;color:var(--ink);}
   .roletag{font-size:11px;color:var(--ink-soft);}
+  .dishgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:8px;margin-bottom:6px;}
+  .dishtile{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:6px;text-align:left;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:2px;}
+  .dishimg{position:relative;aspect-ratio:1/1;border-radius:9px;overflow:hidden;background:#EFE8D8;display:flex;align-items:center;justify-content:center;}
+  .dishimg img{width:100%;height:100%;object-fit:cover;} .dishimg span{font-family:'Fraunces',serif;font-size:34px;color:#B9A98A;}
+  .dishimg .vegdot{position:absolute;top:5px;left:5px;background:#fff;}
+  .dishname{font-weight:600;font-size:12.5px;line-height:1.2;margin-top:4px;} .dishlocal{font-size:11.5px;color:var(--ink-soft);}
+  .dishmeta{font-size:12px;} .dishgap{font-size:10.5px;color:#9A6B12;}
+  .vegdot{display:inline-flex;width:13px;height:13px;border:1.5px solid;border-radius:3px;align-items:center;justify-content:center;vertical-align:middle;}
+  .vegdot i{width:6px;height:6px;border-radius:50%;}
+  .rcardimg img{width:100%;max-height:240px;object-fit:cover;border-radius:12px;}
+  .sopstep{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);} .sopstep img{max-width:100%;border-radius:8px;margin-top:6px;}
+  .sopn{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--ink);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;}
   .rpdayhead{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding-bottom:4px;}
   .recper{margin-bottom:8px;}
 
@@ -894,7 +906,19 @@ var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
   VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY];
-var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo";
+var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo";
+// Every place in a list that can hold a photo: the item's own field, and for menu
+// items each SOP step's photo too.
+function photoSlots(key, list){
+  var field = PHOTO_FIELDS[key], out = [];
+  if(!field || !Array.isArray(list)) return out;
+  list.forEach(function(x){
+    if(!x) return;
+    out.push([x, field]);
+    if(key===MENU_KEY && Array.isArray(x.sop)) x.sop.forEach(function(st){ if(st) out.push([st, "photo"]); });
+  });
+  return out;
+}
 
 var cloud = {
   values: {},   // key -> live value (the same arrays the app works on)
@@ -1018,11 +1042,10 @@ function mergeValues(base, local, remote){
 
 // Bill and asset photos go to the server as files instead of sitting inside the lists.
 function uploadPhotos(key){
-  var field = PHOTO_FIELDS[key];
-  var list = cloud.values[key];
-  if(!field || !Array.isArray(list)) return Promise.resolve();
-  var todo = list.filter(function(x){ return x && typeof x[field]==="string" && x[field].indexOf("data:")===0; });
-  return todo.reduce(function(p, item){
+  var todo = photoSlots(key, cloud.values[key]).filter(function(s){ return typeof s[0][s[1]]==="string" && s[0][s[1]].indexOf("data:")===0; });
+  if(!todo.length) return Promise.resolve();
+  return todo.reduce(function(p, slot){
+    var item = slot[0], field = slot[1];
     return p.then(function(){
       var dataUrl = item[field];
       return api("POST", "/api/photos"+API_Q, { dataUrl: dataUrl }).then(function(r){
@@ -1483,8 +1506,7 @@ function syncFromServer(done){
     });
     // Data pushed from the old app still carries photos inline - move them to photo storage.
     Object.keys(PHOTO_FIELDS).forEach(function(key){
-      var f = PHOTO_FIELDS[key], list = cloud.values[key];
-      if(Array.isArray(list) && list.some(function(x){ return x && typeof x[f]==="string" && x[f].indexOf("data:")===0; })) cloud.dirty[key] = true;
+      if(canWriteKey(key) && photoSlots(key, cloud.values[key]).some(function(s){ return typeof s[0][s[1]]==="string" && s[0][s[1]].indexOf("data:")===0; })) cloud.dirty[key] = true;
     });
     done();
   }).catch(function(){
@@ -3356,7 +3378,7 @@ function switchRecordsSub(name){
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
   var ids = {sales:"salesList", purchases:"purchList", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu & recipes", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -3378,7 +3400,7 @@ function updateRecordsTotal(){
     lbl.textContent = customers.length+" customer"+(customers.length!==1?"s":"")+(due>0?" · "+rupee(due)+" due":""); }
   else if(recSub==="assets"){ lbl.textContent = assets.length+" asset"+(assets.length!==1?"s":"")+" · "+rupee(totalAssetValue()); }
   else if(recSub==="vendors"){ lbl.textContent = vendors.length+" vendor"+(vendors.length!==1?"s":""); }
-  else if(recSub==="menu"){ lbl.textContent = menuItems.length+" item"+(menuItems.length!==1?"s":""); }
+  else if(recSub==="menu"){ var rd = menuItems.filter(function(m){ return !dishGaps(m).length; }).length; lbl.textContent = menuItems.length+" dish"+(menuItems.length!==1?"es":"")+" · "+rd+" ready"; }
   else if(recSub==="stock"){ var low=ingredients.filter(function(i){return stockLevel(i.id) <= (i.minStock||0);}).length;
     lbl.textContent = ingredients.length+" ingredients"+(low?" · "+low+" low":""); }
   else { lbl.textContent = rl+" · "+PARTNERS.length+" partner"+(PARTNERS.length!==1?"s":""); }
@@ -5000,42 +5022,452 @@ function forecastIngredients(dateStr){
 }
 
 
+// ---------- MENU, RECIPES & SOPs ----------
+// Each dish: photo, local-language name, veg mark, category, price, recipe (ingredient
+// portions per plate, costed from your purchase prices), SOP steps with optional
+// photos, portion, prep time and how long it can be held. Costs and margins are
+// shown to the owner, partners and manager; the kitchen sees the recipe and SOP.
+var DEFAULT_MENU_CATS = ["Tea & coffee","Beverages","Snacks","Meals","Desserts"];
+var VEG_MARK = { veg:{ label:"Veg", color:"#1F8A3B" }, egg:{ label:"Egg", color:"#C99A06" }, nonveg:{ label:"Non-veg", color:"#A6402D" } };
+function targetFoodCost(){ var v = settings && +settings.targetFoodCost; return v>0 && v<100 ? v : 30; }
+function seesCosts(){ return isFullAccess() || myAccess()==="manager"; }
+function menuCats(){
+  var c = DEFAULT_MENU_CATS.slice();
+  menuItems.forEach(function(m){ if(m.category && c.indexOf(m.category)<0) c.push(m.category); });
+  return c;
+}
+function vegDot(m){ var v = VEG_MARK[m.veg]; return v ? '<span class="vegdot" style="border-color:'+v.color+';" title="'+v.label+'"><i style="background:'+v.color+';"></i></span>' : ''; }
+function dishCost(m){ var rc = recipeCost(m), price = +m.price||0; return { cost:rc.cost, missing:rc.missing, price:price, fc: price>0 ? rc.cost/price*100 : null, margin: price - rc.cost }; }
+// What a dish still needs before it is "ready": recipe, SOP, photo, price.
+function dishGaps(m){
+  var g = [];
+  if(!(m.recipe||[]).length) g.push("recipe"); if(!(m.sop||[]).filter(function(x){ return x && x.text; }).length) g.push("SOP"); if(!m.photo) g.push("photo"); if(!(+m.price>0)) g.push("price");
+  return g;
+}
+function suggestedPrice(cost){ var p = cost / (targetFoodCost()/100); return p>0 ? Math.ceil(p/5)*5 : 0; }
+function pickPhoto(cb){
+  var inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*"; inp.style.display = "none";
+  inp.addEventListener("change", function(){ var f = inp.files && inp.files[0]; if(f) compressPhoto(f, cb); document.body.removeChild(inp); });
+  document.body.appendChild(inp); inp.click();
+}
+
 function renderMenuView(){
   var el = document.getElementById("menuView");
   if(!el) return;
-  var html = '<button class="btn-save" id="menu_tally" style="width:100%;margin-bottom:8px;">⚡ Quick tally — tap as you serve</button>';
-  html += '<div class="addrow"><button class="sale" id="menu_log">Type counts</button><button class="expense" id="menu_est">Estimate from takings</button></div>';
-  html += '<div class="addrow"><button class="purch" id="menu_add">+ Menu item</button></div>';
-
-  var noCost = menuItems.filter(function(m){ return recipeCost(m).missing>0; }).length;
-  if(noCost>0){
-    html += '<div class="backupnote" style="margin-bottom:10px;">'+noCost+' item'+(noCost!==1?'s have':' has')+' ingredients you have not purchased yet, so their cost is partly estimated. Costs come from your own purchase rates - log a bill for those ingredients to make it exact.</div>';
+  var costs = seesCosts(), html = '';
+  var ready = menuItems.filter(function(m){ return !dishGaps(m).length; }).length;
+  if(canWriteKey(SALES_KEY) || canWriteKey(DISH_KEY)){
+    html += '<button class="btn-save" id="menu_tally" style="width:100%;margin-bottom:8px;">⚡ Quick tally — tap as you serve</button>';
+    html += '<div class="addrow"><button class="sale" id="menu_log">Type counts</button><button class="expense" id="menu_est">Estimate from takings</button></div>';
   }
-
+  html += '<div class="addrow">'+(canWriteKey(MENU_KEY)?'<button class="purch" id="menu_add">+ Dish</button>':'')+'<button class="invest" id="menu_prep">Today’s prep list</button></div>';
+  html += '<div class="addrow"><button class="sale" id="menu_book">📖 Recipe &amp; SOP book (PDF)</button>'+(costs?'<button class="expense" id="menu_eng">Menu analysis</button>':'')+'</div>';
+  if(menuItems.length){
+    html += '<div class="card" style="margin-bottom:10px;padding:10px 12px;"><div class="psrow" style="padding:2px 0;"><span><b>'+ready+' of '+menuItems.length+' dishes ready</b><br><span class="muted" style="font-size:11.5px;">ready = photo, price, recipe and SOP all set</span></span>'+
+      '<b>'+Math.round(ready/menuItems.length*100)+'%</b></div><div class="stockbar" style="margin-top:6px;"><i style="width:'+Math.round(ready/menuItems.length*100)+'%;background:#1F5C52;"></i></div></div>';
+    if(costs){
+      var over = menuItems.filter(function(m){ var d = dishCost(m); return d.fc!==null && d.fc > targetFoodCost() + 5 && !d.missing; });
+      if(over.length) html += '<div class="attmwarn" data-menueng="1" style="cursor:pointer;">'+over.length+' dish'+(over.length!==1?'es cost':' costs')+' more than '+(targetFoodCost()+5)+'% of the price to make — tap to see suggested prices.</div>';
+    }
+  }
   var cats = {};
-  menuItems.forEach(function(m){ (cats[m.category] = cats[m.category] || []).push(m); });
-  Object.keys(cats).forEach(function(cat){
-    html += '<div class="daygroup">'+esc(cat)+'</div>';
+  menuItems.forEach(function(m){ (cats[m.category||"Other"] = cats[m.category||"Other"] || []).push(m); });
+  menuCats().concat(Object.keys(cats)).filter(function(c, i, a){ return a.indexOf(c)===i && cats[c]; }).forEach(function(cat){
+    html += '<div class="daygroup">'+esc(cat)+' <span class="muted">· '+cats[cat].length+'</span></div><div class="dishgrid">';
     html += cats[cat].map(function(m){
-      var rc = recipeCost(m);
-      var margin = m.price>0 ? Math.round((m.price - rc.cost)/m.price*100) : 0;
-      var cls = margin>=65 ? "ok" : (margin>=50 ? "warnamt" : "bad");
-      return '<div class="entry" data-menu="'+m.id+'"><div><div class="who">'+esc(m.name)+'</div>'+
-        '<div class="meta">Sells '+rupee(m.price)+' · costs '+rupeeFine(rc.cost)+(rc.missing>0?' +':'')+' · '+(m.recipe||[]).length+' ingredients</div></div>'+
-        '<div class="scorebox '+cls+'"><b>'+margin+'%</b><span>margin</span></div></div>';
-    }).join("");
+      var d = dishCost(m), gaps = dishGaps(m);
+      var fcCls = d.fc===null ? "" : d.fc <= targetFoodCost() ? "ok" : d.fc <= targetFoodCost()+10 ? "warnamt" : "bad";
+      return '<button class="dishtile" data-menu="'+esc(m.id)+'">'+
+        '<div class="dishimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="" loading="lazy">' : '<span>'+esc((m.name||"?").charAt(0).toUpperCase())+'</span>')+vegDot(m)+'</div>'+
+        '<div class="dishname">'+esc(m.name)+'</div>'+(m.localName?'<div class="dishlocal">'+esc(m.localName)+'</div>':'')+
+        '<div class="dishmeta"><b>'+rupee(d.price)+'</b>'+(costs && d.fc!==null ? ' <span class="'+fcCls+'">'+Math.round(d.fc)+'%</span>' : '')+'</div>'+
+        (gaps.length ? '<div class="dishgap">needs '+esc(gaps.join(", "))+'</div>' : '')+'</button>';
+    }).join("")+'</div>';
   });
-  if(menuItems.length===0){ html += '<div class="empty">No menu items yet.</div>'; }
-
+  if(menuItems.length===0){ html += '<div class="empty">No dishes yet. Add your first dish with its photo, recipe and SOP.</div>'; }
   el.innerHTML = html;
-  document.getElementById("menu_add").addEventListener("click", function(){ openMenuForm(null); });
-  document.getElementById("menu_log").addEventListener("click", function(){ openDishLogForm(fmtDate(new Date())); });
-  document.getElementById("menu_tally").addEventListener("click", function(){ openTally(fmtDate(new Date())); });
-  document.getElementById("menu_est").addEventListener("click", function(){ openEstimateSheet(fmtDate(new Date())); });
+  function on(id, fn){ var b = document.getElementById(id); if(b) b.addEventListener("click", fn); }
+  on("menu_add", function(){ openMenuForm(null); });
+  on("menu_log", function(){ openDishLogForm(fmtDate(new Date())); });
+  on("menu_tally", function(){ openTally(fmtDate(new Date())); });
+  on("menu_est", function(){ openEstimateSheet(fmtDate(new Date())); });
+  on("menu_prep", function(){ openPrepList(fmtDate(new Date())); });
+  on("menu_book", openRecipeBookSheet);
+  on("menu_eng", openMenuAnalysis);
+  var w = el.querySelector("[data-menueng]"); if(w) w.addEventListener("click", openMenuAnalysis);
   Array.prototype.forEach.call(el.querySelectorAll("[data-menu]"), function(b){
-    b.addEventListener("click", function(){ openMenuForm(b.getAttribute("data-menu")); });
+    b.addEventListener("click", function(){ openRecipeCard(b.getAttribute("data-menu")); });
   });
   if(recSub==="menu") updateRecordsTotal();
+}
+
+// The recipe card: what the kitchen follows. Scale the recipe for any number of plates.
+function openRecipeCard(id, plates){
+  var m = menuById(id); if(!m) return;
+  plates = plates || 1;
+  var d = dishCost(m), costs = seesCosts(), sheet = document.getElementById("sheet");
+  var html = '<div class="rcard">';
+  html += m.photo ? '<div class="rcardimg"><img src="'+esc(m.photo)+'" alt=""></div>' : '';
+  html += '<h2 class="serif" style="margin:8px 0 2px;">'+vegDot(m)+' '+esc(m.name)+'</h2>'+(m.localName?'<div class="dishlocal" style="font-size:15px;">'+esc(m.localName)+'</div>':'');
+  html += '<div class="barsub" style="margin:4px 0 10px;">'+esc(m.category||"")+' · '+rupee(d.price)+(m.portion?' · '+esc(m.portion):'')+(m.prepTime?' · '+esc(m.prepTime)+' min':'')+(m.holding?' · '+esc(m.holding):'')+'</div>';
+  if(costs) html += '<div class="kpis fckpis" style="margin-bottom:10px;"><div class="kpi"><div class="lbl">Cost / plate</div><div class="val">'+rupeeFine(d.cost)+(d.missing?'+':'')+'</div></div>'+
+    '<div class="kpi"><div class="lbl">Food cost</div><div class="val '+(d.fc!==null && d.fc>targetFoodCost()?"neg":"pos")+'">'+(d.fc===null?'—':Math.round(d.fc)+'%')+'</div><div class="sub2">target '+targetFoodCost()+'%</div></div>'+
+    '<div class="kpi"><div class="lbl">Earns / plate</div><div class="val">'+rupee(d.margin)+'</div></div></div>';
+  html += '<div class="card" style="margin-bottom:10px;"><div class="billtop"><h3 style="margin:0;">Ingredients</h3><span style="display:flex;align-items:center;gap:6px;font-size:12.5px;">for <input type="number" inputmode="numeric" id="rc_plates" value="'+plates+'" style="width:64px;"> plate'+(plates!==1?'s':'')+'</span></div>';
+  if(!(m.recipe||[]).length) html += '<div class="backupnote" style="margin:4px 0 0;">No recipe yet.</div>';
+  (m.recipe||[]).forEach(function(r){
+    var ing = ingById(r.ingredientId), q = (+r.qty||0) * plates;
+    html += '<div class="psrow"><span>'+esc(ing?ing.name:"(removed item)")+'</span><b>'+fmtQty(r2(q))+' '+esc(ing?ing.unit:"")+'</b></div>';
+  });
+  html += '</div>';
+  var steps = (m.sop||[]).filter(function(x){ return x && (x.text || x.photo); });
+  html += '<div class="card" style="margin-bottom:10px;"><h3>How to make it (SOP)</h3>';
+  if(!steps.length) html += '<div class="backupnote" style="margin:0;">No steps written yet.</div>';
+  steps.forEach(function(st, i){
+    html += '<div class="sopstep"><span class="sopn">'+(i+1)+'</span><div>'+(st.text?'<div>'+esc(st.text)+'</div>':'')+(st.photo?'<img src="'+esc(st.photo)+'" alt="" loading="lazy">':'')+'</div></div>';
+  });
+  if(m.notes) html += '<div class="barsub" style="margin-top:8px;">'+esc(m.notes)+'</div>';
+  html += '</div></div>';
+  html += '<div class="sheetbtns">'+(canWriteKey(MENU_KEY)?'<button class="btn-save" id="rc_edit" style="flex:1;">Edit dish</button>':'')+'<button class="btn-cancel" id="rc_pdf" style="flex:1;">Recipe PDF</button></div>';
+  html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="rc_wa" style="flex:1;">Share on WhatsApp</button><button class="btn-cancel" id="rc_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  sheet.scrollTop = 0;
+  document.getElementById("rc_plates").addEventListener("change", function(){ var n = Math.max(1, parseInt(this.value,10)||1); openRecipeCard(id, n); });
+  document.getElementById("rc_close").addEventListener("click", closeForm);
+  var ed = document.getElementById("rc_edit"); if(ed) ed.addEventListener("click", function(){ openMenuForm(id); });
+  document.getElementById("rc_pdf").addEventListener("click", function(){ makeRecipeBook([m], false, this); });
+  document.getElementById("rc_wa").addEventListener("click", function(){
+    var t = m.name+(m.localName?" ("+m.localName+")":"")+"\n"+(m.portion?"Portion: "+m.portion+"\n":"")+"\nIngredients for "+plates+" plate"+(plates!==1?"s":"")+":\n"+
+      (m.recipe||[]).map(function(r){ var ing = ingById(r.ingredientId); return "• "+(ing?ing.name:"?")+" "+fmtQty(r2((+r.qty||0)*plates))+" "+(ing?ing.unit:""); }).join("\n")+
+      (steps.length ? "\n\nSteps:\n"+steps.map(function(st, i){ return (i+1)+". "+(st.text||"(photo)"); }).join("\n") : "");
+    try{ window.open("https://wa.me/?text="+encodeURIComponent(t), "_blank"); }catch(e){}
+  });
+}
+
+function openMenuForm(menuId){
+  var m = menuId ? menuById(menuId) : null;
+  var draft = m ? JSON.parse(JSON.stringify(m)) : { id:uid(), name:"", localName:"", category:"Tea & coffee", price:"", veg:"veg", photo:null, recipe:[], sop:[{ text:"", photo:null }], portion:"", prepTime:"", holding:"", notes:"" };
+  if(!Array.isArray(draft.sop)) draft.sop = [];
+  renderMenuFormSheet(draft, !!m);
+}
+
+function renderMenuFormSheet(draft, isEdit){
+  var sheet = document.getElementById("sheet"), costs = seesCosts();
+  var html = '<h2 class="serif">'+(isEdit?"Edit dish":"New dish")+'</h2>';
+  html += draft.photo ? '<div class="billphoto"><img src="'+esc(draft.photo)+'" alt="Dish photo"><div class="billphotobtns"><button class="btn-cancel" id="m_imgchange">Replace photo</button><button class="btn-del" id="m_imgremove">Remove</button></div></div>'
+                      : '<button class="btn-additem" id="m_imgadd" style="margin-bottom:10px;">📷 Add dish photo (shown on the menu and billing screen)</button>';
+  html += '<div class="field two"><div><label>Name</label><input type="text" id="m_name" value="'+esc(draft.name)+'" placeholder="e.g. Masala chai"></div>';
+  html += '<div><label>Name in Hindi / local (optional)</label><input type="text" id="m_local" value="'+esc(draft.localName||"")+'" placeholder="e.g. मसाला चाय"></div></div>';
+  html += '<div class="field two"><div><label>Category</label><input type="text" id="m_cat" list="m_cats" value="'+esc(draft.category||"")+'"></div>';
+  html += '<div><label>Selling price (₹)</label><input type="number" inputmode="decimal" id="m_price" value="'+esc(draft.price)+'"></div></div>';
+  html += '<datalist id="m_cats">'+menuCats().map(function(c){ return '<option value="'+esc(c)+'">'; }).join("")+'</datalist>';
+  html += '<div class="field"><label>Type</label><div class="segctl" id="m_veg" style="margin:0;">'+["veg","egg","nonveg"].map(function(v){ return '<button data-veg="'+v+'" class="'+(draft.veg===v?"on":"")+'">'+VEG_MARK[v].label+'</button>'; }).join("")+'</div></div>';
+  html += '<div class="field two"><div><label>Portion (optional)</label><input type="text" id="m_portion" value="'+esc(draft.portion||"")+'" placeholder="e.g. 150 ml cup / 1 plate"></div>';
+  html += '<div><label>Prep time, minutes (optional)</label><input type="number" inputmode="numeric" id="m_time" value="'+esc(draft.prepTime||"")+'"></div></div>';
+  html += '<div class="field"><label>Holding / shelf life (optional)</label><input type="text" id="m_hold" value="'+esc(draft.holding||"")+'" placeholder="e.g. serve within 10 min · gravy keeps 1 day in fridge"></div>';
+
+  html += '<label class="billlabel">Recipe — ingredients for ONE plate / cup</label>';
+  (draft.recipe||[]).forEach(function(r, i){
+    var ing = ingById(r.ingredientId);
+    html += '<div class="reciperow"><select class="ri" data-i="'+i+'" data-f="ingredientId">'+
+      ingredients.map(function(g){ return '<option value="'+g.id+'" '+(r.ingredientId===g.id?"selected":"")+'>'+esc(g.name)+'</option>'; }).join("")+'</select>'+
+      '<input type="number" inputmode="decimal" class="ri" data-i="'+i+'" data-f="qty" value="'+esc(r.qty)+'">'+
+      '<span class="runit" data-ru="'+i+'">'+esc(ing?ing.unit:"")+'</span>'+
+      '<button class="ndel" data-rrm="'+i+'">×</button></div>';
+  });
+  html += '<div class="billbtns">'+(ingredients.length?'<button class="btn-additem" id="m_adding">+ Add ingredient</button>':'')+'<button class="btn-additem" id="m_newing">+ New ingredient</button></div>';
+  html += '<div id="m_newingbox"></div>';
+
+  html += '<label class="billlabel" style="margin-top:12px;">SOP — steps to make it</label>';
+  draft.sop.forEach(function(st, i){
+    html += '<div class="card sopedit" style="margin-bottom:8px;padding:8px 10px;"><div style="display:flex;gap:8px;align-items:flex-start;"><span class="sopn">'+(i+1)+'</span>'+
+      '<textarea class="sopt" data-i="'+i+'" rows="2" style="flex:1;" placeholder="e.g. Boil 100 ml water with crushed ginger for 1 minute">'+esc(st.text||"")+'</textarea></div>'+
+      (st.photo ? '<img src="'+esc(st.photo)+'" alt="" style="max-width:100%;border-radius:8px;margin-top:6px;">' : '')+
+      '<div class="billbtns" style="margin-top:6px;"><button class="btn-additem" data-sopph="'+i+'">'+(st.photo?'Replace photo':'📷 Photo')+'</button>'+
+      (i>0?'<button class="btn-additem" data-sopup="'+i+'">↑ Move up</button>':'')+'<button class="btn-additem" data-soprm="'+i+'">Remove</button></div></div>';
+  });
+  html += '<button class="btn-additem" id="m_addstep">+ Add step</button>';
+  html += '<div class="field" style="margin-top:10px;"><label>Notes (optional)</label><input type="text" id="m_notes" value="'+esc(draft.notes||"")+'" placeholder="e.g. less sugar on request · allergens: milk, nuts"></div>';
+
+  if(costs) html += '<div class="card" style="margin-top:12px;" id="m_costbox"></div>';
+  html += '<div class="err" id="m_err"></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="m_cancel">Cancel</button>';
+  if(isEdit) html += '<button class="btn-del" id="m_delete">Delete</button>';
+  html += '<button class="btn-save" id="m_save">Save</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+
+  function sync(){
+    draft.name = document.getElementById("m_name").value;
+    draft.localName = document.getElementById("m_local").value;
+    draft.category = document.getElementById("m_cat").value;
+    draft.price = document.getElementById("m_price").value;
+    draft.portion = document.getElementById("m_portion").value;
+    draft.prepTime = document.getElementById("m_time").value;
+    draft.holding = document.getElementById("m_hold").value;
+    draft.notes = document.getElementById("m_notes").value;
+    Array.prototype.forEach.call(sheet.querySelectorAll(".ri"), function(inp){ draft.recipe[+inp.getAttribute("data-i")][inp.getAttribute("data-f")] = inp.value; });
+    Array.prototype.forEach.call(sheet.querySelectorAll(".sopt"), function(t){ draft.sop[+t.getAttribute("data-i")].text = t.value; });
+  }
+  function redraw(){ var y = sheet.scrollTop; renderMenuFormSheet(draft, isEdit); sheet.scrollTop = y; }
+  // Typing updates the cost box in place. Redrawing here would replace the next box the
+  // cook taps, and what they type into it would be lost.
+  function costBox(){
+    var box = document.getElementById("m_costbox");
+    sheet.querySelectorAll("[data-ru]").forEach(function(sp){ var r = draft.recipe[+sp.getAttribute("data-ru")], g = r && ingById(r.ingredientId); sp.textContent = g ? g.unit : ""; });
+    if(!box) return;
+    var rc = recipeCost({ recipe:(draft.recipe||[]).map(function(r){ return { ingredientId:r.ingredientId, qty:parseFloat(r.qty)||0 }; }) }), price = parseFloat(draft.price)||0, fc = price>0 ? rc.cost/price*100 : null;
+    box.innerHTML = '<div class="psrow"><span>Ingredient cost per plate</span><b>'+rupeeFine(rc.cost)+'</b></div>'+
+      '<div class="psrow"><span>Food cost</span><b class="'+(fc===null?"":fc<=targetFoodCost()?"ok":fc<=targetFoodCost()+10?"warnamt":"bad")+'">'+(fc===null?"—":Math.round(fc)+"% of price")+'</b></div>'+
+      '<div class="psrow"><span>Earns per plate</span><b>'+rupee(price - rc.cost)+'</b></div>'+
+      (rc.cost>0 ? '<div class="psrow"><span>Price for a '+targetFoodCost()+'% food cost</span><b>'+rupee(suggestedPrice(rc.cost))+'</b></div>' : '')+
+      (rc.missing>0 ? '<div class="backupnote" style="margin-top:6px;">'+rc.missing+' ingredient(s) have no purchase rate yet, so this cost is understated.</div>' : '');
+  }
+  costBox();
+  Array.prototype.forEach.call(sheet.querySelectorAll(".ri"), function(inp){ inp.addEventListener("input", function(){ sync(); costBox(); }); inp.addEventListener("change", function(){ sync(); costBox(); }); });
+  document.getElementById("m_price").addEventListener("input", function(){ sync(); costBox(); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-veg]"), function(b){ b.addEventListener("click", function(){ sync(); draft.veg = b.getAttribute("data-veg"); redraw(); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-rrm]"), function(b){ b.addEventListener("click", function(){ sync(); draft.recipe.splice(+b.getAttribute("data-rrm"),1); redraw(); }); });
+  var addIng = document.getElementById("m_adding");
+  if(addIng) addIng.addEventListener("click", function(){ sync(); draft.recipe.push({ ingredientId: ingredients[0].id, qty: "" }); redraw(); });
+  // A new ingredient right here, without leaving the dish.
+  document.getElementById("m_newing").addEventListener("click", function(){
+    sync();
+    var box = document.getElementById("m_newingbox");
+    box.innerHTML = '<div class="card" style="margin:8px 0;padding:8px 10px;"><div class="field two" style="margin:0;"><div><label>Ingredient name</label><input type="text" id="ni_name" list="ni_items" placeholder="e.g. Milk"></div>'+
+      '<div><label>Cook with it in</label><select id="ni_unit">'+["g","ml","pcs","kg","litre","packet"].map(function(u){ return '<option>'+u+'</option>'; }).join("")+'</select></div></div>'+
+      '<datalist id="ni_items">'+allTrackedItems().map(function(x){ return '<option value="'+esc(x)+'">'; }).join("")+'</datalist>'+
+      '<div class="sheetbtns" style="margin-top:6px;"><button class="btn-save" id="ni_add" style="flex:1;">Add to stock and to this recipe</button></div></div>';
+    document.getElementById("ni_add").addEventListener("click", function(){
+      var n = document.getElementById("ni_name").value.trim();
+      if(!n) return;
+      var ex = ingredients.find(function(g){ return normItem(g.name)===normItem(n); });
+      if(!ex){ ex = { id:uid(), name:n, unit:document.getElementById("ni_unit").value, type:"Raw material", minStock:0, vendor:"", openingStock:0, openingDate:fmtDate(new Date()), costOverride:null }; ingredients.push(ex); saveIngredients(); }
+      draft.recipe.push({ ingredientId: ex.id, qty: "" });
+      redraw();
+    });
+  });
+  function setPhoto(dataUrl){ draft.photo = dataUrl; redraw(); }
+  ["m_imgadd","m_imgchange"].forEach(function(id){ var b = document.getElementById(id); if(b) b.addEventListener("click", function(){ sync(); pickPhoto(setPhoto); }); });
+  var rmImg = document.getElementById("m_imgremove"); if(rmImg) rmImg.addEventListener("click", function(){ sync(); draft.photo = null; redraw(); });
+  document.getElementById("m_addstep").addEventListener("click", function(){ sync(); draft.sop.push({ text:"", photo:null }); redraw(); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-soprm]"), function(b){ b.addEventListener("click", function(){ sync(); draft.sop.splice(+b.getAttribute("data-soprm"),1); redraw(); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sopup]"), function(b){ b.addEventListener("click", function(){ sync(); var i = +b.getAttribute("data-sopup"); var t = draft.sop[i]; draft.sop[i] = draft.sop[i-1]; draft.sop[i-1] = t; redraw(); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sopph]"), function(b){ b.addEventListener("click", function(){ sync(); var i = +b.getAttribute("data-sopph"); pickPhoto(function(u){ draft.sop[i].photo = u; redraw(); }); }); });
+  document.getElementById("m_cancel").addEventListener("click", function(){ if(isEdit) openRecipeCard(draft.id); else closeForm(); });
+  if(isEdit) document.getElementById("m_delete").addEventListener("click", function(){
+    askConfirm("Delete “"+draft.name+"” from the menu?", function(){
+      menuItems = menuItems.filter(function(x){ return x.id!==draft.id; });
+      saveMenu(); closeForm(); renderAll();
+    });
+  });
+  document.getElementById("m_save").addEventListener("click", function(){
+    sync();
+    var errEl = document.getElementById("m_err");
+    errEl.style.display = "none";
+    if(!draft.name.trim()){ errEl.textContent = "Enter the dish name."; errEl.style.display="block"; return; }
+    var pr = parseFloat(draft.price);
+    if(isNaN(pr) || pr<=0){ errEl.textContent = "Enter the selling price."; errEl.style.display="block"; return; }
+    var old = menuById(draft.id) || {};
+    var rec = Object.assign({}, old, { id:draft.id, name:draft.name.trim(), localName:(draft.localName||"").trim(), category:(draft.category||"").trim() || "Other", price:pr,
+                active: old.active===false ? false : true, veg:draft.veg||"veg", photo:draft.photo||null,
+                portion:(draft.portion||"").trim(), prepTime: parseFloat(draft.prepTime)||"", holding:(draft.holding||"").trim(), notes:(draft.notes||"").trim(),
+                recipe:(draft.recipe||[]).map(function(r){ return { ingredientId:r.ingredientId, qty:parseFloat(r.qty)||0 }; }).filter(function(r){ return r.qty>0; }),
+                sop:(draft.sop||[]).filter(function(x){ return x && ((x.text||"").trim() || x.photo); }).map(function(x){ return { text:(x.text||"").trim(), photo:x.photo||null }; }) });
+    var idx = menuItems.findIndex(function(x){ return x.id===rec.id; });
+    if(idx>=0) menuItems[idx]=rec; else menuItems.push(rec);
+    saveMenu(); renderAll(); openRecipeCard(rec.id);
+  });
+}
+
+// ---- today's prep list ----
+// How many of each dish to expect (average of the same weekday over the last 4 weeks,
+// else the last 14 days), and what that needs from stock. Numbers can be changed.
+function expectedPlates(menuId, d){
+  function sold(day){ return dishLog.filter(function(x){ return x.date===day && x.menuId===menuId && !x.staffMeal; }).reduce(function(a,x){ return a+(+x.qty||0); },0); }
+  var same = [1,2,3,4].map(function(w){ return sold(addDays(d, -7*w)); }), withData = same.filter(function(q){ return q>0; });
+  if(withData.length) return Math.ceil(same.reduce(function(a,b){ return a+b; },0) / same.length);
+  var last = []; for(var i=1;i<=14;i++) last.push(sold(addDays(d, -i)));
+  var tot = last.reduce(function(a,b){ return a+b; },0);
+  return tot ? Math.ceil(tot/14) : 0;
+}
+function openPrepList(d, plan){
+  plan = plan || {};
+  var dishes = menuItems.filter(function(m){ return m.active!==false && (m.recipe||[]).length; });
+  dishes.forEach(function(m){ if(plan[m.id]===undefined) plan[m.id] = expectedPlates(m.id, d); });
+  var need = {};
+  dishes.forEach(function(m){ (m.recipe||[]).forEach(function(r){ need[r.ingredientId] = (need[r.ingredientId]||0) + (+r.qty||0) * (plan[m.id]||0); }); });
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Prep list · '+esc(parseDate(d).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"}))+'</h2>';
+  html += '<div class="backupnote">Expected plates come from the same weekday over the last 4 weeks of dishes logged. Change any number — the ingredients update.</div>';
+  if(!dishes.length) html += '<div class="empty">Add recipes to your dishes first.</div>';
+  else {
+    html += '<div class="card" style="margin-bottom:10px;"><h3>Plates to expect</h3>'+dishes.map(function(m){
+      return '<div class="psrow"><span>'+vegDot(m)+' '+esc(m.name)+'</span><b><input type="number" inputmode="numeric" class="pl_q" data-id="'+esc(m.id)+'" value="'+(plan[m.id]||0)+'" style="width:70px;"></b></div>'; }).join("")+'</div>';
+    var ids = Object.keys(need).filter(function(k){ return need[k]>0; });
+    var cooked = ids.filter(function(k){ var g = ingById(k); return g && g.type==="Cooked / prepared"; }), raw = ids.filter(function(k){ return cooked.indexOf(k)<0; });
+    function line(k){ var g = ingById(k), have = g ? stockLevel(k) : 0, short = g && have < need[k];
+      return '<div class="psrow"><span>'+esc(g?g.name:"(removed)")+'<br><span class="muted" style="font-size:11.5px;">in stock '+fmtQty(r2(have))+' '+esc(g?g.unit:"")+'</span></span><b class="'+(short?"bad":"")+'">'+fmtQty(r2(need[k]))+' '+esc(g?g.unit:"")+(short?' · short '+fmtQty(r2(need[k]-have)):'')+'</b></div>'; }
+    if(cooked.length) html += '<div class="card" style="margin-bottom:10px;"><h3>Prepare in advance</h3>'+cooked.map(line).join("")+'</div>';
+    html += '<div class="card" style="margin-bottom:10px;"><h3>Ingredients needed</h3>'+(raw.length ? raw.map(line).join("") : '<div class="backupnote" style="margin:0;">Nothing — no plates expected.</div>')+'</div>';
+  }
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="pl_wa" style="flex:1;">Share on WhatsApp</button><button class="btn-cancel" id="pl_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll(".pl_q"), function(inp){
+    inp.addEventListener("change", function(){ plan[inp.getAttribute("data-id")] = Math.max(0, parseInt(inp.value,10)||0); var y = sheet.scrollTop; openPrepList(d, plan); sheet.scrollTop = y; });
+  });
+  document.getElementById("pl_close").addEventListener("click", closeForm);
+  document.getElementById("pl_wa").addEventListener("click", function(){
+    var t = "Prep list "+fmtD(d)+"\n\nPlates:\n"+dishes.filter(function(m){ return plan[m.id]; }).map(function(m){ return "• "+m.name+": "+plan[m.id]; }).join("\n")+
+      "\n\nIngredients:\n"+Object.keys(need).filter(function(k){ return need[k]>0; }).map(function(k){ var g = ingById(k); return "• "+(g?g.name:"?")+": "+fmtQty(r2(need[k]))+" "+(g?g.unit:""); }).join("\n");
+    try{ window.open("https://wa.me/?text="+encodeURIComponent(t), "_blank"); }catch(e){}
+  });
+}
+
+// ---- menu analysis: what earns, what sells, what to change ----
+// Menu engineering: each dish is popular or not (share of plates vs 70% of an even
+// share) and profitable or not (earnings per plate vs the menu's average). Stars keep,
+// Plowhorses (popular, low earning) re-price or trim the portion, Puzzles (earning,
+// slow) promote, Dogs rework or drop. Plus dishes whose food cost is above target.
+function menuAnalysis(days){
+  var to = fmtDate(new Date()), from = addDays(to, -(days||30)+1), q = {};
+  dishLog.forEach(function(x){ if(!x.staffMeal && x.date>=from && x.date<=to) q[x.menuId] = (q[x.menuId]||0) + (+x.qty||0); });
+  var rows = menuItems.map(function(m){ var d = dishCost(m); return { m:m, qty:q[m.id]||0, cm:d.margin, fc:d.fc, cost:d.cost, missing:d.missing }; });
+  var total = rows.reduce(function(a,r){ return a+r.qty; },0), n = rows.length || 1;
+  var popLine = total ? 0.7 * total / n : 0;
+  var avgCm = total ? rows.reduce(function(a,r){ return a + r.cm*r.qty; },0) / total : 0;
+  rows.forEach(function(r){
+    var pop = total && r.qty >= popLine, prof = r.cm >= avgCm;
+    r.cls = !total ? "none" : pop && prof ? "star" : pop ? "plowhorse" : prof ? "puzzle" : "dog";
+  });
+  return { rows:rows, total:total, avgCm:avgCm, from:from, to:to };
+}
+var ME_INFO = {
+  star:{ t:"Stars", d:"Sell well and earn well. Keep them visible, keep quality steady.", c:"#1F5C52" },
+  plowhorse:{ t:"Plowhorses", d:"Sell well, earn little. Raise the price a little, trim the portion, or use a cheaper ingredient.", c:"#C99A06" },
+  puzzle:{ t:"Puzzles", d:"Earn well, sell slowly. Put them first on the menu, suggest them at the counter, or combo them.", c:"#2B6CB0" },
+  dog:{ t:"Dogs", d:"Sell slowly and earn little. Rework the recipe or drop them.", c:"#A6402D" }
+};
+function openMenuAnalysis(){
+  var A = menuAnalysis(30), sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Menu analysis</h2><div class="backupnote">Last 30 days of dishes logged ('+A.total+' plates). Earnings per plate = price − ingredient cost.</div>';
+  if(!A.total) html += '<div class="attmwarn">No dishes logged in the last 30 days. Use Quick tally or Type counts on the Menu tab, and this fills in.</div>';
+  else ["star","plowhorse","puzzle","dog"].forEach(function(k){
+    var list = A.rows.filter(function(r){ return r.cls===k; }).sort(function(a,b){ return b.qty-a.qty; });
+    html += '<div class="card" style="margin-bottom:10px;border-left:4px solid '+ME_INFO[k].c+';"><h3>'+ME_INFO[k].t+' <span class="muted">· '+list.length+'</span></h3><div class="barsub" style="margin:0 0 4px;">'+ME_INFO[k].d+'</div>'+
+      (list.length ? list.map(function(r){ return '<div class="psrow"><span>'+esc(r.m.name)+'</span><b style="font-weight:500;">'+r.qty+' sold · earns '+rupee(r.cm)+'</b></div>'; }).join("") : '<div class="backupnote" style="margin:0;">None.</div>')+'</div>';
+  });
+  var over = A.rows.filter(function(r){ return r.fc!==null && r.fc > targetFoodCost() && !r.missing; }).sort(function(a,b){ return b.fc-a.fc; });
+  html += '<div class="card" style="margin-bottom:10px;"><h3>Price check <span class="muted">· target food cost '+targetFoodCost()+'%</span></h3>';
+  html += over.length ? over.map(function(r){ return '<div class="psrow"><span>'+esc(r.m.name)+'<br><span class="muted" style="font-size:11.5px;">costs '+rupeeFine(r.cost)+' · '+Math.round(r.fc)+'% of '+rupee(r.m.price)+'</span></span><b>try '+rupee(suggestedPrice(r.cost))+'</b></div>'; }).join("")
+                      : '<div class="backupnote" style="margin:0;">Every costed dish is within the target.</div>';
+  var unc = A.rows.filter(function(r){ return r.missing || !(r.m.recipe||[]).length; }).length;
+  if(unc) html += '<div class="barsub" style="margin-top:6px;">'+unc+' dish'+(unc!==1?'es have':' has')+' no full recipe cost yet, so '+(unc!==1?'they are':'it is')+' left out.</div>';
+  html += '<div class="field two" style="margin-top:8px;"><div><label>Target food cost (%)</label><input type="number" inputmode="numeric" id="ma_target" value="'+targetFoodCost()+'"></div><div style="display:flex;align-items:end;"><button class="btn-additem" id="ma_save">Save target</button></div></div></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="ma_close" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("ma_close").addEventListener("click", closeForm);
+  document.getElementById("ma_save").addEventListener("click", function(){ var v = parseFloat(document.getElementById("ma_target").value); if(v>0 && v<100){ settings.targetFoodCost = v; saveSettings(); renderAll(); openMenuAnalysis(); } });
+}
+
+// ---- recipe & SOP book (PDF) ----
+function openRecipeBookSheet(){
+  var sheet = document.getElementById("sheet"), cats = menuCats().filter(function(c){ return menuItems.some(function(m){ return (m.category||"Other")===c; }); });
+  var html = '<h2 class="serif">Recipe &amp; SOP book</h2><div class="backupnote">One page per dish: photo, ingredients (per plate and for 10 plates) and the numbered steps. Print it for the kitchen wall or give it to a new cook.</div>';
+  html += '<div class="field"><label>Dishes</label><select id="rb_cat"><option value="">All dishes ('+menuItems.length+')</option>'+cats.map(function(c){ return '<option value="'+esc(c)+'">'+esc(c)+'</option>'; }).join("")+'</select></div>';
+  if(seesCosts()) html += '<label class="setlopt"><input type="checkbox" id="rb_cost"> <span>Include cost and food cost % (leave off for the kitchen copy)</span></label>';
+  html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="rb_close">Close</button><button class="btn-save" id="rb_go">Create PDF</button></div>';
+  sheet.innerHTML = html;
+  document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("rb_close").addEventListener("click", closeForm);
+  document.getElementById("rb_go").addEventListener("click", function(){
+    var c = document.getElementById("rb_cat").value, list = menuItems.filter(function(m){ return !c || (m.category||"Other")===c; });
+    var cb = document.getElementById("rb_cost");
+    makeRecipeBook(list, !!(cb && cb.checked), this);
+  });
+}
+function loadPdfImage(url){
+  return new Promise(function(resolve){
+    if(!url) return resolve(null);
+    var img = new Image();
+    img.onload = function(){
+      try{ var c = document.createElement("canvas"), max = 700, w = img.naturalWidth, h = img.naturalHeight;
+        if(w>max || h>max){ if(w>h){ h = Math.round(h*max/w); w = max; } else { w = Math.round(w*max/h); h = max; } }
+        c.width = w; c.height = h; c.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve({ data:c.toDataURL("image/jpeg", 0.7), w:w, h:h }); }catch(e){ resolve(null); }
+    };
+    img.onerror = function(){ resolve(null); };
+    img.src = url;
+  });
+}
+function buildRecipeBookPdf(list, withCost, imgs, Ctor){
+  var jsPDF = Ctor || window.jspdf.jsPDF;
+  var doc = new jsPDF({ unit:"pt", format:"a4" });
+  var W = doc.internal.pageSize.getWidth(), H = doc.internal.pageSize.getHeight(), M = 40;
+  var ink = [36,26,18], soft = [91,80,68], teal = [31,92,82];
+  // Cover
+  doc.setFillColor(31,92,82); doc.rect(0, 0, W, 120, "F");
+  doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(24); doc.text(pdfClean(OUTLET.name), M, 60);
+  doc.setFont("helvetica","normal"); doc.setFontSize(13); doc.text("Recipe & SOP book", M, 86);
+  doc.setTextColor.apply(doc, ink); doc.setFontSize(11);
+  var y = 160;
+  doc.setFont("helvetica","bold"); doc.text("Dishes", M, y); y += 16; doc.setFont("helvetica","normal"); doc.setFontSize(10);
+  list.forEach(function(m, i){ if(y > H-60){ doc.addPage(); y = M; } doc.text((i+1)+".  "+pdfClean(m.name)+"   ("+pdfClean(m.category||"")+")", M, y); y += 14; });
+  doc.setTextColor.apply(doc, soft); doc.setFontSize(9); doc.text("Made "+new Date().toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})+". Quantities are for one plate / cup unless shown for 10.", M, Math.min(y+14, H-50));
+  list.forEach(function(m){
+    doc.addPage(); y = M;
+    var img = imgs[m.id];
+    var textW = img ? W - 2*M - 190 : W - 2*M;
+    doc.setTextColor.apply(doc, ink); doc.setFont("helvetica","bold"); doc.setFontSize(18);
+    doc.text(doc.splitTextToSize(pdfClean(m.name), textW), M, y+14);
+    doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor.apply(doc, soft);
+    var vm = VEG_MARK[m.veg] ? VEG_MARK[m.veg].label : "";
+    var info = [m.category, vm, "Rs. "+(m.price||0), m.portion, m.prepTime ? m.prepTime+" min" : "", m.holding].filter(Boolean).map(pdfClean).join("  |  ");
+    doc.text(doc.splitTextToSize(info, textW), M, y+34);
+    if(withCost){ var d = dishCost(m); doc.text("Cost / plate Rs. "+r2(d.cost)+"   |   Food cost "+(d.fc===null?"-":Math.round(d.fc)+"%")+"   |   Earns Rs. "+Math.round(d.margin), M, y+62); }
+    if(img){ var iw = 180, ih = Math.min(150, img.h*iw/img.w); doc.addImage(img.data, "JPEG", W-M-iw, y, iw, ih); y = Math.max(y+80, y+ih+14); } else y += 80;
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, theme:"grid", head:[["Ingredient","1 plate","10 plates"]],
+      body: (m.recipe||[]).map(function(r){ var g = ingById(r.ingredientId); return [pdfClean(g?g.name:"(removed)"), fmtQty(+r.qty||0)+" "+(g?g.unit:""), fmtQty(r2((+r.qty||0)*10))+" "+(g?g.unit:"")]; }).concat((m.recipe||[]).length ? [] : [["No recipe yet","",""]]),
+      styles:{ fontSize:10, cellPadding:5, textColor:ink, lineColor:[226,220,200], lineWidth:0.6 }, headStyles:{ fillColor:teal, textColor:255 },
+      columnStyles:{ 1:{ halign:"right", cellWidth:90 }, 2:{ halign:"right", cellWidth:90 } },
+      didParseCell: function(c){ if(c.section==="head" && c.column.index>0) c.cell.styles.halign = "right"; } });
+    y = doc.lastAutoTable.finalY + 20;
+    doc.setTextColor.apply(doc, ink); doc.setFont("helvetica","bold"); doc.setFontSize(12); doc.text("Steps (SOP)", M, y); y += 16;
+    var steps = (m.sop||[]).filter(function(x){ return x && (x.text || x.photo); });
+    if(!steps.length){ doc.setFont("helvetica","normal"); doc.setFontSize(10); doc.setTextColor.apply(doc, soft); doc.text("No steps written yet.", M, y); y += 14; }
+    steps.forEach(function(st, i){
+      var si = imgs[m.id+"#"+i], lines = doc.splitTextToSize(pdfClean(st.text||""), W - 2*M - 30 - (si ? 110 : 0));
+      var hgt = Math.max(lines.length*13, si ? Math.min(80, si.h*100/si.w) : 0) + 10;
+      if(y + hgt > H - 50){ doc.addPage(); y = M; }
+      doc.setFillColor(36,26,18); doc.circle(M+9, y+4, 9, "F"); doc.setTextColor(255,255,255); doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.text(String(i+1), M+9, y+7, { align:"center" });
+      doc.setTextColor.apply(doc, ink); doc.setFont("helvetica","normal"); doc.setFontSize(10.5); doc.text(lines, M+26, y+8);
+      if(si) doc.addImage(si.data, "JPEG", W-M-100, y-4, 100, Math.min(80, si.h*100/si.w));
+      y += hgt;
+    });
+    if(m.notes){ y += 6; doc.setFontSize(9.5); doc.setTextColor.apply(doc, soft); doc.text(doc.splitTextToSize("Note: "+pdfClean(m.notes), W-2*M), M, y); }
+  });
+  pdfFooter(doc, OUTLET.name+" - Recipe & SOP book");
+  return { doc:doc, fname:(OUTLET.name+"_Recipes"+(list.length===1?"_"+list[0].name:"")).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf" };
+}
+function makeRecipeBook(list, withCost, btn){
+  if(!list.length){ appAlert("No dishes to put in the book."); return; }
+  var label = btn ? btn.textContent : ""; if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  ensurePdfLib().then(function(){
+    var imgs = {}, jobs = [];
+    list.forEach(function(m){
+      if(m.photo) jobs.push(loadPdfImage(m.photo).then(function(x){ if(x) imgs[m.id] = x; }));
+      (m.sop||[]).filter(function(x){ return x && (x.text || x.photo); }).forEach(function(st, i){ if(st.photo) jobs.push(loadPdfImage(st.photo).then(function(x){ if(x) imgs[m.id+"#"+i] = x; })); });
+    });
+    return Promise.all(jobs).then(function(){
+      var out = buildRecipeBookPdf(list, withCost, imgs);
+      if(btn){ btn.disabled = false; btn.textContent = label; }
+      sharePdf(out.doc, out.fname);
+    });
+  }).catch(function(){ if(btn){ btn.disabled = false; btn.textContent = label; } appAlert("Couldn't create the PDF. Check the internet connection."); });
 }
 
 // ---------- COLD DRINKS & WATER (resale stock) ----------
@@ -5639,91 +6071,6 @@ function openAuditForm(){
 function fmtQty(n){
   n = +n || 0;
   return (Math.round(n*100)/100).toLocaleString("en-IN");
-}
-
-function openMenuForm(menuId){
-  var m = menuId ? menuById(menuId) : null;
-  var draft = m ? JSON.parse(JSON.stringify(m)) : { id:uid(), name:"", category:"Beverages", price:"", recipe:[] };
-  renderMenuFormSheet(draft, !!m);
-}
-
-function renderMenuFormSheet(draft, isEdit){
-  var sheet = document.getElementById("sheet");
-  var html = '<h2 class="serif">'+(isEdit?"Edit menu item":"Add menu item")+'</h2>';
-  html += '<div class="field two"><div><label>Name</label><input type="text" id="m_name" value="'+esc(draft.name)+'"></div>';
-  html += '<div><label>Category</label><select id="m_cat">'+["Beverages","Snacks","Meals","Desserts"].map(function(c){ return '<option '+(draft.category===c?"selected":"")+'>'+c+'</option>'; }).join("")+'</select></div></div>';
-  html += '<div class="field"><label>Selling price (₹)</label><input type="number" inputmode="decimal" id="m_price" value="'+draft.price+'"></div>';
-
-  html += '<label class="billlabel">Recipe - portion per plate/cup</label>';
-  if(ingredients.length===0){
-    html += '<div class="backupnote">Add ingredients in the Stock tab first, then set portions here.</div>';
-  }
-  (draft.recipe||[]).forEach(function(r, i){
-    var ing = ingById(r.ingredientId);
-    html += '<div class="reciperow"><select class="ri" data-i="'+i+'" data-f="ingredientId">'+
-      ingredients.map(function(g){ return '<option value="'+g.id+'" '+(r.ingredientId===g.id?"selected":"")+'>'+esc(g.name)+'</option>'; }).join("")+'</select>'+
-      '<input type="number" inputmode="decimal" class="ri" data-i="'+i+'" data-f="qty" value="'+r.qty+'">'+
-      '<span class="runit">'+esc(ing?ing.unit:"")+'</span>'+
-      '<button class="ndel" data-rrm="'+i+'">×</button></div>';
-  });
-  if(ingredients.length>0) html += '<button class="btn-additem" id="m_adding">+ Add ingredient to recipe</button>';
-
-  var rc = recipeCost(draft);
-  var price = parseFloat(draft.price)||0;
-  html += '<div class="card" style="margin-top:12px;">';
-  html += '<div class="psrow"><span>Ingredient cost per portion</span><b>'+rupeeFine(rc.cost)+'</b></div>';
-  html += '<div class="psrow"><span>Selling price</span><b>'+rupee(price)+'</b></div>';
-  html += '<div class="psrow"><span>Gross margin</span><b class="'+(price>0&&(price-rc.cost)/price>=0.65?"ok":(price>0&&(price-rc.cost)/price>=0.5?"warnamt":"bad"))+'">'+
-          (price>0?Math.round((price-rc.cost)/price*100)+"%":"—")+'</b></div>';
-  if(rc.missing>0) html += '<div class="backupnote" style="margin-top:6px;">'+rc.missing+' ingredient(s) have no purchase rate yet, so this cost is understated.</div>';
-  html += '</div>';
-
-  html += '<div class="err" id="m_err"></div>';
-  html += '<div class="sheetbtns"><button class="btn-cancel" id="m_cancel">Cancel</button>';
-  if(isEdit) html += '<button class="btn-del" id="m_delete">Delete</button>';
-  html += '<button class="btn-save" id="m_save">Save</button></div>';
-  sheet.innerHTML = html;
-  document.getElementById("sheetBg").classList.add("on");
-
-  function sync(){
-    draft.name = document.getElementById("m_name").value;
-    draft.category = document.getElementById("m_cat").value;
-    draft.price = document.getElementById("m_price").value;
-    Array.prototype.forEach.call(sheet.querySelectorAll(".ri"), function(inp){
-      var i = +inp.getAttribute("data-i"), f = inp.getAttribute("data-f");
-      draft.recipe[i][f] = f==="qty" ? inp.value : inp.value;
-    });
-  }
-  Array.prototype.forEach.call(sheet.querySelectorAll(".ri"), function(inp){
-    inp.addEventListener("change", function(){ sync(); renderMenuFormSheet(draft, isEdit); });
-  });
-  Array.prototype.forEach.call(sheet.querySelectorAll("[data-rrm]"), function(b){
-    b.addEventListener("click", function(){ sync(); draft.recipe.splice(+b.getAttribute("data-rrm"),1); renderMenuFormSheet(draft, isEdit); });
-  });
-  var addIng = document.getElementById("m_adding");
-  if(addIng) addIng.addEventListener("click", function(){
-    sync(); draft.recipe.push({ ingredientId: ingredients[0].id, qty: 1 }); renderMenuFormSheet(draft, isEdit);
-  });
-  document.getElementById("m_cancel").addEventListener("click", closeForm);
-  if(isEdit) document.getElementById("m_delete").addEventListener("click", function(){
-    askConfirm("Delete this menu item?", function(){
-    menuItems = menuItems.filter(function(x){ return x.id!==draft.id; });
-    saveMenu(); closeForm(); renderAll();
-  });
-  });
-  document.getElementById("m_save").addEventListener("click", function(){
-    sync();
-    var errEl = document.getElementById("m_err");
-    errEl.style.display = "none";
-    if(!draft.name.trim()){ errEl.textContent = "Enter the item name."; errEl.style.display="block"; return; }
-    var pr = parseFloat(draft.price);
-    if(isNaN(pr) || pr<=0){ errEl.textContent = "Enter the selling price."; errEl.style.display="block"; return; }
-    var rec = { id:draft.id, name:draft.name.trim(), category:draft.category, price:pr, active:true,
-                recipe:(draft.recipe||[]).map(function(r){ return { ingredientId:r.ingredientId, qty:parseFloat(r.qty)||0 }; }).filter(function(r){ return r.qty>0; }) };
-    var idx = menuItems.findIndex(function(x){ return x.id===rec.id; });
-    if(idx>=0) menuItems[idx]=rec; else menuItems.push(rec);
-    saveMenu(); closeForm(); renderAll();
-  });
 }
 
 function openCafeUseForm(){

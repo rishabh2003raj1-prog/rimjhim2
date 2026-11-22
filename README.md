@@ -273,3 +273,22 @@ Also: **Activity** (owner / partner) lists who changed what and how many entries
 **daily server backups** of every store at 2:30 AM, kept 14 days, downloadable from Backup & restore (owner can
 also "Back up now"); the old PIN-header import route is switched off (set `ALLOW_LEGACY_PUSH = "1"` to re-enable);
 bill photos open only for their own store.
+
+### Menu, recipes & SOPs (Step 5)
+Records → **Menu**. Each dish has a **photo**, a **Hindi / local name**, a **veg / egg / non-veg** mark, category,
+price, portion, prep time, holding / shelf life, notes, a **recipe** (ingredients per plate, costed from your
+purchase prices; a new ingredient can be added right from the dish) and an **SOP** — numbered steps, each with an
+optional photo, reorderable.
+- The menu is a grid of photo tiles by category with a readiness bar ("12 of 20 dishes ready" = photo, price,
+  recipe and SOP set) and what each dish still needs.
+- Tap a dish for its **recipe card**: ingredients scaled to any number of plates, the SOP with photos, Edit, a
+  one-dish PDF and WhatsApp share.
+- **Recipe & SOP book (PDF)**: cover with the dish list, then one page per dish (photo, ingredients for 1 and 10
+  plates, numbered steps with step photos); all dishes or one category; costs optional (off for the kitchen copy).
+- **Today's prep list**: expected plates per dish (same weekday, last 4 weeks of dishes logged; else last 14 days),
+  editable, with the ingredients and "prepare in advance" items needed vs stock and shortfalls; WhatsApp share.
+- **Menu analysis** (owner / partner / manager): stars, plowhorses, puzzles and dogs from the last 30 days with
+  what to do about each, and a **price check** of dishes above the target food cost (default 30%, editable) with a
+  suggested price. The menu warns when dishes cost more than target + 5%.
+- Chefs edit dishes but don't see costs or margins; billing can only view.
+- Fixed: typing in the dish form no longer redraws it (which lost the next field being typed into).
