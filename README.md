@@ -408,9 +408,11 @@ Customers get their own page at **/c** (e.g. `https://<your-site>/c`), completel
 - Matching is by the customer's name on bills (as in Customers & loyalty) and payments recorded against them.
 
 ### Order types & Live orders (Counter)
-At the top of the Counter: **🍽️ Dine-in · 🛍️ Takeaway · 🛵 Delivery · 🔴 Zomato · 🟠 Swiggy** (the choice is remembered
-on the phone).
-- **Dine-in**: pick a table (tables are set in ⚙️ Settings; busy tables show their running amount), add items,
+At the top of the Counter: **🍽️ Dine-in · 🛍️ Takeaway · 🛵 Delivery** (the choice is remembered on the phone). Zomato and
+Swiggy order types were built and then switched off at the owner's request; the code stays for a possible direct link later.
+- **Dine-in**: pick a table (busy tables show their running amount; owner / manager tap **✏️ Edit** at the end of the
+  table row, or ⚙️ Settings → Edit tables, to rename, add, remove or reorder tables — a table with an open order
+  can't be removed or renamed), add items,
   **Send to kitchen** — no payment yet. More items for the same table join the same order (marked new for the
   kitchen). The bill is made from Live orders when the guests ask, then paid as usual (cash / UPI / udhaar,
   discounts).

@@ -236,7 +236,7 @@
   .custcode{font-size:38px;font-weight:800;letter-spacing:6px;text-align:center;margin:10px 0 2px;font-variant-numeric:tabular-nums;}
   .mpcats{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13.5px;} .mpcats label{display:flex;gap:5px;align-items:center;}
   .mpprev img{width:100%;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;display:block;}
-  .ctype{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:8px;}
+  .ctype{display:grid;grid-template-columns:repeat(auto-fit,minmax(0,1fr));gap:6px;margin-bottom:8px;}
   .ctype button{border:2px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 2px;font:inherit;font-size:12px;font-weight:600;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:2px;}
   .ctype button span{font-size:22px;line-height:1;} .ctype button.on{border-color:var(--ink);background:var(--ink);color:#fff;}
   .ctype button.zomato.on{background:#CB202D;border-color:#CB202D;} .ctype button.swiggy.on{background:#FC8019;border-color:#FC8019;}
@@ -253,6 +253,9 @@
   .packrow{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:2px solid var(--line);background:var(--panel);border-radius:12px;padding:12px;margin-bottom:8px;font:inherit;font-size:15px;color:var(--ink);}
   .packrow b{width:28px;height:28px;border-radius:8px;border:2px solid var(--line);display:flex;align-items:center;justify-content:center;flex:0 0 28px;} .packrow.on{border-color:#2E7D4F;background:#EEF7F1;} .packrow.on b{background:#2E7D4F;color:#fff;border-color:#2E7D4F;}
   .kbig.cook{background:#C2412D;} .kbig.live{background:#1F5C52;}
+  .tblrow{display:flex;gap:6px;align-items:center;margin-bottom:6px;} .tblrow input{flex:1;min-width:0;padding:10px;border-radius:10px;border:1px solid var(--line);font:inherit;font-size:15px;}
+  .tblrow button{width:38px;height:38px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:16px;} .tblrow button:disabled{opacity:.35;}
+  .ctables button.tbedit{border-style:dashed;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -9407,7 +9410,8 @@ var counterType = (function(){ try{ var v = localStorage.getItem(TYPE_KEY); retu
 var counterTable = null, counterTicket = null, counterMeta = {};
 function setCounterType(t){ counterType = t; counterTable = null; counterTicket = null; counterMeta = {}; try{ localStorage.setItem(TYPE_KEY, t); }catch(e){} }
 function isPlatform(t){ return !!(CHANNELS[t] && CHANNELS[t].platform); }
-function platformCfg(p){ var c = (settings.platforms||{})[p] || {}; return { enabled: c.enabled!==false, commission: c.commission===0 || +c.commission>0 ? +c.commission : 25, markup: +c.markup||0, packing: +c.packing||0, prep: +c.prep>0 ? +c.prep : 15 }; }
+// Zomato / Swiggy are switched off (the owner removed them); the code stays for a future direct link.
+function platformCfg(p){ var c = (settings.platforms||{})[p] || {}; return { enabled: c.enabled===true && false, commission: c.commission===0 || +c.commission>0 ? +c.commission : 25, markup: +c.markup||0, packing: +c.packing||0, prep: +c.prep>0 ? +c.prep : 15 }; }
 function cafeTables(){ var t = settings.tables; return Array.isArray(t) && t.length ? t : ["Table 1","Table 2","Table 3","Table 4","Outside 1","Outside 2","Outside 3"]; }
 function deliveryCharge(){ var v = settings.deliveryCharge; return v===0 || +v>0 ? +v : 20; }
 // Price for the current order type: platforms can carry a markup to cover their commission.
@@ -9461,6 +9465,34 @@ function createTicket(o){
   var now = new Date(), t = Object.assign({ id:uid(), no:nextTicketNo(), date:fmtDate(now), at:now.getTime(), time:nowHM(), status: isPlatform(o.type) && !o.accepted ? "new" : "cooking", steps:{}, byName:myName() }, o);
   tLog(t, "placed"); liveOrders.push(t); saveLive(); return t;
 }
+// Edit the cafe's tables: rename, remove, add, reorder. A table with an open (unpaid) order can't be removed.
+function canEditTables(){ return isFullAccess() || myAccess()==="manager"; }
+function openTablesEditor(back){
+  var list = cafeTables().slice(), sheet = document.getElementById("sheet");
+  function draw(){
+    var html = '<h2 class="serif">✏️ Tables · टेबल</h2><div class="backupnote">Name each table the way staff call it (e.g. Table 1, Window, Outside 2). Use ↑ ↓ to set the order they show on the Counter.</div>';
+    html += list.map(function(t, i){ var busy = !!openTicketFor(t);
+      return '<div class="tblrow"><input data-tn="'+i+'" value="'+esc(t)+'"'+(busy?' disabled':'')+'><button data-tu="'+i+'"'+(i===0?' disabled':'')+'>↑</button><button data-td="'+i+'"'+(i===list.length-1?' disabled':'')+'>↓</button>'+
+        (busy ? '<span class="muted" style="font-size:11px;">open order</span>' : '<button class="ndel" data-tr="'+i+'">×</button>')+'</div>'; }).join("");
+    html += '<button class="btn-additem" id="tb_add" style="margin-top:6px;">+ Add table</button>';
+    html += '<div class="err" id="tb_err"></div><div class="sheetbtns"><button class="btn-cancel" id="tb_c">Cancel</button><button class="btn-save" id="tb_s">Save</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    function sync(){ Array.prototype.forEach.call(sheet.querySelectorAll("[data-tn]"), function(inp){ list[+inp.getAttribute("data-tn")] = inp.value; }); }
+    function on(sel, fn){ Array.prototype.forEach.call(sheet.querySelectorAll(sel), function(b){ b.addEventListener("click", function(){ sync(); fn(b); draw(); }); }); }
+    on("[data-tu]", function(b){ var i = +b.getAttribute("data-tu"); var x = list[i]; list[i] = list[i-1]; list[i-1] = x; });
+    on("[data-td]", function(b){ var i = +b.getAttribute("data-td"); var x = list[i]; list[i] = list[i+1]; list[i+1] = x; });
+    on("[data-tr]", function(b){ list.splice(+b.getAttribute("data-tr"), 1); });
+    on("#tb_add", function(){ var n = 1; while(list.some(function(t){ return String(t).trim().toLowerCase()==="table "+n; })) n++; list.push("Table "+n); });
+    document.getElementById("tb_c").addEventListener("click", function(){ if(back) back(); else closeForm(); });
+    document.getElementById("tb_s").addEventListener("click", function(){
+      sync(); var clean = list.map(function(t){ return String(t||"").trim(); }).filter(Boolean), e = document.getElementById("tb_err");
+      if(!clean.length){ e.textContent = "Keep at least one table."; e.style.display = "block"; return; }
+      var seen = {}; if(clean.some(function(t){ var k = t.toLowerCase(); if(seen[k]) return true; seen[k] = 1; return false; })){ e.textContent = "Two tables have the same name."; e.style.display = "block"; return; }
+      settings.tables = clean; saveSettings(); if(counterTable && clean.indexOf(counterTable)<0) counterTable = null; renderAll(); if(back) back(); else closeForm();
+    });
+  }
+  draw();
+}
 function counterBarLabel(){
   if(counterTicket) return "Bill ➜";
   if(counterType==="dine") return counterTable ? (openTicketFor(counterTable) ? "Add to "+counterTable+" ➜" : "Send to kitchen ➜") : "Pick a table ↑";
@@ -9469,11 +9501,13 @@ function counterBarLabel(){
   return "Bill ➜";
 }
 function counterTypeHtml(){
+  if(isPlatform(counterType) && !platformCfg(counterType).enabled && !counterTicket) setCounterType("take");
   var html = '<div class="ctype">'+Object.keys(CHANNELS).filter(function(k){ return !CHANNELS[k].platform || platformCfg(k).enabled; }).map(function(k){
     var c = CHANNELS[k]; return '<button data-ctype="'+k+'" class="'+k+(counterType===k?" on":"")+'"><span>'+c.i+'</span>'+c.t+'</button>'; }).join("")+'</div>';
   if(counterType==="dine" && !counterTicket){
     html += '<div class="ctables">'+cafeTables().map(function(tb){ var o = openTicketFor(tb);
-      return '<button data-table="'+esc(tb)+'" class="'+(counterTable===tb?"on ":"")+(o?"busy":"")+'">'+esc(tb)+(o?'<i>'+rupee((o.items||[]).reduce(function(a,i){ return a+i.qty*i.price; },0))+'</i>':'<i>free</i>')+'</button>'; }).join("")+'</div>';
+      return '<button data-table="'+esc(tb)+'" class="'+(counterTable===tb?"on ":"")+(o?"busy":"")+'">'+esc(tb)+(o?'<i>'+rupee((o.items||[]).reduce(function(a,i){ return a+i.qty*i.price; },0))+'</i>':'<i>free</i>')+'</button>'; }).join("")+
+      (canEditTables() ? '<button id="ct_tables" class="tbedit">✏️<i>Edit</i></button>' : '')+'</div>';
   }
   if(counterTicket){ var tk = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk) html += '<div class="backupnote">Billing <b>'+esc(ticketLabel(tk))+'</b>. <a href="#" id="ct_unbill">Stop</a></div>'; }
   if(isPlatform(counterType)){ var pc = platformCfg(counterType); html += '<div class="backupnote">'+CHANNELS[counterType].t+' prices'+(pc.markup?' (+'+pc.markup+'%)':'')+'. Add the items exactly as in the '+CHANNELS[counterType].t+' app.</div>'; }
@@ -9482,6 +9516,7 @@ function counterTypeHtml(){
 function wireCounterType(el){
   Array.prototype.forEach.call(el.querySelectorAll("[data-ctype]"), function(b){ b.addEventListener("click", function(){ if(counterTicket) return; setCounterType(b.getAttribute("data-ctype")); renderCounter(); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-table]"), function(b){ b.addEventListener("click", function(){ var tb = b.getAttribute("data-table"); counterTable = counterTable===tb ? null : tb; renderCounter(); }); });
+  var te = el.querySelector("#ct_tables"); if(te) te.addEventListener("click", function(){ openTablesEditor(null); });
   var ub = el.querySelector("#ct_unbill"); if(ub) ub.addEventListener("click", function(ev){ ev.preventDefault(); counterTicket = null; counterOrder = {}; counterDisc = null; renderCounter(); });
 }
 // What "Bill / Send" does for the chosen order type.
@@ -9775,20 +9810,15 @@ function openUpiSettings(){
         '<button class="btn-additem" id="of_add">+ Add offer</button>';
     }
     html += '<div class="dgroup">Order types</div>'+
-      '<div class="field"><label>Tables (comma separated)</label><input id="up_tables" value="'+esc(cafeTables().join(", "))+'"></div>'+
+      '<div class="psrow"><span>Tables: '+esc(cafeTables().join(", "))+'</span><button class="btn-additem" id="up_tables" style="width:auto;padding:6px 12px;">✏️ Edit tables</button></div>'+
       '<div class="field"><label>Own delivery charge (₹)</label><input id="up_dcharge" type="number" inputmode="numeric" value="'+esc(deliveryCharge())+'"></div>';
-    ["zomato","swiggy"].forEach(function(pl){ var pc = platformCfg(pl), ch = CHANNELS[pl];
-      html += '<div class="card" style="margin-bottom:8px;"><label class="poclose" style="margin:0 0 6px;"><input type="checkbox" id="up_'+pl+'_on"'+(pc.enabled?" checked":"")+'> <b>'+ch.i+' '+ch.t+'</b> orders</label>'+
-        '<div class="field two"><div><label>Commission %</label><input id="up_'+pl+'_comm" type="number" inputmode="decimal" value="'+esc(pc.commission)+'"></div><div><label>Price markup % on '+ch.t+'</label><input id="up_'+pl+'_mk" type="number" inputmode="decimal" value="'+esc(pc.markup)+'"></div></div>'+
-        '<div class="field two"><div><label>Packing charge (₹)</label><input id="up_'+pl+'_pack" type="number" inputmode="numeric" value="'+esc(pc.packing)+'"></div><div><label>Preparation time (min)</label><input id="up_'+pl+'_prep" type="number" inputmode="numeric" value="'+esc(pc.prep)+'"></div></div></div>';
-    });
-    html += '<div class="backupnote">Zomato and Swiggy orders are accepted on their partner apps and entered here with the order ID; the Live orders board then guides packing and rider handover. A direct link to your Zomato / Swiggy accounts needs an approved integration (for example through UrbanPiper); orders could then arrive here automatically.</div>';
     html += '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
-    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_tables","up_dcharge"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
+    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     Object.keys(keep).forEach(function(k){ var e = document.getElementById(k); if(e) e.value = keep[k]; });
     function err(m){ var e = document.getElementById("up_err"); e.textContent = m; e.style.display = "block"; }
     document.getElementById("up_cancel").addEventListener("click", closeForm);
+    document.getElementById("up_tables").addEventListener("click", function(){ openTablesEditor(openUpiSettings); });
     Array.prototype.forEach.call(sheet.querySelectorAll("[data-rmoffer]"), function(b){ b.addEventListener("click", function(){ offs.splice(+b.getAttribute("data-rmoffer"), 1); draw(); }); });
     var ad = document.getElementById("of_add");
     if(ad) ad.addEventListener("click", function(){
@@ -9803,11 +9833,8 @@ function openUpiSettings(){
       if(id && !/^[\w.\-]{2,}@[\w.\-]{2,}$/.test(id)) return err("That doesn\u2019t look like a UPI ID (name@bank).");
       if(!(mx>=0 && mx<=100)) return err("The limit must be between 0 and 100%.");
       settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx;
-      var tbs = document.getElementById("up_tables").value.split(",").map(function(x){ return x.trim(); }).filter(Boolean); if(tbs.length) settings.tables = tbs;
       var dc = parseFloat(document.getElementById("up_dcharge").value); settings.deliveryCharge = dc>=0 ? dc : 0;
-      var pls = {}; ["zomato","swiggy"].forEach(function(pl){ pls[pl] = { enabled: document.getElementById("up_"+pl+"_on").checked, commission: parseFloat(document.getElementById("up_"+pl+"_comm").value)||0,
-        markup: parseFloat(document.getElementById("up_"+pl+"_mk").value)||0, packing: parseFloat(document.getElementById("up_"+pl+"_pack").value)||0, prep: parseFloat(document.getElementById("up_"+pl+"_prep").value)||15 }; });
-      settings.platforms = pls; saveSettings();
+      saveSettings();
       if(canOffers){ offers = offs; saveOffers(); }
       closeForm(); renderCounter();
     });
