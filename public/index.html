@@ -209,6 +209,29 @@
   @media(max-width:380px){.poline{grid-template-columns:1fr 56px 66px;}.poline .porate{grid-column:1 / 3;}}
   .pdacts{display:flex;flex-direction:column;gap:8px;margin:12px 0;} .pdacts button{width:100%;}
   .rcvflag{font-size:12.5px;margin-top:4px;} .poclose{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;margin:4px 0 10px;}
+  .khome{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .kbig{position:relative;border:none;border-radius:18px;padding:18px 8px;color:#fff;font:inherit;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:132px;justify-content:center;box-shadow:0 2px 8px rgba(36,26,18,.15);}
+  .kbig span{font-size:44px;line-height:1.1;} .kbig b{font-size:19px;} .kbig i{font-style:normal;font-size:12.5px;opacity:.9;}
+  .kbig em{position:absolute;top:8px;right:10px;min-width:26px;height:26px;border-radius:13px;background:#fff;color:#A6402D;font-style:normal;font-weight:800;line-height:26px;padding:0 6px;}
+  .kbig.buy{background:#2E7D4F;} .kbig.recv{background:#3B5BA9;} .kbig.waste{background:#A6402D;} .kbig.count{background:#8A6D1F;} .kbig.checks{background:#4E5D6C;}
+  body.simple .kbig{min-height:150px;} body.simple .kbig b{font-size:22px;} body.simple .kbig span{font-size:52px;}
+  .kback{display:flex;align-items:center;gap:10px;margin-bottom:12px;} .kback button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 14px;font:inherit;font-weight:700;} .kback b{font-size:15px;}
+  .ktile{position:relative;background:var(--panel);border:2px solid var(--line);border-radius:14px;padding:6px;font:inherit;color:var(--ink);display:flex;flex-direction:column;gap:1px;text-align:center;}
+  .ktile.has{border-color:var(--teal-dk);background:var(--teal-bg);}
+  .kimg{position:relative;aspect-ratio:1/1;border-radius:10px;overflow:hidden;background:#EFE8D8;display:flex;align-items:center;justify-content:center;}
+  .kimg img{width:100%;height:100%;object-fit:cover;} .kimg span{font-size:42px;line-height:1;} body.simple .kimg span{font-size:58px;}
+  .kflag{position:absolute;left:4px;bottom:4px;background:#C9772B;color:#fff;font-size:11.5px;border-radius:6px;padding:2px 6px;} .kflag.out{background:#A6402D;}
+  .ksub{font-size:12.5px;font-weight:700;color:var(--teal-dk);}
+  .kq{text-align:center;} .kqimg{width:110px;height:110px;margin:0 auto 6px;border-radius:18px;overflow:hidden;background:#EFE8D8;display:flex;align-items:center;justify-content:center;} .kqimg img{width:100%;height:100%;object-fit:cover;} .kqimg span{font-size:62px;}
+  .kqname{font-size:22px;display:block;} .kqhead{font-weight:700;margin:12px 0 6px;font-size:15px;}
+  .kqstep{display:flex;align-items:center;justify-content:center;gap:12px;margin:8px 0;} .kqstep b{font-size:34px;min-width:70px;} .kqstep span{font-size:16px;color:var(--ink-soft);} .kqstep .pbtn{width:56px;height:56px;border-radius:28px;font-size:28px;}
+  .kqchips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin:6px 0;} .kqchips button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:11px 14px;font:inherit;font-size:15px;font-weight:600;color:var(--ink);} .kqchips button.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .kqin{width:60%;padding:10px;border-radius:10px;border:1px solid var(--line);font:inherit;text-align:center;margin-top:6px;}
+  .kreasons{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;} .kreasons button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 4px;font:inherit;font-size:13px;display:flex;flex-direction:column;align-items:center;gap:2px;color:var(--ink);} .kreasons button span{font-size:28px;} .kreasons button.on{border-color:#A6402D;background:#FBEDEA;font-weight:700;}
+  .kpo{display:block;width:100%;text-align:left;border:2px solid var(--line);background:var(--panel);border-radius:14px;padding:12px;margin-bottom:10px;font:inherit;color:var(--ink);} .kpo b{font-size:18px;display:block;} .kpo span{font-size:12.5px;color:var(--ink-soft);}
+  .kpoitems{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;} .kpoitems i{font-style:normal;background:#EFE8D8;border-radius:8px;padding:4px 8px;font-size:13.5px;}
+  .krow{border:2px solid var(--line);border-radius:14px;padding:10px;margin-bottom:10px;background:var(--panel);} .krow.ok{border-color:#2E7D4F;background:#EEF7F1;} .krow.short{border-color:#C9772B;background:#FFF4E0;}
+  .krowh{display:flex;align-items:center;gap:8px;} .krate{font-size:13.5px;margin-top:6px;text-align:center;} .krate input{width:90px;padding:7px;border-radius:8px;border:1px solid var(--line);font:inherit;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -634,6 +657,7 @@
     </div>
 
     <div class="view" id="view-counter"><div id="counterView"></div></div>
+    <div class="view" id="view-kitchen"><div id="kitchenView"></div></div>
 
     <div class="view" id="view-records">
       <div class="listhead">
@@ -729,6 +753,10 @@
     <button data-v="counter">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2Z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>
       Counter
+    </button>
+    <button data-v="kitchen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 11h16v2a7 7 0 0 1-7 7h-2a7 7 0 0 1-7-7z"/><path d="M8 8c0-2 2-2 2-4M12 8c0-2 2-2 2-4M16 8c0-2 2-2 2-4"/></svg>
+      Kitchen
     </button>
     <button data-v="dashboard" class="on">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12l9-8 9 8"/><path d="M5 10v9a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9"/></svg>
@@ -1008,7 +1036,7 @@ var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
   VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY];
-var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo";
+var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
 function photoSlots(key, list){
@@ -1458,9 +1486,9 @@ function canSwitchStores(){ return isOwner() || (cloud.who && cloud.who.outlet==
 var ACCESS_LABEL = { owner:"Owner", partner:"Partner", full:"Full access", manager:"Manager", chef:"Chef / kitchen", billing:"Billing / counter" };
 // Each role's screens. Anything not listed is hidden.
 var ROLE_SCREENS = {
-  manager: { nav:["dashboard","counter","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
-  chef:    { nav:["notes","staff","records"], rec:["purchases","orders","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
-  billing: { nav:["counter","notes","staff","records"], rec:["sales","orders","customers","cash"], staff:["roster","attendance","tasks"] }
+  manager: { nav:["dashboard","counter","kitchen","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
+  chef:    { nav:["kitchen","notes","staff","records"], rec:["purchases","orders","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
+  billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash"], staff:["roster","attendance","tasks"] }
 };
 function roleScreens(){ return isFullAccess() ? null : (ROLE_SCREENS[myAccess()] || ROLE_SCREENS.billing); }
 // Lists each kind of note writes to, so a note this login can't file is refused clearly.
@@ -2231,6 +2259,7 @@ function renderAll(){
   renderStaffSection();
   renderNotes();
   renderCounter();
+  renderKitchen();
   try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } updateNavBadge(); }catch(e){}
 }
 
@@ -6695,7 +6724,15 @@ function openPoReceive(id){
     var lines = rows.filter(function(r){ return r.gotQ>0; });
     if(!lines.length && !document.getElementById("rc_close").checked){ e.textContent = "Enter what was received (or tick close the order)."; e.style.display = "block"; return; }
     if(lines.some(function(r){ return !(r.gotR>0); })){ e.textContent = "Enter the price for every item received."; e.style.display = "block"; return; }
-    var pay = document.getElementById("rc_pay").value, mode = pay==="credit" ? "Credit" : pay==="cash" ? "Cash" : "UPI", paidBy = pay==="upi" ? "Cafe UPI/bank" : "Cafe cash";
+    applyPoDelivery(po, rows, document.getElementById("rc_pay").value, document.getElementById("rc_close").checked);
+    renderAll(); openPoDetail(po.id);
+  });
+}
+// Save a delivery: each received line becomes a purchase linked to the order.
+// rows: [{ l: order line, qty: still expected, gotQ: received, gotR: price on bill }]
+function applyPoDelivery(po, rows, pay, closeAll){
+  var lines = rows.filter(function(r){ return r.gotQ>0; });
+  var mode = pay==="credit" ? "Credit" : pay==="cash" ? "Cash" : "UPI", paidBy = pay==="upi" ? "Cafe UPI/bank" : "Cafe cash";
     var today = fmtDate(new Date()), bid = "po_"+po.id+"_"+((po.purchaseIds||[]).length+1), ids = [];
     lines.forEach(function(r){
       var pid = uid(); ids.push(pid);
@@ -6706,14 +6743,221 @@ function openPoReceive(id){
     po.purchaseIds = (po.purchaseIds||[]).concat(ids);
     var gotAll = {}; po.received.forEach(function(r){ gotAll[r.lineId] = (gotAll[r.lineId]||0) + r.qty; });
     var complete = (po.lines||[]).every(function(l){ return (gotAll[l.id]||0) >= (+l.qty||0)-0.0001; });
-    po.status = complete || document.getElementById("rc_close").checked ? "received" : "partial";
+    po.status = complete || closeAll ? "received" : "partial";
     po.receivedAt = today; po.receivedByName = myName();
     var short = rows.filter(function(r){ return r.gotQ < r.qty-0.0001; }).length, dear = rows.filter(function(r){ return r.l.rate && r.gotR > r.l.rate*1.05; }).length;
     poLog(po, "received "+lines.length+" item"+(lines.length!==1?"s":"")+" ("+rupee(lines.reduce(function(a,r){ return a+r.gotQ*r.gotR; },0))+", "+(mode==="Credit"?"pay later":mode)+")"+(short?" · "+short+" short":"")+(dear?" · "+dear+" pricier":""));
     if(lines.length) savePurch();
-    savePos(); renderAll(); openPoDetail(po.id);
-  });
+  savePos();
 }
+// ---------- KITCHEN: picture screen for staff ----------
+// Same idea as the Counter: big pictures, Hindi words, few choices. Four jobs:
+// मँगवाना (need to buy -> purchase request), माल आया (goods arrived -> receive an order),
+// खराब हुआ (wastage), गिनती (stock count, done blind: staff never see the expected figure).
+var kView = "home", kBasket = {}, kNeed = 1;
+var ING_ICONS = [[/milk|doodh/i,"🥛"],[/paneer|cheese/i,"🧀"],[/curd|dahi|yogurt/i,"🥣"],[/butter|makhan/i,"🧈"],[/cream|malai/i,"🥛"],[/egg|anda/i,"🥚"],[/chicken|murga/i,"🍗"],[/mutton|meat/i,"🥩"],[/fish/i,"🐟"],
+  [/onion|pyaz/i,"🧅"],[/tomato|tamatar/i,"🍅"],[/potato|aloo/i,"🥔"],[/garlic|lahsun/i,"🧄"],[/ginger|adrak/i,"🫚"],[/chilli|mirch/i,"🌶️"],[/capsicum|shimla/i,"🫑"],[/carrot|gajar/i,"🥕"],[/cabbage|patta|lettuce|palak|spinach|coriander|dhania|mint|pudina/i,"🥬"],
+  [/mushroom/i,"🍄"],[/corn|makka/i,"🌽"],[/lemon|nimbu|lime/i,"🍋"],[/cucumber|kheera/i,"🥒"],[/peas|matar|beans/i,"🫛"],[/banana|kela/i,"🍌"],[/apple/i,"🍎"],[/mango|aam/i,"🥭"],[/fruit/i,"🍉"],
+  [/rice|chawal|basmati/i,"🍚"],[/atta|maida|flour|besan|suji|rava/i,"🌾"],[/dal|lentil|rajma|chana|chole/i,"🫘"],[/bread|bun|pav|toast/i,"🍞"],[/noodle|maggi|pasta/i,"🍜"],[/momo|wrapper|sheet/i,"🥟"],
+  [/oil|tel|ghee/i,"🛢️"],[/sugar|cheeni|shakkar/i,"🍬"],[/salt|namak/i,"🧂"],[/tea|chai|patti/i,"🍃"],[/coffee/i,"☕"],[/masala|spice|haldi|jeera|garam|powder/i,"🌶️"],[/sauce|ketchup|mayo|vinegar|soya/i,"🥫"],
+  [/water|bisleri|jar/i,"💧"],[/gas|cylinder/i,"🔥"],[/cold drink|coke|pepsi|soda/i,"🥤"],[/cup|glass/i,"🥤"],[/box|container|packet|parcel|foil|bag/i,"📦"],[/tissue|napkin/i,"🧻"],[/soap|clean|phenyl|vim|harpic|detergent/i,"🧽"],[/ice/i,"🧊"]];
+function ingIcon(g){ for(var i=0;i<ING_ICONS.length;i++) if(ING_ICONS[i][0].test(g.name||"")) return ING_ICONS[i][1]; return "📦"; }
+function ingLabel(g){ return g.localName || g.name; }
+function buyUnit(g){ return g.unit==="g" ? "kg" : g.unit==="ml" ? "litre" : g.unit; }
+function toBuy(g, q){ return (g.unit==="g" || g.unit==="ml") ? q/1000 : q; }          // ingredient unit -> buying unit
+function fromBuy(g, q){ return (g.unit==="g" || g.unit==="ml") ? q*1000 : q; }        // buying unit -> ingredient unit
+function qtyChips(u){ return u==="kg" ? [0.5,1,2,5] : u==="litre" ? [1,2,5,10] : u==="pcs" ? [6,12,30,50] : [1,2,5,10]; }
+function qtyStep(u){ return (u==="kg" || u==="litre") ? 0.5 : 1; }
+function kSeesStock(){ return canReadKey(PURCH_KEY) && canReadKey(ING_KEY); }
+function kItems(){
+  var list = ingredients.filter(function(g){ return g && g.name; });
+  if(!kSeesStock()) return list.sort(function(a,b){ return ingLabel(a).localeCompare(ingLabel(b)); });
+  var info = {}; list.forEach(function(g){ info[g.id] = stockInfo(g); });
+  return list.sort(function(a,b){ var sa = info[a.id].status==="ok"?1:0, sb = info[b.id].status==="ok"?1:0; return sa-sb || ingLabel(a).localeCompare(ingLabel(b)); });
+}
+function kTile(g, extra, attr){
+  var low = kSeesStock() ? stockInfo(g) : null;
+  return '<button class="ktile'+(extra&&extra.on?" has":"")+'" '+attr+'><div class="kimg">'+(g.photo ? '<img src="'+esc(g.photo)+'" alt="" loading="lazy">' : '<span>'+ingIcon(g)+'</span>')+
+    (low && low.status==="out" ? '<b class="kflag out">खत्म</b>' : low && low.status==="low" ? '<b class="kflag">कम है</b>' : '')+(extra&&extra.badge ? '<b class="cqty">'+extra.badge+'</b>' : '')+'</div>'+
+    '<div class="cloc">'+esc(ingLabel(g))+'</div>'+(g.localName && !simpleMode() ? '<div class="cname">'+esc(g.name)+'</div>' : '')+(extra&&extra.sub ? '<div class="ksub">'+extra.sub+'</div>' : '')+'</button>';
+}
+function kOrdered(){ return pos.filter(function(p){ return p.status==="ordered" || p.status==="partial"; }); }
+function kMyRequests(){ return pos.filter(function(p){ return poMine(p) && ["requested","review","approved"].indexOf(p.status)>=0; }); }
+function renderKitchen(){
+  var el = document.getElementById("kitchenView"); if(!el) return;
+  applySimpleMode();
+  var html = "";
+  if(kView==="home"){
+    var low = kSeesStock() ? stockAlerts().length : 0, ord = kOrdered().length, mine = kMyRequests();
+    html += '<div class="listhead"><h2 class="serif">Kitchen · रसोई</h2></div>';
+    html += '<div class="khome">';
+    if(canWriteKey(POS_KEY)) html += '<button class="kbig buy" data-kv="buy"><span>🛒</span><b>मँगवाना है</b><i>Need to buy</i>'+(low?'<em>'+low+'</em>':'')+'</button>';
+    if(canWriteKey(PURCH_KEY) && canWriteKey(POS_KEY)) html += '<button class="kbig recv" data-kv="recv"><span>📦</span><b>माल आया</b><i>Goods arrived</i>'+(ord?'<em>'+ord+'</em>':'')+'</button>';
+    if(canWriteKey(WASTE_KEY)) html += '<button class="kbig waste" data-kv="waste"><span>🗑️</span><b>खराब हुआ</b><i>Wasted</i></button>';
+    if(canWriteKey(AUDIT_KEY)) html += '<button class="kbig count" data-kv="count"><span>📋</span><b>गिनती</b><i>Count stock</i></button>';
+    if(canWriteKey(CHECKS_KEY)) html += '<button class="kbig checks" id="k_checks"><span>✅</span><b>जाँच</b><i>Daily checks</i>'+(checklistStatus().some(function(x){ return x.missed; })?'<em>!</em>':'')+'</button>';
+    html += '</div>';
+    if(mine.length) html += '<div class="card" style="margin-top:12px;"><h3>Your requests · आपकी माँग</h3>'+mine.map(function(p){
+      return '<div class="psrow"><span>'+poNo(p)+' · '+esc(p.vendor)+'</span><b class="'+PO_STATUS[p.status].c+'">'+({requested:"⏳ manager",review:"⏳ owner",approved:"✔ approved"}[p.status])+'</b></div>'; }).join("")+'</div>';
+    html += '<div class="ctools" style="margin-top:12px;"><button id="k_simple" class="'+(simpleMode()?"on":"")+'">'+(simpleMode()?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button><button id="k_voice" class="'+(voiceOn()?"on":"")+'">'+(voiceOn()?"🔊":"🔇")+'</button></div>';
+    if(!ingredients.length) html += '<div class="empty">No items yet. The owner or manager adds them in Records → Stock (+ Ingredient), with a photo and Hindi name.</div>';
+  } else {
+    var titles = { buy:"🛒 मँगवाना है · Need to buy", recv:"📦 माल आया · Goods arrived", waste:"🗑️ खराब हुआ · Wasted", count:"📋 गिनती · Count stock" };
+    html += '<div class="kback"><button id="k_back">← Back</button><b>'+titles[kView]+'</b></div>';
+    if(kView==="buy"){
+      html += '<div class="cgrid">'+kItems().map(function(g){ var q = kBasket[g.id];
+        return kTile(g, { on:!!q, badge: q ? fmtQty(q) : "", sub: q ? fmtQty(q)+" "+buyUnit(g) : "" }, 'data-kbuy="'+esc(g.id)+'"'); }).join("")+'</div>';
+      var n = Object.keys(kBasket).filter(function(k){ return kBasket[k]>0; }).length;
+      html += '<div class="cbar'+(n?" on":"")+'">'+(n ? '<button class="cclear" id="k_clear">✕</button><div class="ctot"><b>🛒 '+n+'</b><span>item'+(n!==1?'s':'')+'</span></div><button class="cgo" id="k_send">भेजें Send ➜</button>' : '<div class="chint">Tap a picture · फोटो दबाएँ</div>')+'</div>';
+    } else if(kView==="recv"){
+      var od = kOrdered();
+      if(!od.length) html += '<div class="empty">Nothing is on order right now. · अभी कोई ऑर्डर नहीं है।</div>';
+      html += od.map(function(p){
+        return '<button class="kpo" data-krecv="'+esc(p.id)+'"><b>'+esc(p.vendor)+'</b><span>'+poNo(p)+(p.needBy?' · '+parseDate(p.needBy).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):'')+'</span>'+
+          '<div class="kpoitems">'+(p.lines||[]).map(function(l){ var g = ingById(l.ingredientId) || ingredients.find(function(x){ return normItem(x.name)===normItem(l.item); }); return '<i>'+(g?ingIcon(g):"📦")+' '+esc(g?ingLabel(g):l.item)+' '+fmtQty(l.qty)+' '+esc(l.unit)+'</i>'; }).join("")+'</div></button>';
+      }).join("");
+    } else if(kView==="waste"){
+      html += '<div class="cgrid">'+kItems().map(function(g){ return kTile(g, null, 'data-kwaste="'+esc(g.id)+'"'); }).join("")+'</div>';
+    } else if(kView==="count"){
+      var today = fmtDate(new Date());
+      html += '<div class="backupnote">Count what is really there and tap the item. · जो रखा है वो गिनकर लिखें।</div>';
+      html += '<div class="cgrid">'+kItems().map(function(g){ var done = stockAudits.find(function(a){ return a.ingredientId===g.id && a.date===today; });
+        return kTile(g, { on:!!done, badge: done ? "✔" : "", sub: done ? fmtQty(toBuy(g, done.counted))+" "+buyUnit(g) : "" }, 'data-kcount="'+esc(g.id)+'"'); }).join("")+'</div>';
+    }
+  }
+  el.innerHTML = html;
+  function on(sel, fn){ Array.prototype.forEach.call(el.querySelectorAll(sel), function(b){ b.addEventListener("click", function(){ fn(b); }); }); }
+  on("[data-kv]", function(b){ kView = b.getAttribute("data-kv"); renderKitchen(); window.scrollTo(0,0); });
+  on("#k_back", function(){ kView = "home"; renderKitchen(); });
+  on("#k_checks", function(){ var sheet = document.getElementById("sheet"); sheet.innerHTML = checksCard(false)+'<div class="sheetbtns"><button class="btn-cancel" id="cc_close" style="flex:1;">Close</button></div>';
+    document.getElementById("sheetBg").classList.add("on"); wireChecksCard(sheet); document.getElementById("cc_close").addEventListener("click", closeForm); });
+  on("#k_simple", function(){ setSimpleMode(!simpleMode()); renderKitchen(); });
+  on("#k_voice", function(){ setVoice(!voiceOn()); renderKitchen(); });
+  on("[data-kbuy]", function(b){ kQtySheet(ingById(b.getAttribute("data-kbuy")), "buy"); });
+  on("[data-kwaste]", function(b){ kQtySheet(ingById(b.getAttribute("data-kwaste")), "waste"); });
+  on("[data-kcount]", function(b){ kQtySheet(ingById(b.getAttribute("data-kcount")), "count"); });
+  on("[data-krecv]", function(b){ kReceive(b.getAttribute("data-krecv")); });
+  on("#k_clear", function(){ askConfirm("Clear the list? · सूची हटाएँ?", function(){ kBasket = {}; renderKitchen(); }); });
+  on("#k_send", kSendSheet);
+}
+var WASTE_PICS = [["Spoiled / expired","🤢","खराब / पुराना"],["Burnt / cooking error","🔥","जल गया"],["Spillage / breakage","💧","गिर गया"],["Customer returned","↩️","वापस आया"],["Over-prepared, unsold","🍲","बच गया"],["Other","❓","और कुछ"]];
+// One item: pick a quantity with big buttons (and a reason for wastage).
+function kQtySheet(g, mode){
+  if(!g) return;
+  var u = buyUnit(g), step = qtyStep(u), today = fmtDate(new Date());
+  var q = mode==="buy" ? (kBasket[g.id] || 0) : 0, reason = null;
+  if(mode==="count"){ var d0 = stockAudits.find(function(a){ return a.ingredientId===g.id && a.date===today; }); if(d0) q = Math.round(toBuy(g, d0.counted)*100)/100; }
+  if(mode==="buy" && !q && kSeesStock()){ var si = stockInfo(g); if(si.status!=="ok" && si.order>0){ q = Math.max(step, Math.ceil(toBuy(g, si.order)/step)*step); } }
+  var sheet = document.getElementById("sheet");
+  function draw(){
+    var head = { buy:"कितना मँगवाना है? · How much to buy?", waste:"कितना खराब हुआ? · How much was wasted?", count:"कितना रखा है? · How much is there?" }[mode];
+    var html = '<div class="kq"><div class="kqimg">'+(g.photo ? '<img src="'+esc(g.photo)+'" alt="">' : '<span>'+ingIcon(g)+'</span>')+'</div><b class="kqname">'+esc(ingLabel(g))+'</b>'+(g.localName?'<div class="muted">'+esc(g.name)+'</div>':'')+
+      '<div class="kqhead">'+head+'</div>'+
+      '<div class="kqstep"><button class="pbtn" id="kq_m">−</button><b id="kq_v">'+fmtQty(q)+'</b><span>'+esc(u)+'</span><button class="pbtn" id="kq_p">+</button></div>'+
+      '<div class="kqchips">'+qtyChips(u).map(function(c){ return '<button data-kc="'+c+'">'+fmtQty(c)+' '+esc(u)+'</button>'; }).join("")+'</div>'+
+      '<input type="number" inputmode="decimal" id="kq_in" class="kqin" placeholder="or type · या लिखें" value="">';
+    if(mode==="waste") html += '<div class="kqhead">क्यों? · Why?</div><div class="kreasons">'+WASTE_PICS.map(function(r){ return '<button data-kr="'+esc(r[0])+'" class="'+(reason===r[0]?"on":"")+'"><span>'+r[1]+'</span>'+esc(r[2])+'</button>'; }).join("")+'</div>';
+    html += '<div class="err" id="kq_err"></div><div class="sheetbtns">'+(mode==="buy" && kBasket[g.id] ? '<button class="btn-del" id="kq_rm">Remove</button>' : '<button class="btn-cancel" id="kq_c">Cancel</button>')+'<button class="btn-save" id="kq_ok">✔ OK</button></div></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    function set(v){ q = Math.max(0, Math.round(v*100)/100); document.getElementById("kq_v").textContent = fmtQty(q); }
+    document.getElementById("kq_m").addEventListener("click", function(){ set(q-step); });
+    document.getElementById("kq_p").addEventListener("click", function(){ set(q+step); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-kc]"), function(b){ b.addEventListener("click", function(){ set(+b.getAttribute("data-kc")); }); });
+    document.getElementById("kq_in").addEventListener("input", function(){ var v = parseFloat(this.value); if(v>=0) set(v); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-kr]"), function(b){ b.addEventListener("click", function(){ reason = b.getAttribute("data-kr"); var keepQ = q; draw(); set(keepQ); }); });
+    var c = document.getElementById("kq_c"); if(c) c.addEventListener("click", closeForm);
+    var rm = document.getElementById("kq_rm"); if(rm) rm.addEventListener("click", function(){ delete kBasket[g.id]; closeForm(); renderKitchen(); });
+    document.getElementById("kq_ok").addEventListener("click", function(){
+      var e = document.getElementById("kq_err"); function bad(m){ e.textContent = m; e.style.display = "block"; }
+      if(mode==="buy"){ if(q>0) kBasket[g.id] = q; else delete kBasket[g.id]; closeForm(); renderKitchen(); return; }
+      if(mode==="waste"){
+        if(!(q>0)) return bad("How much? · कितना?");
+        if(!reason) return bad("Tap why · कारण चुनें");
+        wastage.push({ id:uid(), date:today, ingredientId:g.id, qty:fromBuy(g, q), reason:reason, note:"by "+myName() });
+        saveWastage(); closeForm(); renderAll(); sayHindi("दर्ज हो गया"); appAlert("Saved ✔ · दर्ज हो गया: "+ingLabel(g)+" "+fmtQty(q)+" "+u); return;
+      }
+      if(mode==="count"){
+        var exp = kSeesStock() ? stockLevel(g.id) : 0;
+        stockAudits = stockAudits.filter(function(a){ return !(a.ingredientId===g.id && a.date===today); });
+        stockAudits.push({ id:uid(), date:today, ingredientId:g.id, counted:fromBuy(g, q), expected:exp, byName:myName() });
+        saveAudits(); closeForm(); renderAll(); sayHindi("गिनती दर्ज"); return;
+      }
+    });
+  }
+  draw();
+}
+// Send the basket: one request per vendor (items with no usual vendor go together).
+function kSendSheet(){
+  var ids = Object.keys(kBasket).filter(function(k){ return kBasket[k]>0 && ingById(k); });
+  if(!ids.length) return;
+  var sheet = document.getElementById("sheet");
+  function draw(){
+    var html = '<h2 class="serif">🛒 भेजें · Send request</h2>'+ids.map(function(k){ var g = ingById(k);
+      return '<div class="pline"><span class="picon">'+ingIcon(g)+'</span><div class="pname"><b>'+esc(ingLabel(g))+'</b>'+(g.localName?'<span>'+esc(g.name)+'</span>':'')+'</div><b class="pq">'+fmtQty(kBasket[k])+' '+esc(buyUnit(g))+'</b></div>'; }).join("");
+    html += '<div class="kqhead" style="margin-top:12px;">कब चाहिए? · Needed</div><div class="kqchips">'+[[0,"आज · Today"],[1,"कल · Tomorrow"],[2,"परसों · In 2 days"]].map(function(x){ return '<button data-kn="'+x[0]+'" class="'+(kNeed===x[0]?"on":"")+'">'+x[1]+'</button>'; }).join("")+'</div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="ks_c">← Back</button><button class="btn-save" id="ks_ok">✔ भेजें · Send</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-kn]"), function(b){ b.addEventListener("click", function(){ kNeed = +b.getAttribute("data-kn"); draw(); }); });
+    document.getElementById("ks_c").addEventListener("click", closeForm);
+    document.getElementById("ks_ok").addEventListener("click", function(){
+      var byV = {};
+      ids.forEach(function(k){ var g = ingById(k), v = g.vendor || "Any shop"; (byV[v] = byV[v] || []).push(g); });
+      var made = [];
+      Object.keys(byV).forEach(function(v){
+        var lines = byV[v].map(function(g){ var u = buyUnit(g), lr = lastRate(g.name, u); return { id:uid(), ingredientId:g.id, item:g.name, qty:kBasket[g.id], unit:u, rate: lr!==null ? Math.round(lr*100)/100 : 0 }; });
+        var po = { id:uid(), no:nextPoNo(), date:fmtDate(new Date()), vendor:v, needBy:addDays(fmtDate(new Date()), kNeed), note:"", lines:lines, status:"requested", byName:myName(), history:[] };
+        poLog(po, "requested (Kitchen)"); if(isFullAccess()){ po.status = "approved"; poLog(po, "approved"); }
+        pos.push(po); made.push(po);
+      });
+      savePos(); kBasket = {}; closeForm(); kView = "home"; renderAll();
+      sayHindi("माँग भेज दी");
+      appAlert("Sent ✔ · माँग भेज दी: "+made.map(poNo).join(", ")+(isFullAccess() ? "" : ". The manager will check it."));
+    });
+  }
+  draw();
+}
+// Goods arrived, the simple way: ✔ all came, or say how much; price only if it differs.
+function kReceive(id){
+  var po = poById(id); if(!po) return;
+  var got = {}; (po.received||[]).forEach(function(r){ got[r.lineId] = (got[r.lineId]||0) + (+r.qty||0); });
+  var rows = (po.lines||[]).map(function(l){ var left = Math.max(0, (+l.qty||0)-(got[l.id]||0)); var g = ingById(l.ingredientId) || ingredients.find(function(x){ return normItem(x.name)===normItem(l.item); });
+    return { l:l, g:g, left:left, q:null, rate:+l.rate||0, rateOk:true }; }).filter(function(r){ return r.left>0; });
+  var pay = "credit", sheet = document.getElementById("sheet");
+  function draw(){
+    var html = '<h2 class="serif">📦 '+esc(po.vendor)+' · '+poNo(po)+'</h2><div class="backupnote">हर चीज़ देखें · Check each item.</div>';
+    html += rows.map(function(r, i){
+      var stepU = qtyStep(r.l.unit);
+      return '<div class="krow'+(r.q===null?"":r.q>=r.left-0.0001?" ok":" short")+'"><div class="krowh"><span class="picon">'+(r.g?ingIcon(r.g):"📦")+'</span><div class="pname"><b>'+esc(r.g?ingLabel(r.g):r.l.item)+'</b><span>मँगाया · ordered '+fmtQty(r.left)+' '+esc(r.l.unit)+'</span></div></div>'+
+        '<div class="kqchips"><button data-kall="'+i+'" class="'+(r.q!==null && r.q>=r.left-0.0001?"on":"")+'">✔ पूरा आया · All came</button><button data-kless="'+i+'" class="'+(r.q!==null && r.q<r.left-0.0001?"on":"")+'">− कम आया · Less</button></div>'+
+        (r.q!==null && r.q<r.left-0.0001 ? '<div class="kqstep"><button class="pbtn" data-kqm="'+i+'" data-st="'+stepU+'">−</button><b>'+fmtQty(r.q)+'</b><span>'+esc(r.l.unit)+'</span><button class="pbtn" data-kqp="'+i+'" data-st="'+stepU+'">+</button></div>' : '')+
+        (r.l.rate ? '<div class="krate">₹'+fmtQty(r.l.rate)+' / '+esc(r.l.unit)+' — '+(r.rateOk ? 'बिल पर यही? <a href="#" data-krate="'+i+'">Different price</a>' : '<input type="number" inputmode="decimal" data-kri="'+i+'" value="'+(r.rate||"")+'" placeholder="₹ on bill"> per '+esc(r.l.unit))+'</div>'
+          : '<div class="krate">Price on bill (₹ per '+esc(r.l.unit)+'): <input type="number" inputmode="decimal" data-kri="'+i+'" value="'+(r.rate||"")+'"></div>')+'</div>';
+    }).join("");
+    html += '<div class="kqhead" style="margin-top:10px;">पैसे · Payment</div><div class="ppay">'+[["credit","📒","बाद में · Later"],["cash","💵","कैश · Cash"],["upi","📱","UPI"]].map(function(x){
+      return '<button data-kpay="'+x[0]+'" class="ast '+(x[0]==="credit"?"repair":"ok")+(pay===x[0]?" on":"")+'"><span>'+x[1]+'</span>'+x[2]+'</button>'; }).join("")+'</div>';
+    html += '<div class="err" id="kr_err"></div><div class="sheetbtns"><button class="btn-cancel" id="kr_c">← Back</button><button class="btn-save" id="kr_ok">✔ Save · दर्ज करें</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    function on(sel, fn){ Array.prototype.forEach.call(sheet.querySelectorAll(sel), function(b){ b.addEventListener("click", function(ev){ ev.preventDefault(); fn(b); }); }); }
+    on("[data-kall]", function(b){ var r = rows[+b.getAttribute("data-kall")]; r.q = r.left; draw(); });
+    on("[data-kless]", function(b){ var r = rows[+b.getAttribute("data-kless")]; r.q = Math.max(0, r.left - qtyStep(r.l.unit)); draw(); });
+    on("[data-kqm]", function(b){ var r = rows[+b.getAttribute("data-kqm")]; r.q = Math.max(0, Math.round((r.q - +b.getAttribute("data-st"))*100)/100); draw(); });
+    on("[data-kqp]", function(b){ var r = rows[+b.getAttribute("data-kqp")]; r.q = Math.min(r.left, Math.round((r.q + +b.getAttribute("data-st"))*100)/100); draw(); });
+    on("[data-krate]", function(b){ rows[+b.getAttribute("data-krate")].rateOk = false; draw(); });
+    on("[data-kpay]", function(b){ pay = b.getAttribute("data-kpay"); draw(); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-kri]"), function(inp){ inp.addEventListener("input", function(){ rows[+inp.getAttribute("data-kri")].rate = parseFloat(inp.value)||0; }); });
+    document.getElementById("kr_c").addEventListener("click", closeForm);
+    document.getElementById("kr_ok").addEventListener("click", function(){
+      var e = document.getElementById("kr_err"); function bad(m){ e.textContent = m; e.style.display = "block"; }
+      if(rows.some(function(r){ return r.q===null; })) return bad("हर चीज़ पर ✔ या − दबाएँ · Tap All came or Less on every item.");
+      if(rows.some(function(r){ return r.q>0 && !(r.rate>0); })) return bad("Price missing · रेट लिखें");
+      applyPoDelivery(po, rows.map(function(r){ return { l:r.l, qty:r.left, gotQ:r.q, gotR:r.rate }; }), pay, false);
+      closeForm(); kView = "home"; renderAll(); sayHindi("माल दर्ज हो गया");
+      appAlert("Saved ✔ · माल दर्ज हो गया ("+poNo(po)+(po.status==="partial" ? ", rest still to come · बाकी आना है" : "")+")");
+    });
+  }
+  draw();
+}
+
 function poAttention(){
   var out = [], mine = pos.filter(poNeedsMe);
   var rv = mine.filter(function(p){ return p.status==="review"; }).length, rq = mine.filter(function(p){ return p.status==="requested"; }).length,
@@ -6918,6 +7162,9 @@ function openIngredientForm(ingId, presetType){
   var html = '<h2 class="serif">'+(g?"Edit ingredient":"Add ingredient")+'</h2>';
   html += '<div class="field two"><div><label>Name</label><input type="text" id="i_name" value="'+esc(g?g.name:"")+'"></div>';
   html += '<div><label>Recipe unit</label><select id="i_unit">'+["g","ml","pcs","litre","kg","packet"].map(function(u){ return '<option '+(g&&g.unit===u?"selected":"")+'>'+u+'</option>'; }).join("")+'</select></div></div>';
+  var iPhoto = g ? (g.photo||null) : null;
+  html += '<div class="field two"><div><label>Name in Hindi (Kitchen screen)</label><input type="text" id="i_local" placeholder="e.g. पनीर" value="'+esc(g&&g.localName||"")+'"></div>'+
+    '<div><label>Photo</label><button class="btn-additem" id="i_photo" style="padding:9px;">'+(iPhoto?'<img src="'+esc(iPhoto)+'" alt="" style="height:26px;vertical-align:middle;border-radius:4px;"> Change':'📷 Add photo')+'</button></div></div>';
   html += '<div class="field"><label>Type</label><select id="i_type">'+ING_TYPES.map(function(t){ return '<option '+((g&&g.type===t)||(!g&&t===(presetType||"Raw material"))?"selected":"")+'>'+t+'</option>'; }).join("")+'</select></div>';
   html += '<div class="backupnote">Use the small unit you actually cook with (g, ml, pcs). Buying in kg or litre is handled automatically. Mark items you cook and store — gravy, boiled potato — as "Cooked / prepared".</div>';
   html += '<div class="field two"><div><label>Minimum stock</label><input type="number" inputmode="decimal" id="i_min" value="'+(g?g.minStock:"")+'"></div>';
@@ -6941,6 +7188,7 @@ function openIngredientForm(ingId, presetType){
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("i_cancel").addEventListener("click", closeForm);
+  document.getElementById("i_photo").addEventListener("click", function(){ var btn = this; pickPhoto(function(data){ iPhoto = data; btn.innerHTML = '<img src="'+esc(data)+'" alt="" style="height:26px;vertical-align:middle;border-radius:4px;"> Change'; }); });
   if(g) document.getElementById("i_delete").addEventListener("click", function(){
     var used = menuItems.some(function(m){ return (m.recipe||[]).some(function(r){ return r.ingredientId===g.id; }); });
     var __go = function(){
@@ -6964,6 +7212,7 @@ function openIngredientForm(ingId, presetType){
                 costOverride: co===""?null:parseFloat(co) };
     var ld = parseFloat(document.getElementById("i_lead").value), sh = parseFloat(document.getElementById("i_shelf").value);
     rec.leadDays = ld>=0 ? ld : 1; rec.shelfDays = sh>0 ? sh : null;
+    rec.localName = document.getElementById("i_local").value.trim(); rec.photo = iPhoto;
     if(g) rec = Object.assign({}, g, rec);
     var idx = ingredients.findIndex(function(x){ return x.id===rec.id; });
     if(idx>=0) ingredients[idx]=rec; else ingredients.push(rec);
@@ -14123,8 +14372,9 @@ function showView(name){
   if(viewsStale) renderAll();
   else if(name==="dashboard") renderDashboard();
   Array.prototype.forEach.call(document.querySelectorAll("nav.tabs button"), function(b){ b.classList.toggle("on", b.getAttribute("data-v")===name); });
-  var fab = document.getElementById("fabAdd"); if(fab) fab.style.display = name==="counter" ? "none" : "";
+  var fab = document.getElementById("fabAdd"); if(fab) fab.style.display = (name==="counter" || name==="kitchen") ? "none" : "";
   if(name==="counter") renderCounter();
+  if(name==="kitchen") renderKitchen();
 }
 
 function openAddChooser(){

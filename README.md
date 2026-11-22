@@ -347,6 +347,25 @@ owner → owner / partner approves → sent to the vendor → goods received and
   limit; chef / counter logins can only create requests, edit or cancel their own pending ones, and receive goods for
   ordered items — they can't approve, reject or delete.
 
+### Kitchen: picture screen for staff
+The **Kitchen** tab (first tab for chef logins; also for manager and counter) does stock and buying the same way
+the Counter does billing: big pictures (the item's photo, or a food picture), Hindi words, few choices, Big & simple
+mode and voice.
+- **🛒 मँगवाना है · Need to buy**: item pictures with low ones first ("कम है" / "खत्म"). Tap one, pick a quantity
+  with + / − or quick buttons (½, 1, 2, 5 kg …; the suggested amount is filled in for low items), then **भेजें Send**
+  and pick today / tomorrow. One purchase request is made per usual vendor, with last prices, and goes into the
+  approval flow (Records → Orders).
+- **📦 माल आया · Goods arrived**: orders waiting for delivery as cards. For each item tap **✔ पूरा आया (all came)**
+  or **− कम आया (less)** and step the quantity; the expected price is shown with "different price" only if the
+  bill differs; pay later / cash / UPI as pictures. Saved as purchases exactly like the Orders screen.
+- **🗑️ खराब हुआ · Wasted**: tap the item, the quantity and a picture reason (खराब, जल गया, गिर गया, वापस आया, बच
+  गया).
+- **📋 गिनती · Count stock**: tap each item and enter what is really there. Staff never see the expected figure
+  (a blind count); the difference shows to the owner / manager in Stock → Wastage.
+- **✅ जाँच · Daily checks** and "your requests" (waiting for manager / owner / approved).
+- Each ingredient now has a **Hindi name** and a **photo** (Records → Stock → tap the item).
+- Counter logins only see Need to buy (and checks), because they can't record purchases, wastage or counts.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the
