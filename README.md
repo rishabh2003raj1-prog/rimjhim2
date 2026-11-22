@@ -442,6 +442,20 @@ Swiggy order types were built and then switched off at the owner's request; the 
 - A direct link to the Zomato / Swiggy accounts (orders arriving automatically) needs an approved integration
   (e.g. through a middleware such as UrbanPiper); the app is ready to take such orders as Live orders.
 
+### Purchase categories
+Grouped in the purchase form (older entries keep their category):
+- **Food ingredients**: Dairy · Vegetables & fruits · Meat, chicken & eggs · Grocery & staples · Oil & ghee · Spices &
+  masala · Sauces, syrups & spreads · Bakery · Frozen & ready-to-cook · Tea, coffee & drink ingredients
+- **For resale**: Cold drinks & bottled water
+- **Packaging**: Packaging (boxes, containers, bags, foil) · Disposables (cups, plates, spoons, straws, tissues)
+- **Running the cafe (not food cost)**: Gas (LPG) · Drinking water jars · Cleaning & hygiene · Kitchen tools · Repairs &
+  maintenance material · Stationery & printing · Other cafe-use supplies — all kept out of food cost
+- Other
+
+Typing an item's name picks its category (its last purchase, else from the name — onion → Vegetables & fruits,
+Harpic → Cleaning, Roohafza → Sauces, syrups & spreads); a category chosen by hand is kept. Notes and purchase orders
+use the same rules.
+
 ### Counter: picture billing (Step 6)
 The **Counter** tab (first in the bottom bar; the billing login opens on it) is made for staff who read little.
 - Big photo tiles (or a food picture when a dish has no photo), the Hindi name, the veg / non-veg mark and the

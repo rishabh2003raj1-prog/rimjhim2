@@ -4538,7 +4538,47 @@ function importBackup(file){
 }
 
 // ---------- PURCHASE BILLS (multi-item + photo) ----------
-var PURCH_CATS = ["Dairy","Beverages","Grocery","Bakery","Packaging","Cleaning","Cold drinks & water","Cafe use supplies","Other"];
+// Purchase categories, grouped. The stored value stays short (older entries keep working);
+// the label explains what goes in it. "Running the cafe" items are kept out of food cost.
+var PURCH_CAT_GROUPS = [
+  ["Food ingredients", [["Dairy","Dairy — milk, paneer, curd, butter, cream"],["Vegetables & fruits","Vegetables & fruits"],["Meat, chicken & eggs","Meat, chicken & eggs"],
+    ["Grocery","Grocery & staples — atta, rice, dal, sugar, besan"],["Oil & ghee","Oil & ghee"],["Spices & masala","Spices & masala"],["Sauces, syrups & spreads","Sauces, syrups & spreads — ketchup, mayo, crush"],
+    ["Bakery","Bakery — bread, buns, pav, pizza base"],["Frozen & ready-to-cook","Frozen & ready-to-cook — fries, momos, nuggets"],["Beverages","Tea, coffee & drink ingredients"]]],
+  ["For resale", [["Cold drinks & water","Cold drinks & bottled water (sold as is)"]]],
+  ["Packaging", [["Packaging","Packaging — boxes, containers, bags, foil"],["Disposables & tissues","Disposables — cups, plates, spoons, straws, tissues"]]],
+  ["Running the cafe (not food cost)", [["Gas (LPG)","Gas (LPG) cylinder"],["Drinking water jars","Drinking water jars (cafe use)"],["Cleaning","Cleaning & hygiene — phenyl, soap, mops"],
+    ["Kitchen tools & equipment","Kitchen tools & small equipment"],["Repairs & maintenance","Repairs & maintenance material"],["Stationery & printing","Stationery & printing — bill rolls, menus"],["Cafe use supplies","Other cafe-use supplies"]]],
+  ["", [["Other","Other"]]]
+];
+var PURCH_CATS = []; PURCH_CAT_GROUPS.forEach(function(g){ g[1].forEach(function(c){ PURCH_CATS.push(c[0]); }); });
+var CAFE_USE_CATS = PURCH_CAT_GROUPS[3][1].map(function(c){ return c[0]; });
+function purchCatLabel(v){ var l = v; PURCH_CAT_GROUPS.forEach(function(g){ g[1].forEach(function(c){ if(c[0]===v) l = c[1]; }); }); return l; }
+function purchCatOptions(cur){
+  var html = PURCH_CAT_GROUPS.map(function(g){ var opts = g[1].map(function(c){ return '<option value="'+esc(c[0])+'"'+(cur===c[0]?" selected":"")+'>'+esc(c[1])+'</option>'; }).join("");
+    return g[0] ? '<optgroup label="'+esc(g[0])+'">'+opts+'</optgroup>' : opts; }).join("");
+  if(cur && PURCH_CATS.indexOf(cur)<0) html = '<option value="'+esc(cur)+'" selected>'+esc(cur)+'</option>'+html;
+  return html;
+}
+// A sensible category from the item's name (used when nothing better is known).
+var CAT_GUESS = [[/\b(gas|lpg|cylinder)\b/i,"Gas (LPG)"],[/\b(water jar|20 ?l|bisleri jar|camper)\b/i,"Drinking water jars"],
+  [/\b(phenyl|harpic|vim|lizol|detergent|surf|soap|handwash|mop|broom|jhadu|pochha|scrub|dustbin bag|garbage bag|sanitiser|sanitizer|colin)\b/i,"Cleaning"],
+  [/\b(bill roll|paper roll|thermal roll|pen|register|print|menu card|sticker)\b/i,"Stationery & printing"],
+  [/\b(knife|ladle|kadhai|tawa|pan|pot|strainer|tongs|spatula|grater|chopping|board|bucket|tray|jug)\b/i,"Kitchen tools & equipment"],
+  [/\b(bulb|tube light|wire|plumb|tap|pipe|paint|repair|fevicol|tape roll)\b/i,"Repairs & maintenance"],
+  [/\b(spoon|straw|tissue|napkin|paper plate|paper cup|plastic cup|glass disposable|fork|toothpick|butter paper)\b/i,"Disposables & tissues"],
+  [/\b(box|container|carry ?bag|bag|foil|cling|wrap|pouch|lid|packing|parcel)\b/i,"Packaging"],
+  [/\b(coke|pepsi|thums ?up|sprite|fanta|limca|maaza|frooti|red bull|bisleri|kinley|aquafina|soda bottle|cold drink|mineral water)\b/i,"Cold drinks & water"],
+  [/\b(milk|doodh|paneer|curd|dahi|butter|makhan|cream|malai|cheese|khoa|mawa)\b/i,"Dairy"],
+  [/\b(chicken|mutton|fish|egg|anda|keema)\b/i,"Meat, chicken & eggs"],
+  [/\b(oil|ghee|refined|vanaspati|dalda)\b/i,"Oil & ghee"],
+  [/\b(masala|haldi|jeera|mirchi powder|chilli powder|dhaniya powder|garam|hing|ajwain|elaichi|laung|kali mirch|spice|salt|namak|kasuri)\b/i,"Spices & masala"],
+  [/\b(sauce|ketchup|mayo|mayonnaise|syrup|crush|vinegar|soya|schezwan|jam|spread|dressing|roohafza|roohafja|achaar|pickle)\b/i,"Sauces, syrups & spreads"],
+  [/\b(bread|bun|pav|pizza base|kulcha|rusk)\b/i,"Bakery"],
+  [/\b(frozen|fries|nugget|patty|momo sheet|ready to cook)\b/i,"Frozen & ready-to-cook"],
+  [/\b(tea|chai|patti|coffee|nescafe|cocoa|ice cream)\b/i,"Beverages"],
+  [/\b(onion|pyaz|tomato|tamatar|potato|aloo|garlic|lahsun|ginger|adrak|chilli|mirch|capsicum|carrot|cabbage|gobhi|peas|matar|beans|lemon|nimbu|coriander|dhania|mint|pudina|spinach|palak|cucumber|mushroom|corn|banana|apple|mango|fruit|sabzi|vegetable)\b/i,"Vegetables & fruits"],
+  [/\b(atta|maida|rice|chawal|dal|sugar|cheeni|besan|suji|rava|poha|maggi|noodle|pasta|oats|rajma|chana|chole)\b/i,"Grocery"]];
+function guessPurchCat(item){ var t = String(item||""), t2 = t.replace(/([a-z]{3,})(?:es|s)\b/gi, "$1"); for(var i=0;i<CAT_GUESS.length;i++) if(CAT_GUESS[i][0].test(t) || CAT_GUESS[i][0].test(t2)) return CAT_GUESS[i][1]; return ""; }
 var PURCH_MODES = ["Cash","UPI","Card","Bank Transfer","Credit"];
 var billDraft = null;
 
@@ -4635,7 +4675,7 @@ function renderBillForm(){
     html += '<div class="billrow"><div class="billrowhead"><span>Item '+(i+1)+'</span>'+
             (d.lines.length>1 ? '<button class="ndel" data-rm="'+i+'" aria-label="Remove item">×</button>' : '')+'</div>';
     html += '<div class="field two"><div><label>Name</label><input type="text" class="bi" data-f="item" data-i="'+i+'" placeholder="Item name" value="'+esc(ln.item)+'"></div>';
-    html += '<div><label>Category</label><select class="bi" data-f="category" data-i="'+i+'">'+PURCH_CATS.map(function(c){return '<option '+(ln.category===c?"selected":"")+'>'+c+'</option>';}).join("")+'</select></div></div>';
+    html += '<div><label>Category</label><select class="bi" data-f="category" data-i="'+i+'">'+purchCatOptions(ln.category)+'</select></div></div>';
     html += '<div class="field two"><div><label>Qty</label><input type="number" inputmode="decimal" class="bi" data-f="qty" data-i="'+i+'" value="'+(ln.qty===""?"":ln.qty)+'"></div>';
     html += '<div><label>Unit</label><input type="text" class="bi" data-f="unit" data-i="'+i+'" placeholder="kg / pcs" value="'+esc(ln.unit)+'"></div></div>';
     html += '<div class="field two"><div><label>Rate per unit (₹)</label><input type="number" inputmode="decimal" class="bi" data-f="rate" data-i="'+i+'" value="'+(ln.rate===""?"":ln.rate)+'"></div>';
@@ -4704,6 +4744,12 @@ function renderBillForm(){
   }
   Array.prototype.forEach.call(sheet.querySelectorAll(".bi"), function(inp){
     inp.addEventListener("input", refreshTotals); inp.addEventListener("change", refreshTotals);
+    // Typing an item's name picks its category (from the last purchase, else from the name) unless one was chosen.
+    if(inp.getAttribute("data-f")==="item") inp.addEventListener("change", function(){
+      var i = +inp.getAttribute("data-i"), sel = sheet.querySelector('select.bi[data-f="category"][data-i="'+i+'"]'); if(!sel || sel.getAttribute("data-picked")) return;
+      var c = lastCategory(inp.value); if(c && PURCH_CATS.indexOf(c)>=0){ sel.value = c; billDraft.lines[i].category = c; }
+    });
+    if(inp.getAttribute("data-f")==="category") inp.addEventListener("change", function(){ inp.setAttribute("data-picked","1"); });
   });
   document.getElementById("b_paid").addEventListener("change", function(){ syncDraft(); renderBillForm(); });
   // Mode and payer must agree, or the cash counter deducts money that never left the till.
@@ -5088,7 +5134,7 @@ function cafeSupplySpend(from, to){
     if(p.isDelivery) return false;
     if(from && p.date<from) return false;
     if(to && p.date>to) return false;
-    if(p.category==="Cafe use supplies") return true;
+    if(CAFE_USE_CATS.indexOf(p.category)>=0) return true;
     return ingredients.some(function(i){
       return (i.type===CAFE_USE_TYPE) && p.item && p.item.toLowerCase().indexOf(i.name.toLowerCase().split(" ")[0])>=0;
     });
@@ -6807,7 +6853,7 @@ function lastRate(item, unit){
 }
 function lastCategory(item){
   var n = normItem(item), hit = purchases.filter(function(p){ return p.item && normItem(p.item)===n && p.category; }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
-  return hit ? hit.category : (/milk|doodh|paneer|curd|dahi|butter|cream|cheese/i.test(item) ? "Dairy" : /cup|box|container|foil|bag|tissue/i.test(item) ? "Packaging" : "Grocery");
+  return hit ? hit.category : (guessPurchCat(item) || "Grocery");
 }
 function vendorNames(){
   var s = {}; (vendors||[]).forEach(function(v){ if(v && v.name) s[v.name] = 1; }); ingredients.forEach(function(g){ if(g.vendor) s[g.vendor] = 1; });
@@ -14381,7 +14427,7 @@ function addNoteLines(){
   renderNotes();
 }
 
-var ALLOWED_CATS = ["Dairy","Beverages","Grocery","Bakery","Packaging","Cleaning","Cold drinks & water","Cafe use supplies","Other"];
+var ALLOWED_CATS = PURCH_CATS;
 var ALLOWED_SALE_MODES = ["Cash","UPI","Card","Credit"];
 var ALLOWED_PURCH_MODES = ["Cash","UPI","Card","Bank Transfer","Credit"];
 
@@ -14522,7 +14568,7 @@ function parsePurchaseLines(text){
       .replace(/\s+/g," ").trim();
     if(!name) return;
     name = name.split(" ").slice(0,4).join(" ");
-    out.push({ item:name, qty:qty, unit:unit, rate: qty>0 ? +(price/qty).toFixed(4) : price, gst:0, category:"Other" });
+    out.push({ item:name, qty:qty, unit:unit, rate: qty>0 ? +(price/qty).toFixed(4) : price, gst:0, category:guessPurchCat(name)||"Other" });
   });
   out.missing = missing;
   return out;
@@ -14620,7 +14666,7 @@ function parseNoteLocally(text, todayStr){
   var multiRaw = parsePurchaseLines(text), missingLines = [];
   var multi = multiRaw.map(function(l){ l.item = canonicalItem(l.item); return fillFromMemory(l); });
   (multiRaw.missing||[]).forEach(function(m){
-    var l = fillFromMemory({ item:canonicalItem(m.item), qty:m.qty, unit:m.unit==="pc"?"pcs":m.unit, rate:0, gst:0, category:"Other" });
+    var l = fillFromMemory({ item:canonicalItem(m.item), qty:m.qty, unit:m.unit==="pc"?"pcs":m.unit, rate:0, gst:0, category:guessPurchCat(m.item)||"Other" });
     if(+l.rate>0) multi.push(l); else missingLines.push(m);
   });
   if(multi.length >= 2){
@@ -15094,13 +15140,13 @@ function processNotes(){
             if(!it.item || !(q>0) || !(rt>0)) return;
             purchases.push({ id:track("purchases", uid()), billId:bid2, date:dateVal, vendor:r.vendor||"Unknown vendor",
                              purchasedBy:pbyB, paidBy:ppayB, item:it.item,
-                             category: ALLOWED_CATS.indexOf(it.category)>=0 ? it.category : "Other",
+                             category: ALLOWED_CATS.indexOf(it.category)>=0 && it.category!=="Other" ? it.category : (guessPurchCat(it.item)||"Other"),
                              qty:q, unit:it.unit||"pcs", rate:rt, gst:+it.gst||0, mode:pmodeB });
             added++;
           });
           if(added>0){ ok = true; counts.purchase += added; }
         } else if(r && !r.unclear && r.type==="purchase" && r.item && (r.qty>0) && (r.rate>0)){
-          var cat = ALLOWED_CATS.indexOf(r.category)>=0 ? r.category : "Other";
+          var cat = ALLOWED_CATS.indexOf(r.category)>=0 && r.category!=="Other" ? r.category : (guessPurchCat(r.item)||"Other");
           var pmode = ALLOWED_PURCH_MODES.indexOf(r.purchmode)>=0 ? r.purchmode : "Cash";
           var pby = purchaserOptions().some(function(o){ return o.name===r.purchasedby; }) ? r.purchasedby : "";
           var ppay = payerOptions().some(function(o){ return o.value===r.paidby; }) ? r.paidby
