@@ -6297,6 +6297,8 @@ var DEFAULT_CHECKLISTS = [
   { id:"close", name:"Closing", due:"23:59", items:["Gas regulator OFF, burners off","Leftovers covered, labelled, in fridge","Fridge and freezer doors shut","Dustbins emptied, floor cleaned","Lights, fans, AC and geyser off","Cash counted and handed over","Shutter locked"] },
   { id:"week", name:"Weekly deep clean", every:7, items:["Chimney / exhaust filter cleaned","Fridge cleaned inside, old items removed","Pest / rodent check, no droppings","Drains cleaned","Fire extinguisher in place and in date"] }
 ];
+// Missed-check warnings start once the cafe has filed its first checklist (so a cafe not using them isn't nagged).
+function checksInUse(){ return checks.some(function(c){ return c.kind==="list"; }); }
 function checklistDefs(){ var c = settings.checklists; return Array.isArray(c) && c.length ? c : DEFAULT_CHECKLISTS; }
 function checksOn(day, listId){ return checks.filter(function(c){ return c.kind==="list" && c.date===day && (!listId || c.listId===listId); }); }
 function lastListCheck(listId){ return checks.filter(function(c){ return c.kind==="list" && c.listId===listId; }).sort(function(a,b){ return (b.date+b.time).localeCompare(a.date+a.time); })[0] || null; }
@@ -6440,7 +6442,7 @@ function attentionItems(){
     var al = stockAlerts(); if(al.length) out.push({ t:"🛒 "+al.length+" stock item"+(al.length!==1?"s":"")+" running low ("+al.slice(0,3).map(function(s){ return s.ing.name; }).join(", ")+(al.length>3?"…":"")+")", go:"stock" });
     var ex = expiringBatches(); if(ex.length) out.push({ t:"⏰ "+ex.length+" cooked item"+(ex.length!==1?"s":"")+" to use first or throw", go:"stock" });
   }
-  checklistStatus().forEach(function(x){ if(x.missed) out.push({ t:"⚠️ "+x.l.name+" check "+x.label, go:"assets" }); else if(x.bad) out.push({ t:"⚠️ "+x.l.name+" check found "+x.bad+" problem"+(x.bad!==1?"s":""), go:"assets" }); });
+  if(checksInUse()) checklistStatus().forEach(function(x){ if(x.missed) out.push({ t:"⚠️ "+x.l.name+" check "+x.label, go:"assets" }); else if(x.bad) out.push({ t:"⚠️ "+x.l.name+" check found "+x.bad+" problem"+(x.bad!==1?"s":""), go:"assets" }); });
   if(canReadKey(POS_KEY)) out = out.concat(poAttention());
   if(canSummary()) out = out.concat(patternAlerts());
   if(canReadKey(ASSETS_KEY)) assetAlerts().forEach(function(x){ out.push({ t:(x.st==="broken"?"⛔ ":"🛠️ ")+x.a.name+": "+x.why.join(", "), go:"assets" }); });
@@ -6453,7 +6455,11 @@ function attentionCard(){
 }
 function wireAttention(el){ Array.prototype.forEach.call(el.querySelectorAll("[data-attn]"), function(r){ r.addEventListener("click", function(){ showView("records"); switchRecordsSub(r.getAttribute("data-attn")); }); }); }
 function updateNavBadge(){
-  var b = document.querySelector('nav.tabs button[data-v="records"]'); if(!b) return;
+  Array.prototype.forEach.call(document.querySelectorAll("nav.tabs .navbadge"), function(x){ x.remove(); });
+  // The number sits on the tab that shows the "Needs attention today" list: Dashboard, or Kitchen for the chef.
+  var b = document.querySelector('nav.tabs button[data-v="dashboard"]');
+  if(!b || b.style.display==="none") b = document.querySelector('nav.tabs button[data-v="kitchen"]');
+  if(!b || b.style.display==="none") return;
   var n = 0; try{ if(myAccess()!=="billing") n = attentionItems().length; }catch(e){}
   var dot = b.querySelector(".navbadge");
   if(!n){ if(dot) dot.remove(); return; }
@@ -6794,12 +6800,13 @@ function renderKitchen(){
   if(kView==="home"){
     var low = kSeesStock() ? stockAlerts().length : 0, ord = kOrdered().length, mine = kMyRequests();
     html += '<div class="listhead"><h2 class="serif">Kitchen · रसोई</h2></div>';
+    if(myAccess()==="chef") html += attentionCard();
     html += '<div class="khome">';
     if(canWriteKey(POS_KEY)) html += '<button class="kbig buy" data-kv="buy"><span>🛒</span><b>मँगवाना है</b><i>Need to buy</i>'+(low?'<em>'+low+'</em>':'')+'</button>';
     if(canWriteKey(PURCH_KEY) && canWriteKey(POS_KEY)) html += '<button class="kbig recv" data-kv="recv"><span>📦</span><b>माल आया</b><i>Goods arrived</i>'+(ord?'<em>'+ord+'</em>':'')+'</button>';
     if(canWriteKey(WASTE_KEY)) html += '<button class="kbig waste" data-kv="waste"><span>🗑️</span><b>खराब हुआ</b><i>Wasted</i></button>';
     if(canWriteKey(AUDIT_KEY)) html += '<button class="kbig count" data-kv="count"><span>📋</span><b>गिनती</b><i>Count stock</i></button>';
-    if(canWriteKey(CHECKS_KEY)) html += '<button class="kbig checks" id="k_checks"><span>✅</span><b>जाँच</b><i>Daily checks</i>'+(checklistStatus().some(function(x){ return x.missed; })?'<em>!</em>':'')+'</button>';
+    if(canWriteKey(CHECKS_KEY)) html += '<button class="kbig checks" id="k_checks"><span>✅</span><b>जाँच</b><i>Daily checks</i>'+(checksInUse() && checklistStatus().some(function(x){ return x.missed; })?'<em>!</em>':'')+'</button>';
     html += '</div>';
     if(mine.length) html += '<div class="card" style="margin-top:12px;"><h3>Your requests · आपकी माँग</h3>'+mine.map(function(p){
       return '<div class="psrow"><span>'+poNo(p)+' · '+esc(p.vendor)+'</span><b class="'+PO_STATUS[p.status].c+'">'+({requested:"⏳ manager",review:"⏳ owner",approved:"✔ approved"}[p.status])+'</b></div>'; }).join("")+'</div>';
@@ -6832,6 +6839,7 @@ function renderKitchen(){
   el.innerHTML = html;
   function on(sel, fn){ Array.prototype.forEach.call(el.querySelectorAll(sel), function(b){ b.addEventListener("click", function(){ fn(b); }); }); }
   on("[data-kv]", function(b){ kView = b.getAttribute("data-kv"); renderKitchen(); window.scrollTo(0,0); });
+  wireAttention(el);
   on("#k_back", function(){ kView = "home"; renderKitchen(); });
   on("#k_checks", function(){ var sheet = document.getElementById("sheet"); sheet.innerHTML = checksCard(false)+'<div class="sheetbtns"><button class="btn-cancel" id="cc_close" style="flex:1;">Close</button></div>';
     document.getElementById("sheetBg").classList.add("on"); wireChecksCard(sheet); document.getElementById("cc_close").addEventListener("click", closeForm); });
@@ -7051,7 +7059,7 @@ function dailySummary(d){
     if(soon.length) L.push("📅 Due soon: "+soon.map(function(r){ return r.name+" "+rupee(r.due)+" ("+parseDate(r.dueDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"})+")"; }).join(", ")); }catch(e){} }
   var cs = checksOn(d), probs = []; cs.forEach(function(c){ (c.items||[]).forEach(function(i){ if(i.ok===false) probs.push(i.t+(i.note?" ("+i.note+")":"")); }); });
   var missed = d===fmtDate(new Date()) ? checklistStatus().filter(function(x){ return x.missed; }).map(function(x){ return x.l.name; }) : checklistDefs().filter(function(l){ return !l.every && !checksOn(d, l.id).length; }).map(function(l){ return l.name; });
-  if(missed.length) L.push("⚠️ Checks not done: "+missed.join(", "));
+  if(missed.length && checksInUse()) L.push("⚠️ Checks not done: "+missed.join(", "));
   if(probs.length) L.push("⚠️ Problems: "+probs.slice(0,4).join("; "));
   var broken = assetAlerts().filter(function(x){ return x.st==="broken" || x.st==="repair"; }); if(broken.length) L.push("🛠️ "+broken.map(function(x){ return x.a.name+" "+ASSET_STATUS[x.st].t.toLowerCase(); }).join(", "));
   var waitPo = pos.filter(function(p){ return p.status==="review" || p.status==="requested"; }); if(waitPo.length) L.push("📝 "+waitPo.length+" purchase order"+(waitPo.length!==1?"s":"")+" waiting for approval");
@@ -9259,7 +9267,7 @@ function renderCounter(){
   var html = '<div class="listhead"><h2 class="serif">Counter</h2><div class="monthtot">'+bills.length+' bill'+(bills.length!==1?'s':'')+' today · '+rupee(bills.reduce(function(a,s){ return a+saleTotal(s); },0))+'</div></div>';
   html += '<div class="ctools">'+
     '<button id="ct_bills">🧾 Today’s bills</button>'+
-    (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
+    (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checksInUse() && checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
     '<button id="ct_voice" class="'+(voiceOn()?"on":"")+'">'+(voiceOn()?"🔊":"🔇")+'</button>'+
     ((isFullAccess() || myAccess()==="manager") && !simple ? '<button id="ct_upi">⚙️ UPI & discounts</button>' : '')+'</div>';

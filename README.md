@@ -316,12 +316,12 @@ their recipes, cooking batches, cafe use and wastage over the last 14 days.
 **Daily checks** (Records → Assets, and **✅ Checks** on the Counter): Opening, Closing and a Weekly deep clean, each
 line ticked ✔ or ✖ with a note for what's wrong (e.g. "fridge at 9°C"). Owner / manager can edit the lists, the
 "done by" time after which a list shows as missed, and how often weekly lists are due. Who did each check and when
-is saved.
+is saved. Missed-check warnings start only after the first checklist is filed, so a cafe not using them isn't nagged.
 
 **Asset checks**: set "Check its condition every N days" on an asset (e.g. 1 for the fridge); anyone on shift taps
 **Check condition now** → Working / Needs repair / Broken, with a note. The asset list shows each one's condition.
 
-**Needs attention today** (top of the Dashboard, and a red number on the Records tab): items running low, cooked
+**Needs attention today** (top of the Dashboard — or the Kitchen tab for the chef — with a red number on that tab): items running low, cooked
 items to use first, missed or failed checks, broken / needs-repair equipment, checks and services due. Tap a line
 to go there. Chef and billing logins can file checks but can't change or delete anyone else's; they only see the
 last two days of checks.
