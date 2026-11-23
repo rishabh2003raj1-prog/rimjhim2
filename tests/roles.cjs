@@ -122,7 +122,9 @@ const today = new Date(Date.now()+330*60000).toISOString().slice(0,10);
   await O.evaluate(() => { localStorage.setItem('last_login_id_v1',''); });
   await O.evaluate(() => fetch('/api/logout', { method:'POST' }));
   await O.reload(); await O.waitForSelector('#loginBg.on'); await O.fill('#loginId','ravi-mgr'); await O.fill('#loginPin','secret123'); await O.click('#loginGo'); await O.waitForTimeout(3500);
-  const leftovers = await O.evaluate(() => Object.keys(localStorage).filter(k => /investments_v1|loans_v1|payroll_v1/.test(k)).length);
+  // The phone clears the old copy and reloads; wait for that rather than a fixed time.
+  let leftovers = -1;
+  for (let i = 0; i < 24; i++) { leftovers = await O.evaluate(() => Object.keys(localStorage).filter(k => /investments_v1|loans_v1|payroll_v1/.test(k)).length).catch(() => -1); if (leftovers === 0) break; await O.waitForTimeout(500); }
   assert(leftovers===0, 'owner’s partner money / loans are not left on the phone for the manager');
   console.log(fails ? fails+' FAILED' : 'ALL OK');
   await b.close();

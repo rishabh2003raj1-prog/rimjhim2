@@ -1,0 +1,28 @@
+// Records tabs: switch between the scrolling strip and a grid of big icon tiles.
+const { chromium } = require(process.env.PW_MODULE || 'playwright');
+const fs = require('fs');
+const HTML = fs.readFileSync(require('path').join(__dirname, '..', 'public', 'index.html'),'utf8').replace('\n})();\n</script>', '\nwindow.__ev=function(c){return eval(c);};\n})();\n</script>');
+const E = (p, c) => p.evaluate(x => window.__ev(x), c);
+const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode = 1; } else console.log('ok: ' + m); };
+(async () => {
+  const b = await chromium.launch(), errs = [];
+  const p = await (await b.newContext({ viewport:{width:400,height:850}, deviceScaleFactor:2 })).newPage();
+  p.on('pageerror', e => errs.push(e.message)); await p.route(u => u.pathname === '/', r => r.fulfill({ status:200, contentType:'text/html', body: HTML }));
+  await p.goto('http://127.0.0.1:8787/'); await p.waitForSelector('#loginBg.on'); await p.fill('#loginPin','1234'); await p.click('#loginGo'); await p.waitForTimeout(1500);
+  await E(p, `showView('records'); switchRecordsSub('sales');`);
+  assert(!(await p.$('#recCtl.recgrid')) && await p.isHidden('#recCtl [data-r="sales"] .ri'), 'starts as the usual strip (icons hidden)');
+  assert((await p.textContent('#recGridBtn')).includes('Big icons'), 'button: ▦ Big icons');
+  await p.click('#recGridBtn'); await p.waitForTimeout(100);
+  assert(await p.$('#recCtl.recgrid'), 'grid view on');
+  const box = await p.$eval('#recCtl [data-r="sales"]', e => { const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; });
+  const tops = await p.$$eval('#recCtl button', a => a.slice(0,5).map(x => Math.round(x.getBoundingClientRect().top)));
+  assert(box[1] >= 80 && box[0] >= 70 && tops[0]===tops[3] && tops[4] > tops[0], 'large tiles, 4 per row: '+box+' '+tops);
+  assert(await p.isVisible('#recCtl [data-r="sales"] .ri') && (await p.textContent('#recCtl [data-r="purchases"]')).includes('Purchases') && await p.isHidden('#recCtl [data-r="purchases"] .rs'), 'big icon and full name ("Purchases")');
+  await p.screenshot({ path: process.env.S+'/recgrid.png' });
+  await p.click('#recCtl [data-r="purchases"]'); await p.waitForTimeout(100);
+  assert(await E(p, 'recSub')==='purchases' && await p.$('#recCtl [data-r="purchases"].on'), 'tapping a tile opens it');
+  await p.reload(); await p.waitForTimeout(2000); await E(p, `showView('records');`);
+  assert(await p.$('#recCtl.recgrid'), 'remembered after reopening');
+  await p.click('#recGridBtn'); assert(!(await p.$('#recCtl.recgrid')) && (await p.textContent('#recGridBtn')).includes('Big icons'), 'back to small tabs');
+  console.log('ERRORS', JSON.stringify(errs)); await b.close();
+})();

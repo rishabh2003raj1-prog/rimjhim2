@@ -467,6 +467,15 @@
   .segctl button{flex:1;border:none;background:transparent;padding:8px 4px;font-family:inherit;font-size:13px;font-weight:600;color:var(--ink-soft);border-radius:9px;}
   .recctl5{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;}
   .recctl5::-webkit-scrollbar{display:none;}
+  #recCtl .ri,#recCtl .rg{display:none;}
+  .recgridbtn{display:block;margin:-6px 0 8px auto;border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 14px;font:inherit;font-size:12.5px;font-weight:700;color:var(--ink);}
+  #recCtl.recgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;overflow:visible;background:transparent;border:none;padding:0;}
+  #recCtl.recgrid button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:84px;padding:8px 2px;white-space:normal;font-size:12.5px;line-height:1.2;
+    background:var(--panel);border:1.5px solid var(--line);border-radius:14px;color:var(--ink);}
+  #recCtl.recgrid button[style*="display: none"]{display:none !important;}
+  #recCtl.recgrid .ri{display:block;font-size:30px;line-height:1;}
+  #recCtl.recgrid button.hasfull .rs{display:none;} #recCtl.recgrid .rg{display:block;}
+  #recCtl.recgrid button.on{background:var(--ink);border-color:var(--ink);color:#fff;}
   .recctl5 button{padding:8px 10px;font-size:11.5px;flex:0 0 auto;white-space:nowrap;}
   .partnercard .who{font-size:14px;}
   .segctl button.on{background:var(--ink);color:#fff;}
@@ -715,6 +724,7 @@
         <h2 class="serif" id="recordsTitle">Sales</h2>
         <div class="monthtot" id="recordsTotalLbl"></div>
       </div>
+      <button id="recGridBtn" class="recgridbtn" aria-pressed="false">▦ Big icons</button>
       <div class="segctl recctl5" id="recCtl">
         <button data-r="sales" class="on">Sales</button>
         <button data-r="purchases">Purch.</button>
@@ -3689,6 +3699,27 @@ function wireEntryClicks(root){
 }
 
 // ---------- RECORDS (Sales / Purchases / Investments / Expenses) ----------
+// Records tabs: a scrolling strip, or (▦ Big icons, remembered per phone) a grid of large icon tiles.
+var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"🤝", expenses:"💸", fixed:"💡", customers:"👥", assets:"🪑", vendors:"🏪",
+  menu:"📖", stock:"📦", cash:"💵", handover:"🔁", bank:"🏦", review:"🔍", loans:"💰", partners:"👔" };
+var REC_FULL = { purchases:"Purchases", expenses:"Expenses" }, REC_GRID_KEY = "rec_grid_v1";
+function recGridOn(){ try{ return localStorage.getItem(REC_GRID_KEY)==="1"; }catch(e){ return false; } }
+function applyRecGrid(){
+  var on = recGridOn(), ctl = document.getElementById("recCtl"), btn = document.getElementById("recGridBtn");
+  if(ctl) ctl.classList.toggle("recgrid", on);
+  if(btn){ btn.textContent = on ? "☰ Small tabs" : "▦ Big icons"; btn.setAttribute("aria-pressed", on ? "true" : "false"); }
+}
+function setupRecGrid(){
+  Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){
+    if(b.querySelector(".ri")) return;
+    var k = b.getAttribute("data-r"), short = b.textContent.trim();
+    b.innerHTML = '<span class="ri" aria-hidden="true">'+(REC_ICONS[k]||"📁")+'</span><span class="rs">'+esc(short)+'</span>'+(REC_FULL[k] ? '<span class="rg">'+esc(REC_FULL[k])+'</span>' : '');
+    if(REC_FULL[k]) b.classList.add("hasfull");
+  });
+  var btn = document.getElementById("recGridBtn");
+  if(btn) btn.addEventListener("click", function(){ try{ localStorage.setItem(REC_GRID_KEY, recGridOn() ? "0" : "1"); }catch(e){} applyRecGrid(); });
+  applyRecGrid();
+}
 function switchRecordsSub(name){
   recSub = name;
 
@@ -15749,6 +15780,7 @@ document.addEventListener("DOMContentLoaded", function(){
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){
     b.addEventListener("click", function(){ switchRecordsSub(b.getAttribute("data-r")); });
   });
+  setupRecGrid();
 
   Array.prototype.forEach.call(document.querySelectorAll("#rangeCtl button"), function(b){
     b.addEventListener("click", function(){

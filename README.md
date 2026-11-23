@@ -174,6 +174,11 @@ Staff → **Salary** shows each person's salary for a month:
 
 **Final settlement** closes a month. You can round off the total: to the nearest ₹1, down to the rupee, to the nearest ₹10, down to ₹10, or an amount you type (within ₹100), e.g. ₹13,332.40 settled as ₹13,330. The round off shows on the Salary card and the salary slip, and Bills and the Dashboard use the rounded amount. If the person chooses not to take the extra pay for unused leave, it's recorded as goodwill, which you can give back later with **Give bonus**. **Salary slip** shows the month's slip, which you can download as a PDF or send on WhatsApp.
 
+## Records: big icon view
+Records → **▦ Big icons** (under the title) turns the scrolling tab strip (Sales, Purch., Orders…) into a grid of
+large icon tiles, four per row, with full names. **☰ Small tabs** switches back. The choice is remembered on each
+phone; tabs a login's role can't use stay hidden in both views.
+
 ## How saving works
 
 - Each list (sales, purchases, …) is saved to the server a moment after every change. The top bar shows **Saved to cloud hh:mm**, **Saving…**, or **Offline — N changes will upload**.
