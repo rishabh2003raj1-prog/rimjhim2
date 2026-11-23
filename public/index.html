@@ -3633,6 +3633,7 @@ function renderDayPanel(){
   }
   panel.innerHTML = html;
   wireEntryClicks(panel);
+  wireCounterDayRows(panel);
   Array.prototype.forEach.call(panel.querySelectorAll("[data-add]"), function(b){
     b.addEventListener("click", function(){ openForm(b.getAttribute("data-add"), null, selectedDate); });
   });

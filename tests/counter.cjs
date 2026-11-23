@@ -59,6 +59,11 @@ async function open(b, errs){ const p = await (await b.newContext({ viewport:{wi
   r = await E(p, `({ n: sales.filter(function(s){return s.order;}).length, d: dishLog.filter(function(d){return d.orderId;}).length })`);
   assert(r.n===2 && r.d===3, 'cancel bill removes sale and its plates: '+JSON.stringify(r));
   await E(p, 'closeForm()');
+  // Calendar day panel: the same row opens the bills
+  await E(p, `selectedDate=fmtDate(new Date()); showView('calendar'); renderAll();`); await p.waitForTimeout(200);
+  await p.click('#dayPanel [data-cbills]');
+  assert(/Masala Chai/.test(await p.textContent('#sheet')) && await p.isVisible('#sheetBg.on'), 'Calendar: tap on Counter bills opens the bills');
+  await E(p, 'closeForm()');
   // tally does not duplicate billed plates
   await E(p, `openTally(fmtDate(new Date()))`);
   assert(/plates already billed/.test(await p.textContent('#sheet')), 'tally explains billed plates');
