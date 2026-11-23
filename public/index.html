@@ -261,6 +261,7 @@
   .surow.done > b{background:#2E7D4F;color:#fff;} .surow.done .who{text-decoration:line-through;color:var(--ink-soft);} .surow > div{flex:1;min-width:0;}
   .ctbilling{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;padding:9px 12px;border-radius:12px;background:#FFF1DC;border:1.5px solid #C9772B;font-size:14px;}
   .ctbilling small{display:block;font-size:11.5px;color:var(--ink-soft);} .ctbilling button{flex:none;border:1.5px solid #A6402D;background:#fff;color:#A6402D;border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;font-size:13px;}
+  .hnrow{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:13.5px;} .hnrow input{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:15px;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -5429,6 +5430,8 @@ function renderMenuView(){
   }
   html += '<div class="addrow">'+(canWriteKey(MENU_KEY)?'<button class="purch" id="menu_add">+ Dish</button>':'')+'<button class="invest" id="menu_prep">Today’s prep list</button></div>';
   if(canWriteKey(MENU_KEY)) html += '<button class="btn-big green" id="menu_import">📋 Paste a list of dishes — add or update many at once</button>';
+  if(canWriteKey(MENU_KEY) && menuItems.length){ var noHi = menuItems.filter(function(m){ return !m.localName; }).length;
+    html += '<button class="btn-additem" id="menu_hindi" style="margin-bottom:10px;">अ Hindi names · हिंदी नाम'+(noHi ? ' — '+noHi+' dish'+(noHi!==1?'es':'')+' without one' : ' — check / change')+'</button>'; }
   if(menuItems.length) html += '<button class="btn-big" id="menu_print" style="background:#8A5A1F;">🖨️ Printable menu (PDF) — for the wall, counter or tables</button>';
   html += '<div class="addrow"><button class="sale" id="menu_book">📖 Recipe &amp; SOP book (PDF)</button>'+(costs?'<button class="expense" id="menu_eng">Menu analysis</button>':'')+'</div>';
   if(menuItems.length){
@@ -5449,7 +5452,7 @@ function renderMenuView(){
       var fcCls = d.fc===null ? "" : d.fc <= targetFoodCost() ? "ok" : d.fc <= targetFoodCost()+10 ? "warnamt" : "bad";
       return '<button class="dishtile" data-menu="'+esc(m.id)+'">'+
         '<div class="dishimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="" loading="lazy">' : '<span>'+esc((m.name||"?").charAt(0).toUpperCase())+'</span>')+vegDot(m)+'</div>'+
-        '<div class="dishname">'+esc(m.name)+'</div>'+(m.localName?'<div class="dishlocal">'+esc(m.localName)+'</div>':'')+(soldOutToday(m)?'<div class="dishlocal bad">Sold out today</div>':'')+
+        '<div class="dishname">'+esc(m.name)+'</div>'+(hiNameOf(m)?'<div class="dishlocal notr">'+esc(hiNameOf(m))+'</div>':'')+(soldOutToday(m)?'<div class="dishlocal bad">Sold out today</div>':'')+
         '<div class="dishmeta"><b>'+rupee(d.price)+'</b>'+(costs && d.fc!==null ? ' <span class="'+fcCls+'">'+Math.round(d.fc)+'%</span>' : '')+'</div>'+
         (gaps.length ? '<div class="dishgap">needs '+esc(gaps.join(", "))+'</div>' : '')+'</button>';
     }).join("")+'</div>';
@@ -5465,6 +5468,7 @@ function renderMenuView(){
   on("menu_book", openRecipeBookSheet);
   on("menu_print", openMenuPdfSheet);
   on("menu_import", openMenuImport);
+  on("menu_hindi", openHindiNamesSheet);
   on("menu_eng", openMenuAnalysis);
   var w = el.querySelector("[data-menueng]"); if(w) w.addEventListener("click", openMenuAnalysis);
   Array.prototype.forEach.call(el.querySelectorAll("[data-menu]"), function(b){
@@ -5590,7 +5594,7 @@ function renderMenuFormSheet(draft, isEdit){
   html += draft.photo ? '<div class="billphoto"><img src="'+esc(draft.photo)+'" alt="Dish photo"><div class="billphotobtns"><button class="btn-cancel" id="m_imgchange">Replace photo</button><button class="btn-del" id="m_imgremove">Remove</button></div></div>'
                       : '<button class="btn-additem" id="m_imgadd" style="margin-bottom:10px;">📷 Add dish photo (shown on the menu and billing screen)</button>';
   html += '<div class="field two"><div><label>Name</label><input type="text" id="m_name" value="'+esc(draft.name)+'" placeholder="e.g. Masala chai"></div>';
-  html += '<div><label>Name in Hindi / local (optional)</label><input type="text" id="m_local" value="'+esc(draft.localName||"")+'" placeholder="e.g. मसाला चाय"></div></div>';
+  html += '<div><label>Name in Hindi / local (optional)</label><input type="text" id="m_local" value="'+esc(draft.localName||"")+'" placeholder="'+esc(draft.name ? autoHindi(draft.name) : "e.g. मसाला चाय")+'"></div></div>';
   html += '<div class="field two"><div><label>Category</label><input type="text" id="m_cat" list="m_cats" value="'+esc(draft.category||"")+'"></div>';
   html += '<div><label>Selling price (₹)</label><input type="number" inputmode="decimal" id="m_price" value="'+esc(draft.price)+'"></div></div>';
   html += '<datalist id="m_cats">'+menuCats().map(function(c){ return '<option value="'+esc(c)+'">'; }).join("")+'</datalist>';
@@ -7276,7 +7280,7 @@ var ING_ICONS = [[/milk|doodh/i,"🥛"],[/paneer|cheese/i,"🧀"],[/curd|dahi|yo
   [/oil|tel|ghee/i,"🛢️"],[/sugar|cheeni|shakkar/i,"🍬"],[/salt|namak/i,"🧂"],[/tea|chai|patti/i,"🍃"],[/coffee/i,"☕"],[/masala|spice|haldi|jeera|garam|powder/i,"🌶️"],[/sauce|ketchup|mayo|vinegar|soya/i,"🥫"],
   [/water|bisleri|jar/i,"💧"],[/gas|cylinder/i,"🔥"],[/cold drink|coke|pepsi|soda/i,"🥤"],[/cup|glass/i,"🥤"],[/box|container|packet|parcel|foil|bag/i,"📦"],[/tissue|napkin/i,"🧻"],[/soap|clean|phenyl|vim|harpic|detergent/i,"🧽"],[/ice/i,"🧊"]];
 function ingIcon(g){ for(var i=0;i<ING_ICONS.length;i++) if(ING_ICONS[i][0].test(g.name||"")) return ING_ICONS[i][1]; return "📦"; }
-function ingLabel(g){ return g.localName || g.name; }
+function ingLabel(g){ return hiNameOf(g) || g.name; }
 function buyUnit(g){ return g.unit==="g" ? "kg" : g.unit==="ml" ? "litre" : g.unit; }
 function toBuy(g, q){ return (g.unit==="g" || g.unit==="ml") ? q/1000 : q; }          // ingredient unit -> buying unit
 function fromBuy(g, q){ return (g.unit==="g" || g.unit==="ml") ? q*1000 : q; }        // buying unit -> ingredient unit
@@ -7293,7 +7297,7 @@ function kTile(g, extra, attr){
   var low = kSeesStock() ? stockInfo(g) : null;
   return '<button class="ktile'+(extra&&extra.on?" has":"")+'" '+attr+'><div class="kimg">'+(g.photo ? '<img src="'+esc(g.photo)+'" alt="" loading="lazy">' : '<span>'+ingIcon(g)+'</span>')+
     (low && low.status==="out" ? '<b class="kflag out">खत्म</b>' : low && low.status==="low" ? '<b class="kflag">कम है</b>' : '')+(extra&&extra.badge ? '<b class="cqty">'+extra.badge+'</b>' : '')+'</div>'+
-    '<div class="cloc">'+esc(ingLabel(g))+'</div>'+(g.localName && !simpleMode() ? '<div class="cname">'+esc(g.name)+'</div>' : '')+(extra&&extra.sub ? '<div class="ksub">'+extra.sub+'</div>' : '')+'</button>';
+    '<div class="cloc notr">'+esc(ingLabel(g))+'</div>'+(hiNameOf(g) && !simpleMode() ? '<div class="cname notr">'+esc(g.name)+'</div>' : '')+(extra&&extra.sub ? '<div class="ksub">'+extra.sub+'</div>' : '')+'</button>';
 }
 function kOrdered(){ return pos.filter(function(p){ return p.status==="ordered" || p.status==="partial"; }); }
 function kMyRequests(){ return pos.filter(function(p){ return poMine(p) && ["requested","review","approved"].indexOf(p.status)>=0; }); }
@@ -7657,6 +7661,50 @@ function wireSetup(el){
   var s = el.querySelector("#su_show"); if(s) s.addEventListener("click", function(ev){ ev.preventDefault(); settings.setupHidden = false; settings.setupShow = true; saveSettings(); renderAll(); });
 }
 
+// Owner / manager: give every dish and stock item a Hindi name in one go. Each box starts with
+// the saved name, else the automatic one; "Better names with AI" asks the AI when the server has it.
+function openHindiNamesSheet(){
+  var sheet = document.getElementById("sheet"), showAll = false;
+  var rows = menuItems.map(function(m){ return { kind:"dish", x:m, v:m.localName || autoHindi(m.name), had:!!m.localName }; })
+    .concat(canWriteKey(ING_KEY) ? ingredients.filter(function(g){ return g && g.name; }).map(function(g){ return { kind:"ing", x:g, v:g.localName || autoHindi(g.name), had:!!g.localName }; }) : []);
+  function draw(){
+    var list = rows.filter(function(r){ return showAll || !r.had; });
+    var html = '<h2 class="serif">अ Hindi names · हिंदी नाम</h2>';
+    html += '<div class="backupnote">These show on the Counter, Kitchen, Live orders and bills when the app is in हिंदी. Check each one and correct it if needed, then Save. English names stay as they are.</div>';
+    html += '<div class="rentsw" style="margin-bottom:8px;"><span>Show</span><div><button class="'+(!showAll?'on':'')+'" id="hn_missing">Without a Hindi name ('+rows.filter(function(r){ return !r.had; }).length+')</button><button class="'+(showAll?'on':'')+'" id="hn_all">All ('+rows.length+')</button></div></div>';
+    if(cloud.ai) html += '<button class="btn-additem" id="hn_ai" style="margin-bottom:8px;">✨ Better names with AI</button>';
+    var sec = "";
+    html += list.length ? list.map(function(r){ var i = rows.indexOf(r), h = "";
+      if(r.kind!==sec){ sec = r.kind; h = '<div class="barsub" style="margin:10px 0 4px;font-weight:700;">'+(r.kind==="dish" ? "🍽️ Dishes" : "📦 Stock items (Kitchen)")+'</div>'; }
+      return h+'<div class="hnrow"><span class="notr">'+esc(r.x.name)+'</span><input class="notr" data-hn="'+i+'" value="'+esc(r.v)+'"></div>'; }).join("")
+      : '<div class="empty">Every item has a Hindi name. Tap “All” to check or change them.</div>';
+    html += '<div class="err" id="hn_err"></div><div class="sheetbtns"><button class="btn-cancel" id="hn_c">Cancel</button><button class="btn-save" id="hn_s">Save</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    function sync(){ Array.prototype.forEach.call(sheet.querySelectorAll("[data-hn]"), function(inp){ rows[+inp.getAttribute("data-hn")].v = inp.value; }); }
+    document.getElementById("hn_missing").addEventListener("click", function(){ sync(); showAll = false; draw(); });
+    document.getElementById("hn_all").addEventListener("click", function(){ sync(); showAll = true; draw(); });
+    document.getElementById("hn_c").addEventListener("click", closeForm);
+    var ai = document.getElementById("hn_ai");
+    if(ai) ai.addEventListener("click", function(){
+      sync(); var todo = rows.filter(function(r){ return showAll || !r.had; }); if(!todo.length) return;
+      ai.disabled = true; ai.textContent = "✨ Asking the AI…";
+      callClaude("Give the Hindi name, in Devanagari, that staff in an Indian cafe would say for each of these menu dishes / kitchen stock items. "+
+        "Keep numbers and things in brackets (translate words inside them). Use the common spoken Hindi word (e.g. Tea → चाय, Boiled Eggs → उबले अंडे); for English dish names usually said in English, write them in Devanagari (Sandwich → सैंडविच). "+
+        "Reply with ONLY a JSON array of strings, same order and length.\n"+JSON.stringify(todo.map(function(r){ return r.x.name; }))).then(function(arr){
+        if(!Array.isArray(arr) || arr.length!==todo.length) throw new Error("bad");
+        todo.forEach(function(r, k){ var t = String(arr[k]||"").trim(); if(t && /[\u0900-\u097F]/.test(t)) r.v = t.slice(0, 80); });
+        draw();
+      }).catch(function(){ ai.disabled = false; ai.textContent = "✨ Better names with AI"; var e = document.getElementById("hn_err"); e.textContent = "The AI couldn't be reached. The names shown are still fine to save."; e.style.display = "block"; });
+    });
+    document.getElementById("hn_s").addEventListener("click", function(){
+      sync(); var dm = false, di = false;
+      rows.forEach(function(r){ var v = String(r.v||"").trim().slice(0, 80); if(!v || v===(r.x.localName||"")) return; r.x.localName = v; if(r.kind==="dish") dm = true; else di = true; });
+      if(dm) saveMenu(); if(di) saveIngredients(); closeForm(); renderAll();
+      appAlert(dm||di ? "Hindi names saved." : "Nothing changed.");
+    });
+  }
+  draw();
+}
 // ---------- HINDI OPTION ----------
 // A per-phone switch. Exact labels on screen (tabs, headings, buttons, common words) are shown in
 // Hindi; anything not in the list stays in English. Inputs, dropdown choices and numbers are never
@@ -7727,6 +7775,79 @@ function startLang(){
   });
   langObs.observe(document.body, { childList:true, subtree:true });
 }
+// ---- Hindi names for dishes and stock items ----
+// A saved "Name in Hindi" always wins. Without one, Hindi mode shows an automatic name: common
+// food words from the list below, anything else spelt out in Devanagari by sound.
+var FOOD_HI = {
+  tea:"चाय",chai:"चाय",coffee:"कॉफ़ी",cold:"कोल्ड",hot:"गरम",masala:"मसाला",ginger:"अदरक",adrak:"अदरक",elaichi:"इलायची",cardamom:"इलायची",lemon:"नींबू",nimbu:"नींबू",
+  green:"ग्रीन",black:"ब्लैक",milk:"दूध",doodh:"दूध",lassi:"लस्सी",chaas:"छाछ",buttermilk:"छाछ",shake:"शेक",milkshake:"मिल्कशेक",juice:"जूस",water:"पानी",bottle:"बोतल",
+  soda:"सोडा",shikanji:"शिकंजी",sweet:"मीठा",salt:"नमक",salted:"नमकीन",mango:"आम",banana:"केला",apple:"सेब",orange:"संतरा",chocolate:"चॉकलेट",vanilla:"वनीला",
+  strawberry:"स्ट्रॉबेरी",ice:"आइस",cream:"क्रीम",icecream:"आइसक्रीम",kulfi:"कुल्फ़ी",
+  aloo:"आलू",alu:"आलू",potato:"आलू",potatoes:"आलू",onion:"प्याज़",pyaz:"प्याज़",pyaaz:"प्याज़",tomato:"टमाटर",tamatar:"टमाटर",gobi:"गोभी",gobhi:"गोभी",cauliflower:"गोभी",
+  cabbage:"पत्ता गोभी",peas:"मटर",matar:"मटर",mutter:"मटर",palak:"पालक",spinach:"पालक",methi:"मेथी",bhindi:"भिंडी",baingan:"बैंगन",brinjal:"बैंगन",mushroom:"मशरूम",
+  corn:"कॉर्न",sweetcorn:"स्वीट कॉर्न",veg:"वेज",vegetable:"सब्ज़ी",vegetables:"सब्ज़ियाँ",mix:"मिक्स",mixed:"मिक्स",sabzi:"सब्ज़ी",sabji:"सब्ज़ी",subzi:"सब्ज़ी",
+  paneer:"पनीर",cheese:"चीज़",butter:"बटर",makhan:"मक्खन",ghee:"घी",curd:"दही",dahi:"दही",raita:"रायता",salad:"सलाद",papad:"पापड़",pickle:"अचार",achar:"अचार",
+  dal:"दाल",daal:"दाल",tadka:"तड़का",tarka:"तड़का",fry:"फ्राई",fried:"फ्राइड",makhani:"मखनी",rajma:"राजमा",chole:"छोले",chhole:"छोले",chana:"चना",kadhi:"कढ़ी",
+  rice:"चावल",chawal:"चावल",jeera:"जीरा",biryani:"बिरयानी",pulao:"पुलाव",khichdi:"खिचड़ी",khichri:"खिचड़ी",
+  roti:"रोटी",chapati:"चपाती",tawa:"तवा",tandoori:"तंदूरी",naan:"नान",kulcha:"कुलचा",paratha:"पराठा",parantha:"पराठा",parotta:"पराठा",puri:"पूरी",poori:"पूरी",
+  bhature:"भटूरे",bhatura:"भटूरा",thali:"थाली",mini:"मिनी",deluxe:"डीलक्स",special:"स्पेशल",full:"फ़ुल",half:"हाफ़",plate:"प्लेट",combo:"कॉम्बो",combos:"कॉम्बो",
+  breakfast:"नाश्ता",lunch:"लंच",dinner:"डिनर",snacks:"स्नैक्स",snack:"स्नैक",starter:"स्टार्टर",starters:"स्टार्टर",main:"मेन",course:"कोर्स",dessert:"मिठाई",desserts:"मिठाई",
+  poha:"पोहा",upma:"उपमा",idli:"इडली",idly:"इडली",dosa:"डोसा",dosai:"डोसा",uttapam:"उत्तपम",vada:"वड़ा",wada:"वड़ा",sambhar:"सांभर",sambar:"सांभर",chutney:"चटनी",
+  bread:"ब्रेड",toast:"टोस्ट",omelette:"ऑमलेट",omelet:"ऑमलेट",egg:"अंडा",eggs:"अंडे",anda:"अंडा",ande:"अंडे",boiled:"उबले",boil:"उबला",bhurji:"भुर्जी",
+  sandwich:"सैंडविच",burger:"बर्गर",pizza:"पिज़्ज़ा",pasta:"पास्ता",noodles:"नूडल्स",chowmein:"चाउमीन",maggi:"मैगी",momos:"मोमोज़",momo:"मोमो",fries:"फ्राइज़",
+  french:"फ्रेंच",finger:"फ़िंगर",chips:"चिप्स",grilled:"ग्रिल्ड",grill:"ग्रिल",club:"क्लब",roll:"रोल",rolls:"रोल",wrap:"रैप",frankie:"फ्रैंकी",
+  samosa:"समोसा",samose:"समोसे",kachori:"कचौरी",pakoda:"पकौड़ा",pakora:"पकौड़ा",pakode:"पकौड़े",pakore:"पकौड़े",bhaji:"भाजी",pav:"पाव",vadapav:"वड़ा पाव",
+  chaat:"चाट",tikki:"टिक्की",golgappa:"गोलगप्पे",panipuri:"पानीपूरी",dahi_puri:"दही पूरी",bhel:"भेल",
+  chicken:"चिकन",mutton:"मटन",fish:"मछली",prawn:"झींगा",keema:"कीमा",kebab:"कबाब",tikka:"टिक्का",curry:"करी",gravy:"ग्रेवी",dry:"ड्राई",kadai:"कढ़ाई",kadhai:"कढ़ाई",
+  shahi:"शाही",korma:"कोरमा",manchurian:"मंचूरियन",chilli:"चिली",chili:"चिली",garlic:"गार्लिक",lahsun:"लहसुन",schezwan:"शेज़वान",
+  gulab:"गुलाब",jamun:"जामुन",kheer:"खीर",halwa:"हलवा",jalebi:"जलेबी",rasgulla:"रसगुल्ला",ladoo:"लड्डू",laddu:"लड्डू",cake:"केक",pastry:"पेस्ट्री",cookie:"कुकी",cookies:"कुकीज़",
+  biscuit:"बिस्कुट",biscuits:"बिस्कुट",brownie:"ब्राउनी",
+  lachha:"लच्छा",laccha:"लच्छा",kulhad:"कुल्हड़",kullad:"कुल्हड़",sev:"सेव",hakka:"हक्का",
+  pcs:"पीस",pc:"पीस",piece:"पीस",pieces:"पीस",cup:"कप",glass:"गिलास",kg:"किलो",g:"ग्राम",gm:"ग्राम",ml:"ml",ltr:"लीटर",litre:"लीटर",liter:"लीटर",
+  and:"और",with:"के साथ",without:"बिना",no:"बिना",extra:"एक्स्ट्रा",large:"बड़ा",small:"छोटा",regular:"रेगुलर",medium:"मीडियम",of:"का",
+  oil:"तेल",sugar:"चीनी",cheeni:"चीनी",flour:"आटा",atta:"आटा",maida:"मैदा",besan:"बेसन",sooji:"सूजी",suji:"सूजी",rava:"रवा",gas:"गैस",cylinder:"सिलेंडर",coriander:"धनिया",dhaniya:"धनिया",
+  chilli_powder:"मिर्च पाउडर",mirch:"मिर्च",haldi:"हल्दी",turmeric:"हल्दी",cumin:"जीरा",mustard:"सरसों",peanut:"मूँगफली",peanuts:"मूँगफली",cashew:"काजू",kaju:"काजू",
+  sauce:"सॉस",ketchup:"केचप",mayo:"मेयो",mayonnaise:"मेयोनीज़",packet:"पैकेट",box:"डिब्बा",parcel:"पार्सल",
+  beverages:"पेय",drinks:"ड्रिंक्स",drink:"ड्रिंक",others:"अन्य",other:"अन्य",chinese:"चाइनीज़",south:"साउथ",indian:"इंडियन",north:"नॉर्थ"
+};
+// Rough by-sound spelling for words not in the list (Hinglish names read well this way).
+var HI_CONS = [["chh","छ"],["ksh","क्ष"],["kh","ख"],["gh","घ"],["ch","च"],["jh","झ"],["th","थ"],["dh","ध"],["ph","फ"],["bh","भ"],["sh","श"],["gy","ज्ञ"],
+  ["k","क"],["g","ग"],["c","क"],["j","ज"],["t","ट"],["d","ड"],["n","न"],["p","प"],["b","ब"],["m","म"],["y","य"],["r","र"],["l","ल"],["v","व"],["w","व"],["s","स"],["h","ह"],["f","फ़"],["z","ज़"],["q","क"],["x","क्स"]];
+var HI_VOW = [["aa",["आ","ा"]],["ee",["ई","ी"]],["ii",["ई","ी"]],["oo",["ऊ","ू"]],["uu",["ऊ","ू"]],["ai",["ऐ","ै"]],["au",["औ","ौ"]],["ou",["औ","ौ"]],
+  ["a",["अ",""]],["e",["ए","े"]],["i",["इ","ि"]],["o",["ओ","ो"]],["u",["उ","ु"]]];
+function hiTranslit(w){
+  w = w.toLowerCase(); var out = "", i = 0, prevCons = false;
+  function match(list){ for(var k=0;k<list.length;k++){ if(w.substr(i, list[k][0].length)===list[k][0]) return list[k]; } return null; }
+  while(i < w.length){
+    var v = match(HI_VOW);
+    if(v){
+      var last = i + v[0].length >= w.length;
+      if(prevCons) out += (v[0]==="a" && last) ? "ा" : v[1][1]; else out += v[1][0];
+      i += v[0].length; prevCons = false; continue;
+    }
+    var c = match(HI_CONS);
+    if(c){ if(prevCons) out += "्"; out += c[1]; i += c[0].length; prevCons = true; continue; }
+    out += w.charAt(i); i++; prevCons = false;
+  }
+  return out;
+}
+var AUTO_HI_CACHE = {};
+function autoHindi(name){
+  name = String(name||""); if(!name) return "";
+  if(AUTO_HI_CACHE[name]!==undefined) return AUTO_HI_CACHE[name];
+  var r = name.replace(/[A-Za-z][A-Za-z']*/g, function(word){
+    var k = word.toLowerCase().replace(/'s$/,"").replace(/'/g,"");
+    if(FOOD_HI[k]!==undefined) return FOOD_HI[k];
+    if(/s$/.test(k) && FOOD_HI[k.slice(0,-1)]!==undefined) return FOOD_HI[k.slice(0,-1)];
+    return hiTranslit(k);
+  });
+  return (AUTO_HI_CACHE[name] = r);
+}
+function hindiOn(){ return appLang()==="hi"; }
+// The Hindi name to show for a dish / stock item ("" when none should show).
+function hiNameOf(x){ if(!x) return ""; return x.localName || (hindiOn() ? autoHindi(x.name) : ""); }
+// A live-order / bill line: its dish's Hindi name, else the line's own.
+function lineName(i){ var m = i && i.menuId ? menuItems.find(function(x){ return x.id===i.menuId; }) : null; var h = hindiOn() ? (m ? hiNameOf(m) : autoHindi(i.name)) : ""; return h || (i && i.name) || ""; }
 function toggleLang(){ try{ localStorage.setItem(LANG_KEY, appLang()==="hi" ? "en" : "hi"); }catch(e){} location.reload(); }
 
 function poAttention(){
@@ -10007,7 +10128,7 @@ function openPlatformEntry(){
   var html = '<h2 class="serif">'+c.i+' '+c.t+' order</h2>'+
     '<div class="backupnote">Copy from the '+c.t+' partner app. · '+c.t+' ऐप से ऑर्डर नंबर लिखें।</div>'+
     '<div class="field two"><div><label>Order ID (last 4+ digits) · ऑर्डर नंबर</label><input id="pf_id" inputmode="numeric" value="'+esc(m.pid||"")+'"></div><div><label>Customer first name</label><input id="pf_name" value="'+esc(m.cname||"")+'"></div></div>'+
-    '<div class="card" style="margin-bottom:10px;">'+orderLines().map(function(l){ return '<div class="psrow"><span>'+l.qty+'× '+esc(l.m.name)+'</span><b>'+rupee(l.amt)+'</b></div>'; }).join("")+
+    '<div class="card" style="margin-bottom:10px;">'+orderLines().map(function(l){ return '<div class="psrow"><span class="notr">'+l.qty+'× '+esc(dishLabel(l.m))+'</span><b>'+rupee(l.amt)+'</b></div>'; }).join("")+
       (cfg.packing?'<div class="psrow"><span>Packing</span><b>'+rupee(cfg.packing)+'</b></div>':'')+
       '<div class="psrow"><span><b>Customer pays '+c.t+'</b></span><b>'+rupee(gross)+'</b></div><div class="psrow"><span>'+c.t+' commission (~'+cfg.commission+'%)</span><b class="warnamt">− '+rupee(comm)+'</b></div><div class="psrow"><span><b>Cafe gets (payout)</b></span><b class="ok">'+rupee(gross-comm)+'</b></div></div>'+
     '<label class="poclose"><input type="checkbox" id="pf_acc"> I have already ACCEPTED it on the '+c.t+' app · ऐप पर Accept कर दिया</label>'+
@@ -10032,7 +10153,7 @@ function openLiveOrders(kitchenOnly){
     var maxRound = (t.items||[]).reduce(function(a,i){ return Math.max(a, i.round||1); },1);
     return '<div class="ltk '+t.type+(late?" late":"")+'"><div class="ltkh"><b>'+esc(ticketLabel(t))+'</b><span class="ltime">'+(late?"⏰ ":"")+mins+' min</span></div>'+
       '<div class="muted">Order '+t.no+' · '+esc(t.time)+(t.paid?' · <span class="ok">paid</span>':t.cod?' · <b class="warnamt">cash on delivery '+rupee(t.amount||0)+'</b>':' · <span class="warnamt">not paid</span>')+(t.address?' · '+esc(t.address):'')+(t.phone?' · '+esc(t.phone):'')+'</div>'+
-      '<div class="ltkitems">'+(t.items||[]).map(function(i){ return '<span class="'+((i.round||1)===maxRound && maxRound>1 ? "new" : "")+'">'+i.qty+'× '+esc(i.name)+'</span>'; }).join("")+'</div>'+
+      '<div class="ltkitems">'+(t.items||[]).map(function(i){ return '<span class="'+((i.round||1)===maxRound && maxRound>1 ? "new" : "")+' notr">'+i.qty+'× '+esc(lineName(i))+'</span>'; }).join("")+'</div>'+
       '<div class="lguide"><b>'+esc(st.hi)+'</b><div>'+esc(st.en)+'</div></div>'+
       (st.btn ? '<button class="btn-big green" data-lstep="'+esc(t.id)+'">'+esc(st.btn)+'</button>' : '')+
       (!t.paid && (t.status==="new"||t.status==="cooking") ? '<a href="#" class="lcancel" data-lcancel="'+esc(t.id)+'">Cancel order</a>' : '')+'</div>';
@@ -10075,7 +10196,7 @@ function ticketAdvance(id, kitchenOnly){
 function openPackList(t, items, done){
   var ticks = items.map(function(){ return false; }), sheet = document.getElementById("sheet");
   function draw(){
-    sheet.innerHTML = '<h2 class="serif">📦 Pack · '+esc(ticketLabel(t))+'</h2><div class="ltkitems" style="margin-bottom:8px;">'+(t.items||[]).map(function(i){ return '<span>'+i.qty+'× '+esc(i.name)+'</span>'; }).join("")+'</div>'+
+    sheet.innerHTML = '<h2 class="serif">📦 Pack · '+esc(ticketLabel(t))+'</h2><div class="ltkitems" style="margin-bottom:8px;">'+(t.items||[]).map(function(i){ return '<span class="notr">'+i.qty+'× '+esc(lineName(i))+'</span>'; }).join("")+'</div>'+
       items.map(function(x, i){ return '<button class="packrow'+(ticks[i]?" on":"")+'" data-pk="'+i+'"><b>'+(ticks[i]?"✔":"")+'</b>'+esc(x.replace("Order ID", "Order ID #"+(t.pid||t.no)))+'</button>'; }).join("")+
       '<div class="err" id="pk_err"></div><div class="sheetbtns"><button class="btn-cancel" id="pk_c">Back</button><button class="btn-save" id="pk_ok">✔ Packed · पैक हो गया</button></div>';
     Array.prototype.forEach.call(sheet.querySelectorAll("[data-pk]"), function(b){ b.addEventListener("click", function(){ var i = +b.getAttribute("data-pk"); ticks[i] = !ticks[i]; draw(); }); });
@@ -10167,16 +10288,16 @@ function discWithinLimit(kind, value, sub){
 function orderCount(){ return orderLines().reduce(function(a,l){ return a+l.qty; },0); }
 function counterBills(dateStr){ return sales.filter(function(s){ return s.order && s.date===dateStr; }).sort(function(a,b){ return (b.order.no||0)-(a.order.no||0); }); }
 function billedPlates(dateStr){ return dishLog.filter(function(d){ return d.orderId && d.date===dateStr; }).reduce(function(a,d){ return a+(+d.qty||0); },0); }
-function dishLabel(m){ return m.localName ? m.localName : m.name; }
+function dishLabel(m){ return hiNameOf(m) || m.name; }
 function tileHtml(m){
   var q = counterOrder[m.id]||0, simple = simpleMode();
   if(soldOutToday(m)) return '<button class="ctile soldout" disabled><div class="cimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="">' : '<span>'+dishIcon(m)+'</span>')+'<b class="csold">Sold out</b></div>'+
-    '<div class="cloc">'+esc(dishLabel(m))+'</div><div class="cprice">'+rupee(m.price)+'</div></button>';
+    '<div class="cloc notr">'+esc(dishLabel(m))+'</div><div class="cprice">'+rupee(m.price)+'</div></button>';
   return '<button class="ctile'+(q?" has":"")+'" data-add="'+esc(m.id)+'">'+
     '<div class="cimg">'+(m.photo ? '<img src="'+esc(m.photo)+'" alt="" loading="lazy">' : '<span>'+dishIcon(m)+'</span>')+vegDot(m)+
       (q ? '<b class="cqty">'+q+'</b>' : '')+'</div>'+
-    (m.localName ? '<div class="cloc">'+esc(m.localName)+'</div>' : '')+
-    ((!simple || !m.localName) ? '<div class="cname">'+esc(m.name)+'</div>' : '')+
+    (hiNameOf(m) ? '<div class="cloc notr">'+esc(hiNameOf(m))+'</div>' : '')+
+    ((!simple || !hiNameOf(m)) ? '<div class="cname notr">'+esc(m.name)+'</div>' : '')+
     '<div class="cprice">'+rupee(unitPrice(m))+'</div>'+
     (q ? '<span class="cminus" data-minus="'+esc(m.id)+'" aria-label="one less">−</span>' : '')+'</button>';
 }
@@ -10203,7 +10324,7 @@ function renderCounter(){
   html += counterTypeHtml();
   var cats = counterCats();
   if(counterCat!=="__top" && counterCat!=="__all" && cats.indexOf(counterCat)<0) counterCat = "__top";
-  html += '<div class="ccats">'+[["__top","⭐ "+(simple?"Most sold":"Most sold")]].concat(cats.map(function(c){ return [c, (iconFor(c)||"🍽️")+" "+c]; })).concat(simple?[]:[["__all","All"]]).map(function(c){
+  html += '<div class="ccats">'+[["__top","⭐ "+(simple?"Most sold":"Most sold")]].concat(cats.map(function(c){ return [c, (iconFor(c)||"🍽️")+" "+(hindiOn() ? autoHindi(c) : c)]; })).concat(simple?[]:[["__all","All"]]).map(function(c){
     return '<button data-cat="'+esc(c[0])+'" class="'+(counterCat===c[0]?"on":"")+'">'+esc(c[1])+'</button>'; }).join("")+'</div>';
   var show = counterCat==="__top" ? counterTop(simple ? 8 : 12) : counterCat==="__all" ? items : items.filter(function(m){ return (m.category||"Other")===counterCat; });
   html += '<div class="cgrid">'+show.map(tileHtml).join("")+'</div>';
@@ -10305,7 +10426,7 @@ function renderCounterPay(speak){
   if(payStep==="order"){
     html += '<h2 class="serif">Bill</h2>';
     html += lines.map(function(l){
-      return '<div class="pline"><span class="picon">'+dishIcon(l.m)+'</span><div class="pname"><b>'+esc(dishLabel(l.m))+'</b>'+(l.m.localName?'<span>'+esc(l.m.name)+'</span>':'')+'</div>'+
+      return '<div class="pline"><span class="picon">'+dishIcon(l.m)+'</span><div class="pname"><b class="notr">'+esc(dishLabel(l.m))+'</b>'+(hiNameOf(l.m)?'<span class="notr">'+esc(l.m.name)+'</span>':'')+'</div>'+
         '<button class="pbtn" data-less="'+esc(l.m.id)+'">−</button><b class="pq">'+l.qty+'</b><button class="pbtn" data-more="'+esc(l.m.id)+'">+</button>'+
         '<span class="pamt">'+rupee(l.amt)+'</span></div>';
     }).join("");

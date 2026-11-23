@@ -486,6 +486,12 @@ use the same rules.
   ticked by hand. **Go** opens the right screen; **Hide** leaves a one-line reminder.
 - **हिंदी / English** switch at the top (per phone): tabs, headings, buttons and common words in Hindi; anything not
   in the word list stays English. Dropdown choices, inputs and saved data are never changed.
+  **Dish and stock names in Hindi:** in हिंदी mode the Counter tiles and categories, bills, Live orders, packing
+  lists, Menu and Kitchen show each item's Hindi name big with the English name small underneath. A saved "Name in
+  Hindi" always wins; without one an automatic name is shown (`autoHindi`: a list of ~300 food words — Tea → चाय,
+  Boiled Eggs → उबले अंडे — and spelling by sound for the rest). **Records → Menu → अ Hindi names** lists every dish
+  and stock item with its suggested name to check, correct and save in one go (✨ Better names with AI when the
+  server has the AI). Saved names show on every phone, also in English mode.
 - **Privacy policy** (`/privacy.html`, written to the DPDP Act 2023) and **Terms of use** (`/terms.html`), linked from
   the sign-in screen and the customer page. The app listing (manifest) has a description and categories.
 - **Error monitoring**: errors on any signed-in phone (staff or customer) are sent to the server (up to 5 per
