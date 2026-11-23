@@ -259,6 +259,12 @@
   .ctables button.tbedit{border-style:dashed;}
   .surow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);} .surow > b{width:26px;height:26px;border-radius:13px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;background:#EFE8D8;font-size:13px;}
   .surow.done > b{background:#2E7D4F;color:#fff;} .surow.done .who{text-decoration:line-through;color:var(--ink-soft);} .surow > div{flex:1;min-width:0;}
+  .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
+  .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
+  .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
+  .fti{font-size:22px;width:30px;text-align:center;} .ftt{flex:1;font-size:14px;line-height:1.3;} .ftt small{color:var(--ink-soft);font-size:12px;} .fthi{font-size:12px;color:var(--ink-soft);font-weight:600;}
+  .ftsw{flex:none;width:50px;height:30px;border-radius:15px;border:none;background:#C9C2B4;position:relative;padding:0;} .ftsw i{position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:left .15s;box-shadow:0 1px 2px rgba(0,0,0,.25);}
+  .ftsw.on{background:#2E7D4F;} .ftsw.on i{left:23px;} .ftlock{font-size:18px;width:50px;text-align:center;}
   .rentsw{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0 2px;padding:8px 10px;border-radius:10px;background:#F6F1E6;font-size:13.5px;}
   .rentsw div{display:flex;gap:6px;} .rentsw button{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;color:var(--ink);}
   .rentsw button.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .rentsw button.off{background:#A6402D;border-color:#A6402D;color:#fff;}
@@ -1547,7 +1553,55 @@ var ROLE_SCREENS = {
   chef:    { nav:["kitchen","notes","staff","records"], rec:["purchases","orders","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
   billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash"], staff:["roster","attendance","tasks"] }
 };
-function roleScreens(){ return isFullAccess() ? null : (ROLE_SCREENS[myAccess()] || ROLE_SCREENS.billing); }
+// Owner's feature switches (Logins → What each role can use). The server sends this login's
+// { feature: on/off } as who.features and withholds the lists of features that are off.
+var FEATURE_UI = [
+  { id:"billing",   i:"🧾", t:"Billing / Counter", hi:"बिलिंग / काउंटर", d:"Take orders, make bills, discounts", nav:["counter"], rec:["sales"] },
+  { id:"kitchen",   i:"🍳", t:"Kitchen screen", hi:"किचन", d:"Orders to cook, stock in / out with pictures", nav:["kitchen"] },
+  { id:"menu",      i:"📖", t:"Menu & recipes", hi:"मेन्यू और रेसिपी", d:"Dishes, prices, photos, recipe cards, menu PDF", rec:["menu"] },
+  { id:"stock",     i:"📦", t:"Stock / inventory", hi:"स्टॉक", d:"Stock levels, counts, wastage", rec:["stock"] },
+  { id:"purchases", i:"🛒", t:"Purchases", hi:"खरीद", d:"Market purchases and bill photos", rec:["purchases"] },
+  { id:"orders",    i:"📝", t:"Purchase orders", hi:"ऑर्डर", d:"Ask for stock, approvals, receive deliveries", rec:["orders"] },
+  { id:"vendors",   i:"🏪", t:"Vendors", hi:"वेंडर", d:"Suppliers and what is owed to them", rec:["vendors"] },
+  { id:"assets",    i:"🪑", t:"Assets & checklists", hi:"सामान और चेकलिस्ट", d:"Equipment, daily checks", rec:["assets"] },
+  { id:"expenses",  i:"💸", t:"Expenses & bills", hi:"खर्च", d:"Expenses, rent, electricity, fixed bills", rec:["expenses","fixed"] },
+  { id:"customers", i:"👥", t:"Customers & udhaar", hi:"ग्राहक और उधार", d:"Customer list, udhaar, customer app codes", rec:["customers"] },
+  { id:"cash",      i:"💵", t:"Cash count & handover", hi:"कैश", d:"Day's cash count, cash with each person", rec:["cash","handover"] },
+  { id:"staff",     i:"🧑‍🍳", t:"Staff: team, roster, attendance, tasks", hi:"स्टाफ", d:"Who works when, attendance, tasks", staff:["team","roster","attendance","tasks"] },
+  { id:"meals",     i:"🍛", t:"Staff meals", hi:"स्टाफ खाना", d:"Meal plan for staff", staff:["meals"] },
+  { id:"dashboard", i:"📊", t:"Dashboard & reports", hi:"डैशबोर्ड", d:"Today's numbers, alerts, PDF reports", nav:["dashboard"], ui:["reportsBtn"] },
+  { id:"calendar",  i:"📅", t:"Calendar", hi:"कैलेंडर", d:"Day-by-day view", nav:["calendar"] },
+  { id:"notes",     i:"🗒️", t:"Quick notes", hi:"नोट्स", d:"Type or speak entries", nav:["notes"] },
+  { id:"money",     i:"🏦", t:"Partner money, loans & bank", hi:"पैसा, लोन, बैंक", d:"Investments, loans, bank, cash review, partners", rec:["investments","bank","review","loans","partners"], fullOnly:true },
+  { id:"salary",    i:"💰", t:"Salaries", hi:"सैलरी", d:"Pay, allowances, salary slips", staff:["salary"], fullOnly:true },
+  { id:"backup",    i:"💾", t:"Backup & restore", hi:"बैकअप", d:"Download / restore all data", ui:["backupBtn"], fullOnly:true }
+];
+var FEATURE_DEFAULTS_UI = {
+  partner: FEATURE_UI.map(function(f){ return f.id; }),
+  manager: ["billing","kitchen","menu","stock","purchases","orders","vendors","assets","expenses","customers","cash","staff","meals","dashboard","calendar","notes"],
+  chef:    ["kitchen","menu","stock","purchases","orders","vendors","assets","staff","meals","notes"],
+  billing: ["billing","kitchen","orders","customers","cash","staff","notes"]
+};
+function myFeatures(){ return (cloud.who && cloud.who.features) || null; }
+function featOn(id){ var f = myFeatures(); return !f || f[id]!==false; }
+function roleScreens(){
+  var base = isFullAccess() ? null : (ROLE_SCREENS[myAccess()] || ROLE_SCREENS.billing), f = myFeatures();
+  if(!f) return base;
+  var defs = FEATURE_DEFAULTS_UI[myAccess()] || [], out = { nav:[], rec:[], staff:[] };
+  FEATURE_UI.forEach(function(ft){
+    if(!f[ft.id]) return;
+    var usual = defs.indexOf(ft.id)>=0;
+    ["nav","rec","staff"].forEach(function(k){ (ft[k]||[]).forEach(function(sc){ if(!usual || !base || base[k].indexOf(sc)>=0) out[k].push(sc); }); });
+  });
+  if(out.rec.length) out.nav.push("records");
+  if(out.staff.length) out.nav.push("staff");
+  var order = ["counter","kitchen","dashboard","calendar","notes","staff","records"];
+  out.nav = order.filter(function(v){ return out.nav.indexOf(v)>=0; });
+  if(!out.nav.length) out.nav = ["notes"];
+  if(!out.rec.length) out.rec = ["sales"];
+  if(!out.staff.length) out.staff = ["roster"];
+  return out;
+}
 // Lists each kind of note writes to, so a note this login can't file is refused clearly.
 var NOTE_TYPE_KEY = { sale:SALES_KEY, purchase:PURCH_KEY, purchaseBill:PURCH_KEY, investment:INVEST_KEY, expense:EXPENSE_KEY, staffmeal:SETTINGS_KEY,
                       attendance:ATTEND_KEY, udhaarpay:CREDPAY_KEY, loan:LOANS_KEY, billentry:SETTINGS_KEY, advance:EXPENSE_KEY, bill:SETTINGS_KEY };
@@ -1560,13 +1614,14 @@ function applyRoleUI(){
   toggle("nav.tabs button", "data-v", rs && rs.nav);
   toggle("#recCtl button", "data-r", rs && rs.rec);
   toggle("#staffCtl button", "data-s", rs && rs.staff);
-  ["backupBtn","reportsBtn"].forEach(function(id){ var e = document.getElementById(id); if(e) e.style.display = (full || (id==="reportsBtn" && myAccess()==="manager")) ? "" : "none"; });
-  ["moneyPos","investSummary"].forEach(function(id){ var e = document.getElementById(id); if(e && e.parentNode) e.parentNode.style.display = full ? "" : "none"; });
+  var fullish = isFullAccess();
+  ["backupBtn","reportsBtn"].forEach(function(id){ var e = document.getElementById(id); if(e) e.style.display = (((fullish || (id==="reportsBtn" && myAccess()==="manager")) && featOn(id==="backupBtn" ? "backup" : "dashboard"))) ? "" : "none"; });
+  ["moneyPos","investSummary"].forEach(function(id){ var e = document.getElementById(id); if(e && e.parentNode) e.parentNode.style.display = (fullish && featOn("money")) ? "" : "none"; });
   // Land on an allowed screen.
   if(rs){
     var activeNav = document.querySelector("nav.tabs button.on");
     if(activeNav && rs.nav.indexOf(activeNav.getAttribute("data-v"))<0) showView(rs.nav[0]);
-    if(rs.rec.indexOf(recSub)<0) switchRecordsSub(rs.rec[0]);
+    if(rs.rec.indexOf(recSub)<0 && rs.rec[0]) switchRecordsSub(rs.rec[0]);
     if(rs.staff.indexOf(staffSub)<0) switchStaffSub(rs.staff[0]);
   }
   var tag = document.getElementById("roleTag");
@@ -1935,6 +1990,7 @@ function openLoginsSheet(){
       return '<div class="psrow" data-lgedit="'+esc(u.login)+'" style="cursor:pointer;"><span><b>'+esc(u.login)+'</b>'+(u.name?' · '+esc(u.name):'')+'<br><span class="pill'+(a==="full"?' bad':'')+'">'+esc(ACCESS_LABEL[a]||a)+'</span></span><b class="muted" style="font-weight:500;">Edit ›</b></div>'; }
     var html = '<h2 class="serif">Logins &amp; roles</h2>';
     html += '<div class="backupnote">Give every person their own login, so you can see who did what and remove anyone’s access in one tap. The server only sends each login what its role allows — staff phones never receive partner money, loans, bank or salaries.</div>';
+    html += '<button class="btn-save" id="lg_feat" style="width:100%;margin-bottom:10px;">🎚️ What each role can use · कौन क्या देखे</button>';
     var olds = users.filter(function(u){ return (u.access||"full")==="full"; });
     if(olds.length) html += '<div class="attmwarn">'+olds.length+' older login'+(olds.length!==1?'s have':' has')+' full access to '+(olds.length!==1?'their store':'its store')+'. Tap '+(olds.length!==1?'each':'it')+' and pick a role (manager, chef or billing) to limit what it sees.</div>';
     var partners = users.filter(function(u){ return u.outlet==="*"; });
@@ -1951,6 +2007,7 @@ function openLoginsSheet(){
     html += '<div class="sheetbtns" style="margin-top:8px;"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
     sheet.innerHTML = html;
     document.getElementById("lg_back").addEventListener("click", openOutletSheet);
+    document.getElementById("lg_feat").addEventListener("click", function(){ openFeatureSheet("manager"); });
     Array.prototype.forEach.call(sheet.querySelectorAll("[data-lgadd]"), function(b){ b.addEventListener("click", function(){ openLoginForm(null, b.getAttribute("data-lgadd")); }); });
     Array.prototype.forEach.call(sheet.querySelectorAll("[data-lgedit]"), function(b){
       b.addEventListener("click", function(){ openLoginForm(users.find(function(u){ return u.login===b.getAttribute("data-lgedit"); })); });
@@ -1959,6 +2016,54 @@ function openLoginsSheet(){
     sheet.innerHTML = '<h2 class="serif">Logins &amp; roles</h2><div class="err" style="display:block;">You need internet to manage logins.</div><div class="sheetbtns"><button class="btn-cancel" id="lg_back" style="flex:1;">Back</button></div>';
     document.getElementById("lg_back").addEventListener("click", openOutletSheet);
   });
+}
+// Owner: switch features on / off for each role. Saved on the server for all stores.
+var FEATURE_ROLE_TABS = [["partner","🤝 Partner","पार्टनर"],["manager","🧑‍💼 Manager","मैनेजर"],["chef","🧑‍🍳 Staff: Chef","शेफ"],["billing","🧾 Staff: Billing","बिलिंग"]];
+function openFeatureSheet(role, cfgIn){
+  var sheet = document.getElementById("sheet");
+  document.getElementById("sheetBg").classList.add("on");
+  if(!cfgIn){
+    sheet.innerHTML = '<h2 class="serif">🎚️ What each role can use</h2><div class="backupnote">Loading…</div>';
+    api("GET", "/api/features").then(function(r){
+      if(!r.ok){ sheet.innerHTML = '<h2 class="serif">🎚️ What each role can use</h2><div class="err" style="display:block;">'+esc((r.data && r.data.error) || "Couldn't load.")+'</div><div class="sheetbtns"><button class="btn-cancel" id="ft_c" style="flex:1;">Back</button></div>';
+        document.getElementById("ft_c").addEventListener("click", openLoginsSheet); return; }
+      openFeatureSheet(role, JSON.parse(JSON.stringify(r.data.config || {})));
+    }).catch(function(){
+      sheet.innerHTML = '<h2 class="serif">🎚️ What each role can use</h2><div class="err" style="display:block;">You need internet to change this.</div><div class="sheetbtns"><button class="btn-cancel" id="ft_c" style="flex:1;">Back</button></div>';
+      document.getElementById("ft_c").addEventListener("click", openLoginsSheet);
+    });
+    return;
+  }
+  var cfg = cfgIn;
+  function isOn(r, id){ var ft = FEATURE_UI.find(function(x){ return x.id===id; }); if(ft.fullOnly && r!=="partner") return false;
+    var v = cfg[r] && cfg[r][id]; return typeof v==="boolean" ? v : FEATURE_DEFAULTS_UI[r].indexOf(id)>=0; }
+  function draw(){
+    var html = '<h2 class="serif">🎚️ What each role can use</h2>';
+    html += '<div class="backupnote">Switch features on or off for each role. Off = the screen is hidden <b>and</b> the server stops sending that data to those phones. Applies to every login with that role, in all stores. Phones get the change the next time the app opens.</div>';
+    html += '<div class="ftabs">'+FEATURE_ROLE_TABS.map(function(t){ return '<button data-frole="'+t[0]+'" class="'+(t[0]===role?"on":"")+'">'+t[1]+'<small>'+t[2]+'</small></button>'; }).join("")+'</div>';
+    html += '<div class="ftlist">'+FEATURE_UI.map(function(ft){
+      var locked = ft.fullOnly && role!=="partner", on = isOn(role, ft.id), usual = FEATURE_DEFAULTS_UI[role].indexOf(ft.id)>=0;
+      return '<div class="ftrow'+(locked?" locked":"")+'"><span class="fti">'+ft.i+'</span><span class="ftt"><b>'+esc(ft.t)+'</b> <span class="fthi">'+esc(ft.hi)+'</span><br><small>'+esc(locked ? "Owner & partners only" : ft.d+(!usual && on ? " · extra for this role" : ""))+'</small></span>'+
+        (locked ? '<span class="ftlock">🔒</span>' : '<button class="ftsw'+(on?" on":"")+'" data-feat="'+ft.id+'" role="switch" aria-checked="'+on+'" aria-label="'+esc(ft.t)+'"><i></i></button>')+'</div>';
+    }).join("")+'</div>';
+    html += '<button class="btn-additem" id="ft_reset" style="margin-top:8px;">↺ Usual set for this role</button>';
+    html += '<div class="err" id="ft_err"></div><div class="sheetbtns"><button class="btn-cancel" id="ft_c">Back</button><button class="btn-save" id="ft_s">Save</button></div>';
+    sheet.innerHTML = html;
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-frole]"), function(b){ b.addEventListener("click", function(){ role = b.getAttribute("data-frole"); draw(); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-feat]"), function(b){ b.addEventListener("click", function(){
+      var id = b.getAttribute("data-feat"); cfg[role] = cfg[role] || {}; cfg[role][id] = !isOn(role, id); draw(); }); });
+    document.getElementById("ft_reset").addEventListener("click", function(){ delete cfg[role]; draw(); });
+    document.getElementById("ft_c").addEventListener("click", openLoginsSheet);
+    document.getElementById("ft_s").addEventListener("click", function(){
+      var btn = this, err = document.getElementById("ft_err"); btn.disabled = true;
+      api("PUT", "/api/features", { config:cfg }).then(function(r){
+        btn.disabled = false;
+        if(!r.ok){ err.textContent = (r.data && r.data.error) || "Couldn't save."; err.style.display = "block"; return; }
+        openLoginsSheet(); appAlert("Saved. Phones with these roles get the change the next time the app opens.");
+      }).catch(function(){ btn.disabled = false; err.textContent = "You need internet to save this."; err.style.display = "block"; });
+    });
+  }
+  draw();
 }
 function openLoginForm(u, outletId){
   var sheet = document.getElementById("sheet");

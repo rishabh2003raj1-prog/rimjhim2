@@ -276,6 +276,18 @@ staff phone can't read or wipe owner data even if someone tampers with the app. 
 store change signs that login out everywhere. A phone used by a different login is cleared first, and lists a
 login may not see are removed from the phone.
 
+**🎚️ What each role can use** (Logins & roles; owner only): on/off switches per feature for Partner, Manager,
+Staff: Chef and Staff: Billing (Hindi labels on each). Features: Billing / Counter, Kitchen, Menu & recipes, Stock,
+Purchases, Purchase orders, Vendors, Assets & checklists, Expenses & bills, Customers & udhaar, Cash count &
+handover, Staff (team / roster / attendance / tasks), Staff meals, Dashboard & reports, Calendar, Quick notes, and —
+partners only — Partner money / loans / bank, Salaries, Backup & restore. The table above is the usual set
+("↺ Usual set" restores it). Off hides the screens **and** the server stops sending that feature's lists
+(`FEATURES` / `FEATURE_DEFAULTS` in `src/worker.js`; saved in the `meta` table as `role_features`, for all stores).
+A list shared by several features (e.g. the menu, used by Billing and Kitchen) is withheld only when all of them
+are off, so one switch never breaks another screen. A feature switched on beyond a role's usual job uses that
+job's rules (e.g. a chef given Billing bills like the counter: adds sales, last two days). Owner and older
+"full access" logins are never limited. Phones pick up a change the next time the app opens.
+
 Also: **Activity** (owner / partner) lists who changed what and how many entries were added, changed or removed;
 **daily server backups** of every store at 2:30 AM, kept 14 days, downloadable from Backup & restore (owner can
 also "Back up now"); the old PIN-header import route is switched off (set `ALLOW_LEGACY_PUSH = "1"` to re-enable);

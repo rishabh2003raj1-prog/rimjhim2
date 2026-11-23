@@ -212,9 +212,91 @@ const POLICY = {
   partners_v1:       { manager: "r", chef: "r", billing: "r" }
   // investments, loans, payroll and anything new: owner / partner / full only.
 };
+// ---- feature switches: the owner decides which features each role gets ----
+// Each feature lists the lists (keys) it needs. A key is withheld from a role only when EVERY
+// feature that uses it is off for that role, so turning one feature off never breaks another.
+// A feature switched on beyond a role's usual job borrows the rules of the role named in "from".
+// Money, salary and backups are for partners only (never managers or staff).
+const FEATURES = {
+  billing:   { from: "billing", keys: ["sales_v1", "retailsales_v1", "offers_v1", "liveorders_v1", "dishlog_v1", "menu_v1", "ingredients_v1", "retail_v1", "customers_v1", "creditpayments_v1", "custpayments_v1", "cashdays_v1", "checks_v1"] },
+  kitchen:   { from: "chef", keys: ["liveorders_v1", "dishlog_v1", "prepbatches_v1", "wastage_v1", "menu_v1", "ingredients_v1"] },
+  menu:      { from: "chef", keys: ["menu_v1", "ingredients_v1"] },
+  stock:     { from: "chef", keys: ["ingredients_v1", "stockaudits_v1", "cafeuse_v1", "retail_v1", "wastage_v1"] },
+  purchases: { from: "chef", keys: ["purchases_v1", "bills_v1", "vendors_v1"] },
+  orders:    { from: "chef", keys: ["pos_v1"] },
+  vendors:   { from: "manager", keys: ["vendors_v1"] },
+  assets:    { from: "manager", keys: ["assets_v1", "checks_v1"] },
+  expenses:  { from: "manager", keys: ["expenses_v1"] },
+  customers: { from: "manager", keys: ["customers_v1", "custpayments_v1", "creditpayments_v1", "offers_v1"] },
+  cash:      { from: "manager", keys: ["cashdays_v1", "cashmoves_v1"] },
+  staff:     { from: "manager", keys: ["roster_v1", "attendance_v1", "tasks_v1", "conduct_v1"] },
+  meals:     { from: "manager", keys: [] },
+  dashboard: { from: "manager", keys: [] },
+  calendar:  { from: "manager", keys: [] },
+  notes:     { from: "chef", keys: ["notes_v1"] },
+  money:     { fullOnly: true, keys: ["investments_v1", "loans_v1"] },
+  salary:    { fullOnly: true, keys: ["payroll_v1", "expenses_v1"] },
+  backup:    { fullOnly: true, keys: [] }
+};
+const FEATURE_ROLES = ["partner", "manager", "chef", "billing"];
+const FEATURE_DEFAULTS = {
+  partner: Object.keys(FEATURES),
+  manager: ["billing", "kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "expenses", "customers", "cash", "staff", "meals", "dashboard", "calendar", "notes"],
+  chef:    ["kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "staff", "meals", "notes"],
+  billing: ["billing", "kitchen", "orders", "customers", "cash", "staff", "notes"]
+};
+const KEY_FEATURES = {};
+Object.keys(FEATURES).forEach((f) => FEATURES[f].keys.forEach((k) => { (KEY_FEATURES[k] = KEY_FEATURES[k] || []).push(f); }));
+let featCache = null, featCacheAt = 0;
+async function featureConfig(env) {
+  if (featCache && Date.now() - featCacheAt < 3000) return featCache;
+  let cfg = {};
+  try { const r = await env.DB.prepare("SELECT v FROM meta WHERE k = 'role_features'").first(); if (r) cfg = JSON.parse(r.v) || {}; } catch (e) { cfg = {}; }
+  featCache = cfg; featCacheAt = Date.now(); return cfg;
+}
+function cleanFeatureConfig(raw) {
+  const out = {};
+  FEATURE_ROLES.forEach((role) => {
+    const src = raw && raw[role]; if (!src || typeof src !== "object") return;
+    Object.keys(FEATURES).forEach((f) => {
+      if (typeof src[f] !== "boolean") return;
+      if (FEATURES[f].fullOnly && role !== "partner") return;
+      (out[role] = out[role] || {})[f] = src[f];
+    });
+  });
+  return out;
+}
+// { feature: on/off } for a partner / manager / chef / billing login; null for the owner and older "full" logins.
+async function featuresFor(env, who) {
+  if (!who || who.role !== "store") return null;
+  const acc = accessOf(who); if (FEATURE_ROLES.indexOf(acc) < 0) return null;
+  const cfg = (await featureConfig(env))[acc] || {}, out = {};
+  Object.keys(FEATURES).forEach((f) => {
+    const allowed = !FEATURES[f].fullOnly || acc === "partner";
+    out[f] = allowed && (typeof cfg[f] === "boolean" ? cfg[f] : FEATURE_DEFAULTS[acc].indexOf(f) >= 0);
+  });
+  return out;
+}
+function featuresLimit(who) { return !!(who.feat && Object.keys(who.feat).some((f) => !who.feat[f])); }
 function accessOf(who) { return who.role === "owner" ? "owner" : (who.access || "full"); }
 function isFull(who) { return !!FULL_ACCESS[accessOf(who)]; }
-function ruleFor(who, key) { if (isFull(who)) return "rw"; const p = POLICY[key]; return (p && p[accessOf(who)]) || null; }
+function ruleFor(who, key) {
+  const acc = accessOf(who);
+  const base = isFull(who) ? "rw" : ((POLICY[key] && POLICY[key][acc]) || null);
+  const fs = who.feat && KEY_FEATURES[key];
+  if (!fs) return base;
+  const on = fs.filter((f) => who.feat[f]);
+  if (!on.length) return null;
+  if (base) return base;
+  // Only a feature switched on BEYOND the role's usual set lends its rules; usual features keep the role's own.
+  const usual = FEATURE_DEFAULTS[acc] || [];
+  for (const f of on) {
+    if (usual.indexOf(f) >= 0) continue;
+    const g = POLICY[key] && (POLICY[key][FEATURES[f].from] || POLICY[key].manager);
+    if (g) return g;
+  }
+  return null;
+}
 function pick(o, keys) { const r = {}; keys.forEach((k) => { if (o && o[k] !== undefined) r[k] = o[k]; }); return r; }
 function omit(o, keys) { const r = Object.assign({}, o || {}); keys.forEach((k) => { delete r[k]; }); return r; }
 function istDay(offsetDays) { const d = new Date(Date.now() + TZ_OFFSET_MIN * 60000 + (offsetDays || 0) * 86400000); return d.toISOString().slice(0, 10); }
@@ -352,7 +434,7 @@ function diffCounts(cur, next) {
 }
 // For the app: which lists this login can see and how it may change them.
 function permsFor(who) {
-  if (isFull(who)) return { "*": "rw" };
+  if (isFull(who) && !featuresLimit(who)) return { "*": "rw" };
   const out = {};
   Object.keys(POLICY).forEach((k) => { const r = ruleFor(who, k); if (r) out[k] = r; });
   return out;
@@ -398,6 +480,7 @@ async function handleLogin(req, env) {
     if (row && safeEqual(h, row.hash)) {
       token = await storeToken(env, row.login, row.ver, exp, gen);
       who = { role: "store", outlet: row.outlet, login: row.login, name: row.name, access: row.access || "full", exp, outletName: await outletNameOf(env, row.outlet) };
+      who.feat = await featuresFor(env, who); who.features = who.feat;
       who.perms = permsFor(who);
     }
   }
@@ -664,7 +747,7 @@ async function handleData(req, env, url, path, who) {
     const serverTime = Date.now();
     const since = parseInt(url.searchParams.get("since") || "0", 10) || 0;
     const items = await readAll(env, outlet, since);
-    if (!isFull(who)) {
+    if (!isFull(who) || featuresLimit(who)) {
       for (const k of Object.keys(items)) {
         const v = readView(ruleFor(who, k), items[k].value, who);
         if (v === undefined) delete items[k]; else items[k].value = v;
@@ -718,7 +801,7 @@ async function handleData(req, env, url, path, who) {
 async function handleExport(env, url, who) {
   const outlet = outletOf(url);
   if (!outlet) return json({ error: "bad outlet" }, 400);
-  if (!canUseOutlet(who, outlet) || !isFull(who)) return json({ error: "not allowed" }, 403);
+  if (!canUseOutlet(who, outlet) || !isFull(who) || (who.feat && !who.feat.backup)) return json({ error: "not allowed" }, 403);
   const items = await readAll(env, outlet, -1);
   const out = { exportedAt: new Date().toISOString(), outlet };
   for (const k of Object.keys(items)) out[k] = items[k].value;
@@ -888,7 +971,7 @@ async function dailyBackup(env) {
 }
 async function handleBackups(req, env, url, path, who) {
   const outlet = outletOf(url);
-  if (!outlet || !canUseOutlet(who, outlet) || !isFull(who) || accessOf(who) === "full") return json({ error: "Only the owner or a partner can open server backups." }, 403);
+  if (!outlet || !canUseOutlet(who, outlet) || !isFull(who) || accessOf(who) === "full" || (who.feat && !who.feat.backup)) return json({ error: "Only the owner or a partner can open server backups." }, 403);
   if (path === "/api/backups") {
     if (req.method === "POST" && who.role === "owner") { await dailyBackup(env); }
     const rows = await env.DB.prepare("SELECT day, SUM(LENGTH(data)) AS size FROM backups WHERE outlet = ? GROUP BY day ORDER BY day DESC").bind(outlet).all();
@@ -948,6 +1031,7 @@ export default {
         return await handlePhotoGet(env, id, { role: "store", outlet: c.outlet, login: "customer", access: "billing" });
       }
       const who = await whoIs(req, env);
+      if (who) who.feat = await featuresFor(env, who);
       // Errors that happen in the app on someone's phone, so they can be fixed (signed-in users only).
       if (path === "/api/clienterror" && req.method === "POST") {
         const c = who ? null : await custWho(req, env);
@@ -977,7 +1061,7 @@ export default {
         return json({ entries: rows.results });
       }
       if (path === "/api/session") {
-        if (who) { who.access = accessOf(who); who.perms = permsFor(who); }
+        if (who) { who.access = accessOf(who); who.features = who.feat; who.perms = permsFor(who); }
         if (who && who.role === "store") who.outletName = await outletNameOf(env, who.outlet);
         return json(Object.assign({ ok: !!who, ai: aiAvailable(env) }, who || {}), who ? 200 : 401);
       }
@@ -993,6 +1077,18 @@ export default {
       if (path === "/api/password" && req.method === "POST") {
         if (who.role !== "store") return json({ error: "The owner PIN is changed with the APP_PIN secret." }, 400);
         return await handleOwnPassword(req, env, who);
+      }
+      // Owner: which features each role gets.
+      if (path === "/api/features") {
+        if (who.role !== "owner") return json({ error: "Only the owner can choose what each role gets." }, 403);
+        if (req.method === "GET") return json({ config: await featureConfig(env), defaults: FEATURE_DEFAULTS, features: Object.keys(FEATURES) });
+        if (req.method === "PUT") {
+          let b = {}; try { b = await req.json(); } catch (e) { return json({ error: "bad json" }, 400); }
+          const cfg = cleanFeatureConfig(b.config);
+          await env.DB.prepare("INSERT INTO meta (k, v) VALUES ('role_features', ?) ON CONFLICT(k) DO UPDATE SET v = excluded.v").bind(JSON.stringify(cfg)).run();
+          featCache = cfg; featCacheAt = Date.now();
+          return json({ ok: true, config: cfg });
+        }
       }
       if (path === "/api/users" || path.startsWith("/api/users/")) {
         if (who.role !== "owner") return json({ error: "Only the owner can manage logins." }, 403);
