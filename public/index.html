@@ -2439,6 +2439,8 @@ function markStale(){
 
 function renderAll(){
   viewsStale = false;
+  // Quietly; Records → Purchases shows what was sorted, with Undo.
+  if(!catFixRan && cloud.state==="ok"){ try{ fixOldPurchaseCats(); }catch(e){} }
   try{ applyRoleUI(); }catch(e){}
   lastRenderDay = fmtDate(new Date());
   refreshCats();
@@ -4254,6 +4256,9 @@ function renderPurchList(){
   var credit = lines.filter(function(p){ return (p.mode||"Cash")==="Credit"; }).reduce(function(a,p){ return a+purchTotal(p); },0);
   var deliv = lines.filter(function(p){ return p.isDelivery; }).reduce(function(a,p){ return a+purchTotal(p); },0);
   var html = owedSummary() + recPeriodBar("purchase", "purchase");
+  var cfu = null; try{ cfu = JSON.parse(localStorage.getItem("purch_catfix_undo_v1")||"null"); }catch(e){}
+  if(cfu && cfu.changed && Date.now() - (cfu.at||0) < 7*86400000 && canWriteKey(PURCH_KEY))
+    html += '<div class="backupnote">✔ '+cfu.changed.length+' old purchase'+(cfu.changed.length!==1?'s were':' was')+' moved out of “Other” into the right category. <a href="#" id="cf_undo">Undo</a></div>';
   html += recKpis([["Purchases", rupee(tot), "neg", groups.length+" bill"+(groups.length!==1?"s":"")],
                    ["Udhaar", rupee(credit), credit>0?"neg":"", "not paid yet"],
                    ["Delivery", rupee(deliv), "", tot>0 ? Math.round(deliv/tot*100)+"% of spend" : "&nbsp;"]]);
@@ -4281,6 +4286,7 @@ function renderPurchList(){
     dayExtra: recPeriod==="month" ? function(d){ return purchasePaySummary(lines.filter(function(p){ return p.date===d; })); } : null });
   el.innerHTML = html;
   wireRecPeriodBar(el);
+  var cfuB = el.querySelector("#cf_undo"); if(cfuB) cfuB.addEventListener("click", function(ev){ ev.preventDefault(); var n = undoPurchaseCatFix(); renderAll(); appAlert(n ? "Put back "+n+" purchase"+(n!==1?"s":"")+" to the old category." : "Nothing to undo."); });
   wireEntryClicks(el);
   var ov = document.getElementById("owed_view");
   if(ov) ov.addEventListener("click", openOwedSheet);
@@ -4812,17 +4818,57 @@ var CAT_GUESS = [[/\b(gas|lpg|cylinder)\b/i,"Gas (LPG)"],[/\b(water jar|20 ?l|bi
   [/\b(spoon|straw|tissue|napkin|paper plate|paper cup|plastic cup|glass disposable|fork|toothpick|butter paper)\b/i,"Disposables & tissues"],
   [/\b(box|container|carry ?bag|bag|foil|cling|wrap|pouch|lid|packing|parcel)\b/i,"Packaging"],
   [/\b(coke|pepsi|thums ?up|sprite|fanta|limca|maaza|frooti|red bull|bisleri|kinley|aquafina|soda bottle|cold drink|mineral water)\b/i,"Cold drinks & water"],
-  [/\b(milk|doodh|paneer|curd|dahi|butter|makhan|cream|malai|cheese|khoa|mawa)\b/i,"Dairy"],
-  [/\b(chicken|mutton|fish|egg|anda|keema)\b/i,"Meat, chicken & eggs"],
+  [/\b(milk|doodh|dudh|dood|amul|mother dairy|paneer|panir|curd|dahi|butter|makhan|makkhan|cream|malai|cheese|khoa|khowa|mawa|chhena|lassi)\b/i,"Dairy"],
+  [/\b(chicken|mutton|fish|egg|anda|ande|keema|murga|murgi)\b/i,"Meat, chicken & eggs"],
   [/\b(oil|ghee|refined|vanaspati|dalda)\b/i,"Oil & ghee"],
   [/\b(masala|haldi|jeera|mirchi powder|chilli powder|dhaniya powder|garam|hing|ajwain|elaichi|laung|kali mirch|spice|salt|namak|kasuri)\b/i,"Spices & masala"],
   [/\b(sauce|ketchup|mayo|mayonnaise|syrup|crush|vinegar|soya|schezwan|jam|spread|dressing|roohafza|roohafja|achaar|pickle)\b/i,"Sauces, syrups & spreads"],
   [/\b(bread|bun|pav|pizza base|kulcha|rusk)\b/i,"Bakery"],
   [/\b(frozen|fries|nugget|patty|momo sheet|ready to cook)\b/i,"Frozen & ready-to-cook"],
   [/\b(tea|chai|patti|coffee|nescafe|cocoa|ice cream)\b/i,"Beverages"],
-  [/\b(onion|pyaz|tomato|tamatar|potato|aloo|garlic|lahsun|ginger|adrak|chilli|mirch|capsicum|carrot|cabbage|gobhi|peas|matar|beans|lemon|nimbu|coriander|dhania|mint|pudina|spinach|palak|cucumber|mushroom|corn|banana|apple|mango|fruit|sabzi|vegetable)\b/i,"Vegetables & fruits"],
-  [/\b(atta|maida|rice|chawal|dal|sugar|cheeni|besan|suji|rava|poha|maggi|noodle|pasta|oats|rajma|chana|chole)\b/i,"Grocery"]];
-function guessPurchCat(item){ var t = String(item||""), t2 = t.replace(/([a-z]{3,})(?:es|s)\b/gi, "$1"); for(var i=0;i<CAT_GUESS.length;i++) if(CAT_GUESS[i][0].test(t) || CAT_GUESS[i][0].test(t2)) return CAT_GUESS[i][1]; return ""; }
+  [/\b(onion|pyaz|pyaj|pyaaz|pyaaj|piyaz|piyaj|piyaaz|piyaaj|kanda|tomato|tamatar|tamater|potato|aloo|alu|aaloo|aalu|batata|garlic|lahsun|lehsun|lasun|ginger|adrak|adrakh|chilli|chili|mirch|mirchi|hari mirch|capsicum|shimla|carrot|gajar|cabbage|patta gobhi|gobhi|gobi|cauliflower|peas|matar|mutter|beans|lemon|nimbu|neembu|lime|coriander|dhania|dhaniya|mint|pudina|spinach|palak|methi|cucumber|kheera|khira|mushroom|corn|bhutta|brinjal|baingan|bhindi|lauki|tinda|turai|karela|beetroot|chukandar|radish|mooli|sweet potato|shakarkandi|banana|kela|apple|seb|mango|aam|papaya|orange|santra|grapes|angoor|pomegranate|anar|watermelon|tarbooj|fruit|fruits|phal|sabzi|sabji|subzi|vegetable|veggies)\b/i,"Vegetables & fruits"],
+  [/\b(atta|aata|maida|rice|chawal|chaawal|basmati|dal|daal|sugar|cheeni|chini|shakkar|gud|jaggery|besan|suji|sooji|rava|poha|maggi|noodle|pasta|oats|rajma|chana|chane|chole|moong|masoor|urad|arhar|toor|sabudana|makhana|dry fruit|kaju|badam|kishmish|peanut|moongfali)\b/i,"Grocery"]];
+// Items typed in Hindi (Devanagari).
+var CAT_GUESS_HI = [[["दूध","पनीर","दही","मक्खन","मलाई","क्रीम","खोया","मावा","छाछ"],"Dairy"],[["अंडा","अंडे","चिकन","मटन","मछली","मुर्गा"],"Meat, chicken & eggs"],
+  [["तेल","घी","रिफाइंड"],"Oil & ghee"],[["मसाला","हल्दी","जीरा","नमक","धनिया पाउडर","मिर्च पाउडर","इलायची","लौंग","हींग","अजवाइन"],"Spices & masala"],
+  [["ब्रेड","पाव","बन"],"Bakery"],[["चाय","चायपत्ती","पत्ती","कॉफ़ी","कॉफी"],"Beverages"],[["गैस","सिलेंडर"],"Gas (LPG)"],
+  [["प्याज","प्याज़","आलू","टमाटर","लहसुन","अदरक","मिर्च","शिमला","गाजर","गोभी","मटर","नींबू","धनिया","पुदीना","पालक","मेथी","खीरा","बैंगन","भिंडी","लौकी","केला","सेब","आम","फल","सब्ज़ी","सब्जी"],"Vegetables & fruits"],
+  [["आटा","मैदा","चावल","दाल","चीनी","शक्कर","गुड़","बेसन","सूजी","पोहा","राजमा","चना","छोले","मूंग","उड़द"],"Grocery"]];
+function guessPurchCat(item){
+  var t = String(item||""), t2 = t.replace(/([a-z]{3,})(?:es|s)\b/gi, "$1");
+  for(var i=0;i<CAT_GUESS.length;i++) if(CAT_GUESS[i][0].test(t) || CAT_GUESS[i][0].test(t2)) return CAT_GUESS[i][1];
+  for(var j=0;j<CAT_GUESS_HI.length;j++) if(CAT_GUESS_HI[j][0].some(function(w){ return t.indexOf(w)>=0; })) return CAT_GUESS_HI[j][1];
+  return "";
+}
+// Categories too broad to trust from an old entry when the item's name says something more exact
+// (before the detailed list existed, vegetables went under Grocery and many items under Other).
+var BROAD_CATS = ["Other","","Grocery","Cafe use supplies"];
+// One-time tidy of old purchases: "Other" (or a broad old category) becomes the category the name
+// points to. Entries where someone picked the category by hand are never changed.
+var catFixRan = false;
+function fixOldPurchaseCats(){
+  if(catFixRan || !canWriteKey(PURCH_KEY) || !purchases.length) return 0;
+  catFixRan = true;
+  var changed = [];
+  purchases.forEach(function(p){
+    if(!p || p.catPicked || p.isDelivery || !p.item) return;
+    var cur = p.category || "", g = guessPurchCat(p.item);
+    if(g && g!==cur && BROAD_CATS.indexOf(cur)>=0){ changed.push({ id:p.id, from:cur }); p.category = g; }
+  });
+  if(changed.length){
+    savePurch();
+    try{ localStorage.setItem("purch_catfix_undo_v1", JSON.stringify({ at:Date.now(), changed:changed })); }catch(e){}
+  }
+  return changed.length;
+}
+function undoPurchaseCatFix(){
+  var u = null; try{ u = JSON.parse(localStorage.getItem("purch_catfix_undo_v1")||"null"); }catch(e){}
+  if(!u || !u.changed) return 0;
+  var by = {}; u.changed.forEach(function(c){ by[c.id] = c.from; });
+  purchases.forEach(function(p){ if(p && by[p.id]!==undefined){ p.category = by[p.id] || "Other"; p.catPicked = true; } });
+  savePurch(); try{ localStorage.removeItem("purch_catfix_undo_v1"); }catch(e){}
+  return u.changed.length;
+}
 var PURCH_MODES = ["Cash","UPI","Card","Bank Transfer","Credit"];
 var billDraft = null;
 
@@ -4989,11 +5035,15 @@ function renderBillForm(){
   Array.prototype.forEach.call(sheet.querySelectorAll(".bi"), function(inp){
     inp.addEventListener("input", refreshTotals); inp.addEventListener("change", refreshTotals);
     // Typing an item's name picks its category (from the last purchase, else from the name) unless one was chosen.
-    if(inp.getAttribute("data-f")==="item") inp.addEventListener("change", function(){
-      var i = +inp.getAttribute("data-i"), sel = sheet.querySelector('select.bi[data-f="category"][data-i="'+i+'"]'); if(!sel || sel.getAttribute("data-picked")) return;
-      var c = lastCategory(inp.value); if(c && PURCH_CATS.indexOf(c)>=0){ sel.value = c; billDraft.lines[i].category = c; }
-    });
-    if(inp.getAttribute("data-f")==="category") inp.addEventListener("change", function(){ inp.setAttribute("data-picked","1"); });
+    if(inp.getAttribute("data-f")==="item"){
+      var pick = function(){
+        var i = +inp.getAttribute("data-i"), sel = sheet.querySelector('select.bi[data-f="category"][data-i="'+i+'"]');
+        if(!sel || sel.getAttribute("data-picked") || (billDraft.lines[i] && billDraft.lines[i].catPicked) || inp.value.trim().length < 2) return;
+        var c = lastCategory(inp.value); if(c && PURCH_CATS.indexOf(c)>=0){ sel.value = c; billDraft.lines[i].category = c; }
+      };
+      inp.addEventListener("change", pick); inp.addEventListener("input", pick);
+    }
+    if(inp.getAttribute("data-f")==="category") inp.addEventListener("change", function(){ inp.setAttribute("data-picked","1"); var i = +inp.getAttribute("data-i"); if(billDraft.lines[i]) billDraft.lines[i].catPicked = true; });
   });
   document.getElementById("b_paid").addEventListener("change", function(){ syncDraft(); renderBillForm(); });
   // Mode and payer must agree, or the cash counter deducts money that never left the till.
@@ -5068,7 +5118,10 @@ function saveBillDraft(){
     if(!name) return fail("Item "+(i+1)+": enter a name.");
     if(isNaN(qty) || qty<=0) return fail("Item "+(i+1)+" ("+name+"): enter a quantity greater than 0.");
     if(isNaN(rate) || rate<=0) return fail("Item "+(i+1)+" ("+name+"): enter a rate greater than 0.");
-    clean.push({ id:ln.id, item:name, category:ln.category||"Other", qty:qty, unit:(ln.unit||"").trim()||"pcs", rate:rate, gst:parseFloat(ln.gst)||0 });
+    var lcat = ln.category || "Other";
+    // Not picked by hand and still a vague category: use what the name says.
+    if(!ln.catPicked && BROAD_CATS.indexOf(lcat)>=0){ var gc = guessPurchCat(name); if(gc) lcat = gc; }
+    clean.push({ id:ln.id, item:name, category:lcat, catPicked: ln.catPicked ? true : undefined, qty:qty, unit:(ln.unit||"").trim()||"pcs", rate:rate, gst:parseFloat(ln.gst)||0 });
   }
   var delVal = parseFloat(d.delivery)||0;
   if(clean.length===0 && delVal<=0) return fail("Add at least one item to this bill.");
@@ -5085,7 +5138,7 @@ function saveBillDraft(){
   purchases = purchases.filter(function(p){ return (p.billId||p.id)!==bid; });
   clean.forEach(function(ln){
     purchases.push({ id:ln.id||uid(), billId:bid, date:d.date, vendor:vendor, purchasedBy:d.purchasedBy, paidBy:d.paidBy, item:ln.item, category:ln.category,
-                     qty:ln.qty, unit:ln.unit, rate:ln.rate, gst:ln.gst, mode:d.mode });
+                     qty:ln.qty, unit:ln.unit, rate:ln.rate, gst:ln.gst, mode:d.mode, catPicked:ln.catPicked });
   });
 
   if(delVal>0){
@@ -7099,8 +7152,11 @@ function lastRate(item, unit){
   return f===0.001 ? r/1000 : f===1000 ? r*1000 : r;
 }
 function lastCategory(item){
-  var n = normItem(item), hit = purchases.filter(function(p){ return p.item && normItem(p.item)===n && p.category; }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
-  return hit ? hit.category : (guessPurchCat(item) || "Grocery");
+  var n = normItem(item), g = guessPurchCat(item);
+  var hit = purchases.filter(function(p){ return p.item && normItem(p.item)===n && p.category && (p.category!=="Other" || p.catPicked); }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
+  // A category chosen by hand, or a specific one, wins; a broad old one gives way to what the name says.
+  if(hit && (hit.catPicked || BROAD_CATS.indexOf(hit.category)<0 || !g)) return hit.category;
+  return g || (hit ? hit.category : "Grocery");
 }
 function vendorNames(){
   var s = {}; (vendors||[]).forEach(function(v){ if(v && v.name) s[v.name] = 1; }); ingredients.forEach(function(g){ if(g.vendor) s[g.vendor] = 1; });

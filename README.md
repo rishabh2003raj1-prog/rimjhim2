@@ -504,9 +504,17 @@ Grouped in the purchase form (older entries keep their category):
   maintenance material · Stationery & printing · Other cafe-use supplies — all kept out of food cost
 - Other
 
-Typing an item's name picks its category (its last purchase, else from the name — onion → Vegetables & fruits,
-Harpic → Cleaning, Roohafza → Sauces, syrups & spreads); a category chosen by hand is kept. Notes and purchase orders
-use the same rules.
+Typing an item's name picks its category as you type (onion / pyaaj / kanda / प्याज़ → Vegetables & fruits, milk /
+doodh / Amul / दूध → Dairy, Harpic → Cleaning, Roohafza → Sauces, syrups & spreads). Hinglish spellings and Hindi
+words are understood. An earlier purchase decides only when its category was picked by hand or is specific — an old
+"Other" (or a broad old Grocery / Cafe use supplies) gives way to what the name says. A category chosen by hand is
+kept (saved as `catPicked`). On save, a line still on a vague category gets the one its name points to. Notes and
+purchase orders use the same rules.
+
+**Old entries:** once, after the data loads on a phone that can change purchases, purchases under "Other" (or Grocery /
+Cafe use supplies when the name clearly says something else, e.g. onion) are moved to the category their name points
+to; hand-picked ones and delivery charges are never changed. Nothing pops up; Records → Purchases says how many were sorted and offers
+**Undo** for 7 days (undone entries are then kept as they were).
 
 ### Launch readiness (Step 8)
 - **🚀 Get your cafe ready** (Dashboard, owner / partners): a 12-step setup checklist that ticks itself as things

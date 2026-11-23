@@ -17,7 +17,7 @@ async function flush(p){ await E(p, 'scheduleFlush(0)'); await p.waitForFunction
       {id:'s2',date:addDays(T,-1),customer:'sharma ji ',amount:200,gst:0,mode:'Cash'},
       {id:'s3',date:T,customer:'Gupta',amount:999,gst:0,mode:'Credit'},{id:'s4',date:T,customer:'Counter',amount:5555,gst:0,mode:'UPI'}];
     creditPayments=[{id:'cp1',customerId:'c1',date:addDays(T,-1),amount:100,mode:'UPI'},{id:'cp2',customerId:'c2',date:T,amount:50}];
-    menuItems=[{id:'m1',name:'Masala Chai',localName:'मसाला चाय',category:'Tea',price:20,veg:'veg',active:true},{id:'m2',name:'Chicken Biryani',category:'Biryani',price:199,veg:'nonveg',active:true,soldOut:T},{id:'m3',name:'Old',category:'Tea',price:10,active:false}];
+    menuItems=[{id:'m1',name:'Masala Chai',localName:'मसाला चाय',category:'Tea',price:20,veg:'veg',active:true},{id:'m2',name:'Chicken Biryani',category:'Biryani',price:199,veg:'nonveg',active:true,soldOut:new Date(Date.now()+330*60000).toISOString().slice(0,10)},{id:'m3',name:'Old',category:'Tea',price:10,active:false}];
     offers=[{id:'o1',name:'Hospital staff',kind:'pct',value:10,active:true}];
     settings.upiId='rimjhim@okaxis'; settings.upiName='RimJhim Cafe'; settings.bankBalance=99999;
     saveCustomers(); saveSales(); saveCreditPayments(); saveMenu(); saveOffers(); saveSettings(); renderAll(); })()`);
