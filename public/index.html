@@ -262,6 +262,16 @@
   .ctbilling{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;padding:9px 12px;border-radius:12px;background:#FFF1DC;border:1.5px solid #C9772B;font-size:14px;}
   .ctbilling small{display:block;font-size:11.5px;color:var(--ink-soft);} .ctbilling button{flex:none;border:1.5px solid #A6402D;background:#fff;color:#A6402D;border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;font-size:13px;}
   .hnrow{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:13.5px;} .hnrow input{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:15px;}
+  .fmrow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:13.5px;} .fmrow small{color:var(--ink-soft);}
+  .fmbtns{display:flex;gap:6px;flex:none;} .fmbtns button{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 12px;font:inherit;font-weight:700;font-size:13px;color:var(--ink);}
+  .survcard{margin-bottom:14px;} .survline{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
+  .survline.ok b:last-child{color:#2E7D4F;} .survline.bad b:last-child{color:#A6402D;} .survline.warn b:last-child{color:#B5651D;}
+  .survmonths{display:grid;grid-template-columns:repeat(6,1fr);gap:5px;margin:6px 0 10px;} .survmonths button{border:1.5px solid var(--line);background:var(--panel);border-radius:10px;padding:6px 2px;font:inherit;font-weight:700;font-size:12.5px;color:var(--ink);line-height:1.2;}
+  .survmonths button small{display:block;font-weight:500;font-size:10.5px;color:var(--ink-soft);} .survmonths button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .survmonths button.on small{color:#ddd;}
+  .survverdict{display:flex;gap:12px;align-items:center;padding:12px;border-radius:14px;background:#F2EEE5;margin-bottom:8px;font-size:14px;} .survverdict .svi{font-size:34px;}
+  .survverdict.ok{background:#E8F3EA;} .survverdict.bad{background:#F8E5E0;} .survverdict.warn{background:#FFF1DC;} .svgap{margin-top:4px;}
+  .survbar{height:12px;border-radius:6px;background:#E6DFD2;overflow:hidden;} .survbar i{display:block;height:100%;background:#2E7D4F;}
+  .psrow.tot{border-top:2px solid var(--ink);margin-top:4px;} .survtip{font-size:13.5px;padding:6px 0;border-bottom:1px solid var(--line);}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -631,6 +641,7 @@
       <div id="setupBox"></div>
       <div id="attnBox"></div>
       <div id="mgmtBox"></div>
+      <div id="survivalBox"></div>
       <button class="btn-save" id="reportsBtn" style="width:100%;margin-bottom:14px;">📄 Reports — create &amp; share PDF</button>
 
       <div class="kpis">
@@ -2446,7 +2457,7 @@ function renderAll(){
   renderNotes();
   renderCounter();
   renderKitchen();
-  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } var sb = document.getElementById("setupBox"); if(sb){ sb.innerHTML = setupCard(); wireSetup(sb); } updateNavBadge(); }catch(e){}
+  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } var svb = document.getElementById("survivalBox"); if(svb){ svb.innerHTML = survivalCard(); var svo = svb.querySelector("#surv_open"); if(svo) svo.addEventListener("click", function(){ openSurvivalSheet(); }); } var sb = document.getElementById("setupBox"); if(sb){ sb.innerHTML = setupCard(); wireSetup(sb); } updateNavBadge(); }catch(e){}
 }
 
 // ---------- DASHBOARD ----------
@@ -2823,6 +2834,7 @@ function plannedStaffCost(mKey){
 var MONTH_RE = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})\b/;
 var MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 function expenseMonth(x){
+  if(x && /^\d{4}-\d{2}$/.test(x.forMonth||"")) return x.forMonth;
   var m = MONTH_RE.exec(x.description||"");
   if(m) return m[2] + "-" + String(MONTH_NAMES.indexOf(m[1])+1).padStart(2,"0");
   return monthKey(x.date||"");
@@ -2833,10 +2845,37 @@ function expenseMonth(x){
 // real payment date.
 function expBookDate(x){
   var d = x.date || "";
-  if(!d || (FIXED_CATS.indexOf(x.category)<0 && STAFF_CATS.indexOf(x.category)<0)) return d;
+  if(!d || (!x.forMonth && FIXED_CATS.indexOf(x.category)<0 && STAFF_CATS.indexOf(x.category)<0)) return d;
   var m = expenseMonth(x);
   if(!m || m===d.slice(0,7)) return d;
   return m < d.slice(0,7) ? m+"-"+String(daysInMonthOf(m)).padStart(2,"0") : m+"-01";
+}
+// Bills that usually arrive after the month (electricity, internet, salaries): a payment
+// made in the first days of a month is suggested as the month before.
+var LAST_MONTH_CATS = ["Electricity","Wifi / Internet","Mobile recharge","Staff Salary","Staff House Rent","Staff Food Allowance","Staff Travel Allowance","Staff Bonus"];
+function shiftMonth(mKey, n){ var y = +mKey.slice(0,4), m = +mKey.slice(5,7) - 1 + n; y += Math.floor(m/12); m = ((m%12)+12)%12; return y+"-"+String(m+1).padStart(2,"0"); }
+function suggestForMonth(cat, date){ var mk = (date||fmtDate(new Date())).slice(0,7); return (LAST_MONTH_CATS.indexOf(cat)>=0 && +(date||"").slice(8,10) <= 15) ? shiftMonth(mk, -1) : mk; }
+// Old payments of monthly bills / salaries made early in a month, with no month chosen yet.
+function forMonthReviewList(){
+  var cats = FIXED_CATS.concat(STAFF_CATS, ["Staff Bonus"]);
+  return expenses.filter(function(x){ return x && x.date && !x.forMonth && !MONTH_RE.test(x.description||"") && cats.indexOf(x.category)>=0 && +x.date.slice(8,10) <= 10; })
+    .sort(function(a,b){ return b.date.localeCompare(a.date); });
+}
+function openForMonthReview(){
+  var sheet = document.getElementById("sheet"), list = forMonthReviewList();
+  var html = '<h2 class="serif">🗓️ Which month is each bill for?</h2>';
+  html += '<div class="backupnote">These were paid in the first days of a month. If a bill or salary was for the month before (e.g. October electricity paid on 5 November), tap that month, so profit and the survival check count it in the right month. Cash and bank still use the day it was paid.</div>';
+  if(!list.length) html += '<div class="empty">Nothing left to check.</div>';
+  else html += '<button class="btn-additem" id="fm_all" style="margin-bottom:8px;">All → the month before</button>'+list.map(function(x){
+    var mk = x.date.slice(0,7), pm = shiftMonth(mk, -1);
+    return '<div class="fmrow"><div><b>'+esc(x.category)+'</b> · '+rupee(expAmt(x))+'<br><small>'+esc(x.description||"")+(x.description?' · ':'')+'paid '+esc(fmtD(x.date))+'</small></div>'+
+      '<div class="fmbtns"><button data-fm="'+esc(x.id)+'" data-m="'+pm+'">'+esc(monthLabel(pm).slice(0,3))+'</button><button data-fm="'+esc(x.id)+'" data-m="'+mk+'">'+esc(monthLabel(mk).slice(0,3))+'</button></div></div>'; }).join("");
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="fm_c" style="flex:1;">Done</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  function set(id, m){ var x = expenses.find(function(e){ return e.id===id; }); if(x) x.forMonth = m; }
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-fm]"), function(b){ b.addEventListener("click", function(){ set(b.getAttribute("data-fm"), b.getAttribute("data-m")); saveExpense(); renderAll(); openForMonthReview(); }); });
+  var all = document.getElementById("fm_all"); if(all) all.addEventListener("click", function(){ list.forEach(function(x){ x.forMonth = shiftMonth(x.date.slice(0,7), -1); }); saveExpense(); renderAll(); openForMonthReview(); });
+  document.getElementById("fm_c").addEventListener("click", closeForm);
 }
 function monthLabel(mKey){ return MONTH_NAMES[+mKey.slice(5,7)-1] + " " + mKey.slice(0,4); }
 function actualInMonth(cats, mKey){
@@ -3678,7 +3717,8 @@ function entryRow(item, type){
     return '<div class="entry" data-type="investment" data-id="'+item.id+'"><div><div class="who">'+esc(item.partner)+' · '+kl+'</div><div class="meta">'+esc(invCategory(item))+' · '+esc(invDestLabel(item))+(item.notes?' · '+esc(item.notes):'')+'</div></div><div class="amt '+(neg?"purch":"sale")+'">'+rupeeSigned(investAmt(item))+'</div></div>';
   } else {
     var pp = payerIsPersonal(item.paidBy);
-    return '<div class="entry" data-type="expense" data-id="'+item.id+'"><div><div class="who">'+esc(item.category)+'</div><div class="meta">'+esc(item.description||"")+' · '+esc(item.mode)+
+    var fmk = expenseMonth(item), fmTag = (item.date && fmk!==item.date.slice(0,7)) ? ' · <span class="pill">for '+esc(monthLabel(fmk))+' · paid '+esc(fmtD(item.date))+'</span>' : '';
+    return '<div class="entry" data-type="expense" data-id="'+item.id+'"><div><div class="who">'+esc(item.category)+'</div><div class="meta">'+esc(item.description||"")+' · '+esc(item.mode)+fmTag+
       (pp ? ' · paid by '+esc(payerPartner(item.paidBy))+' (own) '+(item.settled?'<span class="pill ok">'+({bank:"repaid by UPI/bank",cash:"repaid in cash",held:"repaid from handover cash",invest:"counted as their loan"}[item.settleMode]||"settled")+'</span>':'<span class="pill bad">owed</span>') : '')+
       (payerHeldBy(item.paidBy) ? ' · from '+esc(payerHeldBy(item.paidBy))+'\u2019s handover cash' : '')+
       '</div></div><div class="amt purch">'+rupee(expAmt(item))+'</div></div>';
@@ -3830,7 +3870,7 @@ function recKpis(cells){
 function recSalesIn(){ return sales.filter(function(x){ return inRecRange(x.date); }); }
 function recPurchIn(){ return purchases.filter(function(x){ return inRecRange(x.date); }); }
 function recInvestIn(){ return investments.filter(function(x){ return inRecRange(x.date); }); }
-function recExpIn(){ return expenses.filter(function(x){ return inRecRange(x.date); }); }
+function recExpIn(){ return expenses.filter(function(x){ return inRecRange(expBookDate(x)); }); }
 
 function renderSalesList(){
   var el = document.getElementById("salesList");
@@ -4260,7 +4300,7 @@ function renderInvestList(){
 function renderExpenseList(){
   var el = document.getElementById("expenseList");
   var r = recRange();
-  var list = recExpIn().sort(function(a,b){ return b.date.localeCompare(a.date) || 0; });
+  var list = recExpIn().sort(function(a,b){ return expBookDate(b).localeCompare(expBookDate(a)) || b.date.localeCompare(a.date); });
   var fixedAct = 0, staffAct = 0, varAct = 0, byCat = {};
   list.forEach(function(x){
     var a = expAmt(x);
@@ -4271,15 +4311,18 @@ function renderExpenseList(){
   var owedCard = owedSummary().replace('id="owed_view"', 'id="owed_view_x"');
   if(!owedCard && settledOwedItems().length) owedCard = '<button class="btn-additem" id="owed_rev_x" style="margin-bottom:12px;">Review / undo settled partner bills ('+settledOwedItems().length+')</button>';
   var html = owedCard + recPeriodBar("expense", "expense");
+  var fmr = canWriteKey(EXPENSE_KEY) ? forMonthReviewList().length : 0;
+  if(fmr) html += '<div class="attmwarn" id="fm_open" style="cursor:pointer;">🗓️ '+fmr+' bill'+(fmr!==1?'s':'')+' paid early in a month — tap to choose which month '+(fmr!==1?'they are':'it is')+' for (last month’s electricity, rent, salary…).</div>';
   html += recKpis([["Expenses", rupee(tot), "neg", list.length+" entr"+(list.length===1?"y":"ies")], ["Fixed + staff", rupee(fixedAct+staffAct), "", "rent, bills, salary"], ["Variable", rupee(varAct), "", "everything else"]]);
   var ck = Object.keys(byCat).sort(function(a,b){ return byCat[b]-byCat[a]; });
   if(ck.length>1)
     html += '<div class="card" style="margin-bottom:12px;padding:8px 12px;"><div class="barsub" style="margin:0 0 4px;font-weight:600;">By category · '+esc(r.label)+'</div>'+
       ck.map(function(k){ return '<div class="psrow" style="font-size:12.5px;padding:5px 0;"><span>'+esc(k)+'</span><b>'+rupee(byCat[k])+(tot>0?' · '+Math.round(byCat[k]/tot*100)+'%':'')+'</b></div>'; }).join("")+'</div>';
-  html += recGrouped(list, { word:"expenses", one:"expense", date:function(x){ return x.date; }, amt:expAmt, cls:function(){ return "purch"; }, row:function(x){ return entryRow(x,"expense"); } });
+  html += recGrouped(list, { word:"expenses", one:"expense", date:function(x){ return expBookDate(x); }, amt:expAmt, cls:function(){ return "purch"; }, row:function(x){ return entryRow(x,"expense"); } });
   el.innerHTML = html;
   wireRecPeriodBar(el);
   wireEntryClicks(el);
+  var fmo = el.querySelector("#fm_open"); if(fmo) fmo.addEventListener("click", openForMonthReview);
   var orv = el.querySelector("#owed_rev_x"); if(orv) orv.addEventListener("click", function(){ openSettlementReview("owed"); });
   var ov2 = el.querySelector("#owed_view_x");
   if(ov2) ov2.addEventListener("click", openOwedSheet);
@@ -7624,6 +7667,97 @@ function openDailySummary(d){
   document.getElementById("ds_wa").addEventListener("click", function(){ window.open("https://wa.me/?text="+encodeURIComponent(txt), "_blank"); try{ localStorage.setItem("summary_sent_v1", d); }catch(e){} });
   document.getElementById("ds_copy").addEventListener("click", function(){ try{ navigator.clipboard.writeText(txt).then(function(){ appAlert("Copied."); }); }catch(e){ appAlert("Couldn’t copy on this phone."); } });
   document.getElementById("ds_close").addEventListener("click", closeForm);
+}
+// ---- Survival check: can sales pay for what the cafe needs every month? ----
+// Essentials = goods & ingredients bought (food, drinks for resale, packaging, gas, water, cleaning...)
+// + monthly bills (rent, electricity, internet, phone and the owner's own monthly bills) + staff pay
+// + bank charges. Not counted: repairs & maintenance, kitchen tools / equipment, assets, bonuses,
+// "Other" expenses, partner money and loans. Bills and pay count in the month they are FOR, and a
+// bill not paid yet counts at its expected amount, so a month never looks better than it is.
+var SURV_SKIP_PURCH = ["Kitchen tools & equipment","Repairs & maintenance"];
+function survivalFor(mKey){
+  var today = fmtDate(new Date()), cur = today.slice(0,7), days = daysInMonthOf(mKey);
+  var running = mKey===cur, future = mKey > cur, elapsed = running ? Math.max(1, +today.slice(8,10)) : days;
+  function inM(d){ return !!d && d.slice(0,7)===mKey; }
+  var salesAmt = sales.filter(function(x){ return inM(x.date); }).reduce(function(a,x){ return a+saleTotal(x); },0);
+  var goods = 0, goodsBy = {}, skipped = 0;
+  purchases.filter(function(p){ return inM(p.date); }).forEach(function(p){
+    var c = p.category || "Other", v = purchTotal(p);
+    if(SURV_SKIP_PURCH.indexOf(c)>=0){ skipped += v; return; }
+    goods += v; goodsBy[c] = (goodsBy[c]||0) + v;
+  });
+  var planned = plannedFixed(mKey), bills = [];
+  FIXED_CATS.forEach(function(c){
+    var paid = actualInMonth([c], mKey), ent = billEntered(mKey, c), exp = ent!==null ? ent : (+planned[c]||0);
+    var amt = Math.max(paid, exp); if(amt>0) bills.push({ c:c, amt:amt, paid:paid, open: paid < amt - 0.5 });
+  });
+  var staffPaid = actualInMonth(STAFF_CATS, mKey), staffPlan = plannedStaffCost(mKey), staffAmt = Math.max(staffPaid, staffPlan);
+  var bank = actualInMonth(["Bank charges"], mKey);
+  var notCounted = skipped + expenses.filter(function(x){ return expenseMonth(x)===mKey && ["Maintenance","Staff Bonus","Other"].indexOf(x.category)>=0; }).reduce(function(a,x){ return a+expAmt(x); },0);
+  var billsAmt = bills.reduce(function(a,b){ return a+b.amt; },0), fixedAll = billsAmt + staffAmt + bank;
+  // A month still running is judged on its pace: sales and goods so far, scaled to the whole month.
+  var k = running ? days/elapsed : 1;
+  var salesP = salesAmt * k, goodsP = goods * k, need = goodsP + fixedAll;
+  var cover = need > 0 ? salesP / need : (salesP > 0 ? 9 : 0);
+  var goodsRatio = salesAmt > 0 ? goods / salesAmt : null;
+  var breakEven = (goodsRatio!==null && goodsRatio < 0.95) ? fixedAll / (1 - goodsRatio) : null;
+  return { mKey:mKey, running:running, future:future, days:days, elapsed:elapsed, sales:salesAmt, salesP:salesP, goods:goods, goodsP:goodsP, goodsBy:goodsBy,
+    bills:bills, billsAmt:billsAmt, staff:staffAmt, staffPaid:staffPaid, bank:bank, fixedAll:fixedAll, need:need, gap:salesP-need, cover:cover,
+    goodsRatio:goodsRatio, breakEven:breakEven, notCounted:notCounted };
+}
+function survivalVerdict(r){
+  if((r.need<=0 && r.sales<=0) || (r.sales<=0 && r.goods<=0)) return { i:"⚪", t:"No data yet", hi:"अभी डेटा नहीं", cls:"" };
+  if(r.cover >= 1.1) return { i:"✅", t:"Survives — sales pay all essentials", hi:"ठीक है — बिक्री से सब ख़र्च निकल रहे हैं", cls:"ok" };
+  if(r.cover >= 1) return { i:"⚠️", t:"Just covers — very little left over", hi:"मुश्किल से — बहुत कम बचता है", cls:"warn" };
+  return { i:"❌", t:"Short — sales don't cover essentials", hi:"कमी — बिक्री से ज़रूरी ख़र्च नहीं निकल रहे", cls:"bad" };
+}
+function survivalCard(){
+  if(!isFullAccess() || !canReadKey(EXPENSE_KEY) || !canReadKey(PURCH_KEY)) return "";
+  var cur = fmtDate(new Date()).slice(0,7), last = survivalFor(shiftMonth(cur,-1)), now = survivalFor(cur);
+  function line(r, lbl){ var v = survivalVerdict(r);
+    return '<div class="survline '+v.cls+'"><span>'+v.i+' <b>'+esc(lbl)+'</b> · '+esc(monthLabel(r.mKey))+'</span><b>'+(r.need>0||r.sales>0 ? (r.gap>=0?'+':'−')+rupee(Math.abs(r.gap)) : '—')+'</b></div>'; }
+  return '<div class="card survcard"><h3>🩺 Survival check · क्या कैफ़े अपने ख़र्च निकाल रहा है?</h3>'+
+    '<div class="backupnote" style="margin:2px 0 6px;">Can sales pay for ingredients & goods, rent, electricity, gas, staff pay…? (Repairs and equipment not counted.)</div>'+
+    line(last, "Last month")+line(now, "This month (on pace)")+
+    '<button class="btn-save" id="surv_open" style="width:100%;margin-top:8px;">Open survival check</button></div>';
+}
+function openSurvivalSheet(mKey){
+  var cur = fmtDate(new Date()).slice(0,7); mKey = mKey || shiftMonth(cur,-1);
+  var r = survivalFor(mKey), v = survivalVerdict(r), sheet = document.getElementById("sheet");
+  var pct = r.need > 0 ? Math.round(r.cover*100) : 0;
+  var html = '<h2 class="serif">🩺 Survival check</h2>';
+  html += '<div class="survmonths">'+[5,4,3,2,1,0].map(function(n){ var m = shiftMonth(cur,-n); return '<button data-sm="'+m+'" class="'+(m===mKey?"on":"")+'">'+esc(monthLabel(m).slice(0,3))+'<small>'+m.slice(2,4)+'</small></button>'; }).join("")+'</div>';
+  html += '<div class="survverdict '+v.cls+'"><div class="svi">'+v.i+'</div><div><b>'+esc(v.t)+'</b><div>'+esc(v.hi)+'</div>'+
+    (r.need>0 ? '<div class="svgap">'+(r.gap>=0 ? 'Left after essentials: <b>'+rupee(r.gap)+'</b>' : 'Short by <b>'+rupee(-r.gap)+'</b>')+(r.running?' (on pace for the month)':'')+'</div>' : '')+'</div></div>';
+  if(r.need>0) html += '<div class="survbar"><i style="width:'+Math.min(100, pct)+'%"></i></div><div class="barsub" style="text-align:right;">Sales cover '+pct+'% of essentials</div>';
+  if(r.running) html += '<div class="backupnote">'+esc(monthLabel(mKey))+' is still running: day '+r.elapsed+' of '+r.days+'. Sales ('+rupee(r.sales)+' so far) and goods ('+rupee(r.goods)+') are scaled to the whole month; bills and pay are the full month’s.</div>';
+  function row(l, a, sub, cls){ return '<div class="psrow'+(cls?' '+cls:'')+'"><span>'+l+(sub?'<br><small class="muted">'+sub+'</small>':'')+'</span><b>'+rupee(a)+'</b></div>'; }
+  html += '<div class="card" style="margin-bottom:10px;"><h3>Money in</h3>'+row('Sales'+(r.running?' (month on pace)':''), r.salesP, r.running ? rupee(r.sales)+' so far' : '')+'</div>';
+  html += '<div class="card" style="margin-bottom:10px;"><h3>Essentials · ज़रूरी ख़र्च</h3>';
+  var gk = Object.keys(r.goodsBy).sort(function(a,b){ return r.goodsBy[b]-r.goodsBy[a]; });
+  html += row('🛒 Goods & ingredients'+(r.running?' (on pace)':''), r.goodsP, gk.slice(0,4).map(function(c){ return esc(c)+' '+rupee(r.goodsBy[c]); }).join(' · ')+(gk.length>4?' …':''));
+  r.bills.forEach(function(b){ html += row('🧾 '+esc(b.c), b.amt, b.open ? (b.paid>0 ? rupee(b.paid)+' paid, rest still due' : 'not paid yet — expected amount') : 'paid'); });
+  if(r.staff>0) html += row('🧑‍🍳 Staff pay', r.staff, r.staffPaid < r.staff - 0.5 ? (r.staffPaid>0 ? rupee(r.staffPaid)+' paid so far' : 'not paid yet — from the Salary tab') : 'paid');
+  if(r.bank>0) html += row('🏦 Bank charges', r.bank);
+  html += row('<b>Total essentials</b>', r.need, '', 'tot')+'</div>';
+  // Diagnosis
+  var tips = [];
+  if(r.goodsRatio!==null){ var gp = Math.round(r.goodsRatio*100), tgt = targetFoodCost();
+    tips.push((gp > tgt+10 ? '⚠️ ' : '✔ ')+'Goods & ingredients are <b>'+gp+'%</b> of sales'+(gp > tgt+10 ? ' — high (aim near '+tgt+'–'+(tgt+10)+'%). Check prices, portions and wastage.' : '.')); }
+  var rent = r.bills.filter(function(b){ return b.c==="Rent"; })[0];
+  if(rent && r.salesP>0){ var rp = Math.round(rent.amt/r.salesP*100); tips.push((rp>15?'⚠️ ':'✔ ')+'Rent is <b>'+rp+'%</b> of sales'+(rp>15?' — high (aim for 10–15%).':'.')); }
+  if(r.staff>0 && r.salesP>0){ var sp = Math.round(r.staff/r.salesP*100); tips.push((sp>30?'⚠️ ':'✔ ')+'Staff pay is <b>'+sp+'%</b> of sales'+(sp>30?' — high (aim for 20–30%).':'.')); }
+  if(r.breakEven!==null){ tips.push('🎯 To cover everything you need about <b>'+rupee(r.breakEven)+'</b> of sales this month — <b>'+rupee(r.breakEven/r.days)+' a day</b>. '+
+    (r.salesP>0 ? 'Now: '+rupee(r.salesP/r.days)+' a day.' : '')); }
+  if(tips.length) html += '<div class="card" style="margin-bottom:10px;"><h3>Diagnosis · जाँच</h3>'+tips.map(function(t){ return '<div class="survtip">'+t+'</div>'; }).join("")+'</div>';
+  if(r.notCounted>0) html += '<div class="backupnote">Not counted (one-off): '+rupee(r.notCounted)+' of repairs, maintenance, equipment, bonuses and “Other” expenses. Partner money and loans are never counted.</div>';
+  // Trend
+  html += '<div class="card" style="margin-bottom:10px;"><h3>Last 6 months</h3>'+[5,4,3,2,1,0].map(function(n){ var m = shiftMonth(cur,-n), t = survivalFor(m), tv = survivalVerdict(t);
+    return '<div class="psrow" data-sm="'+m+'" style="cursor:pointer;"><span>'+tv.i+' '+esc(monthLabel(m))+(t.running?' (on pace)':'')+'</span><b>'+(t.need>0 ? Math.round(t.cover*100)+'% · '+(t.gap>=0?'+':'−')+rupee(Math.abs(t.gap)) : '—')+'</b></div>'; }).join("")+'</div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="sv_c" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sm]"), function(b){ b.addEventListener("click", function(){ openSurvivalSheet(b.getAttribute("data-sm")); }); });
+  document.getElementById("sv_c").addEventListener("click", closeForm);
 }
 function mgmtCard(){
   if(!canSummary()) return "";
@@ -14564,6 +14698,7 @@ function openForm(type, item, defaultDate, prefill){
     if(item && item.category && cats.indexOf(item.category)<0) cats.splice(cats.length-1, 0, item.category);
     var curCat = item ? item.category : (pf.category || "");
     html += '<div class="field"><label>Category</label><select id="f_expcat">'+cats.map(function(c){return '<option value="'+esc(c)+'" '+(curCat===c?"selected":"")+'>'+esc(c)+'</option>';}).join("")+'</select></div>';
+    html += '<div class="field"><label>This bill / salary is for · किस महीने का</label><select id="f_formonth"></select><div class="backupnote" id="f_fmnote" style="margin:4px 0 0;"></div></div>';
     html += '<div class="field"><label>Description</label><input type="text" id="f_desc" placeholder="e.g. Rent - September 2026" value="'+esc(item?item.description:(pf.description||""))+'"></div>';
     html += '<div class="field two"><div><label>Amount (₹)</label><input type="number" inputmode="decimal" id="f_amount" value="'+(item?item.amount:(pf.amount||""))+'"></div>';
     html += '<div><label>Mode</label><select id="f_mode">'+["Cash","UPI","Card","Bank Transfer"].map(function(m){return '<option '+((item ? item.mode===m : pf.mode===m)?"selected":"")+'>'+m+'</option>';}).join("")+'</select></div></div>';
@@ -14622,6 +14757,22 @@ function openForm(type, item, defaultDate, prefill){
     fit.addEventListener("change", function(){ syncInv(false); });
     document.getElementById("f_partner").addEventListener("change", function(){ syncInv(false); });
     syncInv(true);
+  }
+  var fms = document.getElementById("f_formonth");
+  if(fms){
+    var fmTouched = !!item, fmVal = item ? expenseMonth(item) : (pf.forMonth || suggestForMonth(document.getElementById("f_expcat").value, d));
+    var fillFm = function(){
+      var dd = document.getElementById("f_date").value || fmtDate(new Date()), mk = dd.slice(0,7);
+      if(!fmTouched) fmVal = suggestForMonth(document.getElementById("f_expcat").value, dd);
+      var opts = [shiftMonth(mk,-2), shiftMonth(mk,-1), mk, shiftMonth(mk,1)];
+      if(opts.indexOf(fmVal)<0) opts.unshift(fmVal);
+      fms.innerHTML = opts.map(function(m){ return '<option value="'+m+'"'+(m===fmVal?" selected":"")+'>'+esc(monthLabel(m))+(m===mk?" (month paid)":m<mk?" (earlier month)":" (advance)")+'</option>'; }).join("");
+      document.getElementById("f_fmnote").textContent = fmVal===mk ? "Counts in the month it was paid." : "Counts in "+monthLabel(fmVal)+" for profit; cash / bank still use the day it was paid.";
+    };
+    fms.addEventListener("change", function(){ fmTouched = true; fmVal = fms.value; fillFm(); });
+    document.getElementById("f_expcat").addEventListener("change", fillFm);
+    document.getElementById("f_date").addEventListener("change", fillFm);
+    fillFm();
   }
   document.getElementById("f_cancel").addEventListener("click", closeForm);
   if(isEdit){
@@ -14686,7 +14837,8 @@ function submitForm(type, item){
     var mode4 = document.getElementById("f_mode").value;
     if(isNaN(amount4) || amount4<=0){ errEl.textContent = "Enter an amount greater than 0."; errEl.style.display="block"; return; }
     var paidBy4 = document.getElementById("f_paidby").value;
-    var rec4 = {id: item?item.id:uid(), date:date, category:expcat, description:xdesc, amount:amount4, mode:mode4, paidBy:paidBy4,
+    var fmSel = document.getElementById("f_formonth");
+    var rec4 = {id: item?item.id:uid(), date:date, category:expcat, description:xdesc, amount:amount4, mode:mode4, paidBy:paidBy4, forMonth: fmSel && fmSel.value ? fmSel.value : date.slice(0,7),
                 settled: (item && item.paidBy===paidBy4) ? !!item.settled : false};
     if(item){
       var keep = Object.assign({}, item, rec4);

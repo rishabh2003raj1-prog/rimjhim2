@@ -404,6 +404,27 @@ mode and voice.
 - Each ingredient now has a **Hindi name** and a **photo** (Records → Stock → tap the item).
 - Counter logins only see Need to buy (and checks), because they can't record purchases, wastage or counts.
 
+### Which month a bill or salary is for
+Every expense has **"This bill / salary is for"** (a month). Electricity, internet, phone and staff pay paid in the
+first half of a month are suggested as the month before; rent and everything else as the month paid; any month can
+be picked. Profit, Records → Expenses (month view), reports and the survival check count the expense in that month
+(row shows "for October 2026 · paid 5 Nov"); cash and bank still use the day it was paid. Old entries: Records →
+Expenses shows **"🗓️ N bills paid early in a month"** — tap it to choose the month for each (or all → the month
+before). A month in the description ("Ravi - October 2026 salary") still works as before.
+
+### 🩺 Survival check (Dashboard)
+Can sales pay for what the cafe needs every month? The Dashboard card shows last month and this month (on pace);
+**Open survival check** has a month picker (last 6 months), a verdict (✅ survives ≥110% · ⚠️ just covers · ❌ short
+by ₹X), and the breakdown:
+- **Essentials:** goods & ingredients bought (food, drinks for resale, packaging, gas, water jars, cleaning…), monthly
+  bills (rent, electricity, internet, phone and the owner's own monthly bills such as cylinder or water), staff pay
+  and bank charges. Bills and pay count in the month they are for; one not paid yet counts at its expected amount.
+- **Not counted:** repairs & maintenance, kitchen tools / equipment, assets, staff bonuses, "Other" expenses (shown
+  separately as one-offs); partner money and loans never.
+- A running month scales sales and goods to the whole month. **Diagnosis:** goods % of sales vs the target food
+  cost, rent % (aim 10–15%), staff % (aim 20–30%), and the break-even sales for the month and per day.
+Owner / partner / full-access logins only.
+
 ### Smart management (Step 7)
 On the Dashboard (owner, partners, manager):
 - **📲 Daily summary — send on WhatsApp**: today or yesterday in a few lines — sales vs a usual day like it, bills,
