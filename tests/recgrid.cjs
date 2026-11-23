@@ -36,6 +36,18 @@ const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode
   await p.screenshot({ path: process.env.S+'/dashgrid.png' });
   await p.click('#rangeCtl [data-r="30"]'); await p.waitForTimeout(150);
   assert(await p.$('#rangeCtl [data-r="30"].on') && /30 days/.test(await p.textContent('#rangeCtl [data-r="30"]')), '30 days tile works');
+  // This month / Last month tiles
+  await p.click('#rangeCtl [data-r="thismonth"]'); await p.waitForTimeout(150);
+  let rr = await E(p, `({ f:customFrom, t:customTo, today:fmtDate(new Date()) })`);
+  assert(rr.f===rr.today.slice(0,7)+'-01' && rr.t===rr.today && await p.$('#rangeCtl [data-r="thismonth"].on'), 'This month: 1st to today '+JSON.stringify(rr));
+  await p.click('#rangeCtl [data-r="lastmonth"]'); await p.waitForTimeout(150);
+  rr = await E(p, `({ f:customFrom, t:customTo, lm:shiftMonth(fmtDate(new Date()).slice(0,7),-1) })`);
+  assert(rr.f===rr.lm+'-01' && rr.t===rr.lm+'-'+String(await E(p, 'daysInMonthOf(shiftMonth(fmtDate(new Date()).slice(0,7),-1))')).padStart(2,'0'), 'Last month: whole month '+JSON.stringify(rr));
+  assert(/1 \w+ – \d+ \w+/.test(await p.textContent('#rangeBar')), 'range bar shows the month: '+await p.textContent('#rangeBar'));
+  await p.screenshot({ path: process.env.S+'/dashgrid2.png' });
+  await p.click('#dashGridBtn'); await p.waitForTimeout(100);
+  assert(await p.isVisible('#rangeCtl [data-r="lastmonth"]') && /Last month/.test(await p.textContent('#rangeCtl [data-r="lastmonth"]')), 'small tabs also have Last month');
+  await p.click('#dashGridBtn');
   await E(p, `showView('records');`);
   assert(await p.$('#recCtl.recgrid'), 'one switch: Records follows');
   console.log('ERRORS', JSON.stringify(errs)); await b.close();

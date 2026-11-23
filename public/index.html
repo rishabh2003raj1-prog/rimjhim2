@@ -638,6 +638,8 @@
       <div class="segctl recctl5" id="rangeCtl">
         <button data-r="1">Today</button>
         <button data-r="yesterday">Yesterday</button>
+        <button data-r="thismonth">This month</button>
+        <button data-r="lastmonth">Last month</button>
         <button data-r="7" class="on">7 days</button>
         <button data-r="15">15 days</button>
         <button data-r="30">30 days</button>
@@ -3752,7 +3754,7 @@ var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"�
 var REC_FULL = { purchases:"Purchases", expenses:"Expenses" }, REC_GRID_KEY = "rec_grid_v1";
 function recGridOn(){ try{ return localStorage.getItem(REC_GRID_KEY)==="1"; }catch(e){ return false; } }
 // Dashboard date buttons: a calendar tile with the number of days.
-var RANGE_ICONS = { "1":'<span class="ri" aria-hidden="true">☀️</span>', yesterday:'<span class="ri" aria-hidden="true">🌙</span>', custom:'<span class="ri" aria-hidden="true">📆</span>' };
+var RANGE_ICONS = { "1":'<span class="ri" aria-hidden="true">☀️</span>', yesterday:'<span class="ri" aria-hidden="true">🌙</span>', thismonth:'<span class="ri" aria-hidden="true">🗓️</span>', lastmonth:'<span class="ri" aria-hidden="true">⏮️</span>', custom:'<span class="ri" aria-hidden="true">📆</span>' };
 function rangeIcon(k){ return RANGE_ICONS[k] || '<span class="ri rcal" aria-hidden="true"><b>'+esc(k)+'</b><small>days</small></span>'; }
 // Change a tile's words without losing its icon.
 function setTabLabel(b, text){ var rs = b.querySelector(".rs"); if(rs) rs.textContent = text; else b.textContent = text; }
@@ -7898,7 +7900,7 @@ var HI = {
   "Sales":"बिक्री","Purch.":"ख़रीद","Purchases":"ख़रीदारी","Orders":"ऑर्डर","Invest":"निवेश","Expense":"ख़र्च","Expenses":"ख़र्चे","Bills":"बिल","Customers":"ग्राहक","Assets":"सामान","Vendors":"विक्रेता",
   "Menu":"मेन्यू","Stock":"स्टॉक","Cash":"कैश","Handover":"हैंडओवर","Bank":"बैंक","Cash review":"कैश जाँच","Loans":"उधार/लोन","Partners":"पार्टनर",
   "Team":"टीम","Roster":"ड्यूटी","Attend.":"हाज़िरी","Attendance":"हाज़िरी","Tasks":"काम","Salary":"वेतन","Meals":"स्टाफ़ खाना",
-  "Today":"आज","Yesterday":"कल","7 days":"7 दिन","days":"दिन","15 days":"15 दिन","30 days":"30 दिन","90 days":"90 दिन","Custom…":"तारीख़ चुनें…","Day":"दिन","Month":"महीना","Year":"साल",
+  "Today":"आज","Yesterday":"कल","7 days":"7 दिन","This month":"इस महीने","Last month":"पिछला महीना","days":"दिन","15 days":"15 दिन","30 days":"30 दिन","90 days":"90 दिन","Custom…":"तारीख़ चुनें…","Day":"दिन","Month":"महीना","Year":"साल",
   "Refresh":"रीफ़्रेश","Backup & restore":"बैकअप","Save":"सेव करें","Cancel":"रद्द करें","Close":"बंद करें","Delete":"हटाएँ","Edit":"बदलें","Back":"वापस","Done":"हो गया","Next":"आगे","Add":"जोड़ें","Remove":"हटाएँ","Yes":"हाँ","No":"नहीं","OK":"ठीक है",
   "Today’s bills":"आज के बिल","Live orders":"चालू ऑर्डर","Checks":"जाँच","Settings":"सेटिंग","Big & simple":"बड़ा और आसान","Big & simple: ON":"बड़ा और आसान: चालू",
   "Most sold":"सबसे ज़्यादा बिके","All":"सब","Dine-in":"यहीं खाना","Takeaway":"पैक","Delivery":"डिलीवरी","Tap a picture to add it":"फोटो दबाकर जोड़ें",
@@ -15962,6 +15964,9 @@ document.addEventListener("DOMContentLoaded", function(){
       if(v==="yesterday"){
         var y = addDays(fmtDate(new Date()), -1);
         customFrom = customTo = y;
+      } else if(v==="thismonth" || v==="lastmonth"){
+        var tday = fmtDate(new Date()), cm = tday.slice(0,7), mk = v==="thismonth" ? cm : shiftMonth(cm, -1);
+        customFrom = mk+"-01"; customTo = v==="thismonth" ? tday : mk+"-"+String(daysInMonthOf(mk)).padStart(2,"0");
       } else {
         customFrom = customTo = null;
         trendRange = parseInt(v,10);
