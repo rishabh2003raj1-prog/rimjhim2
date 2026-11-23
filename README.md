@@ -178,6 +178,8 @@ Staff → **Salary** shows each person's salary for a month:
 Records → **▦ Big icons** (under the title) turns the scrolling tab strip (Sales, Purch., Orders…) into a grid of
 large icon tiles, four per row, with full names. **☰ Small tabs** switches back. The choice is remembered on each
 phone; tabs a login's role can't use stay hidden in both views.
+The same switch is on the Dashboard: the date buttons (☀️ Today, 🌙 Yesterday, calendar tiles for 7 / 15 / 30 / 90
+days, 📆 Custom) and **📄 Reports** become big tiles too. One setting covers both screens.
 
 ## How saving works
 

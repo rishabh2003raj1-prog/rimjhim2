@@ -24,5 +24,19 @@ const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode
   await p.reload(); await p.waitForTimeout(2000); await E(p, `showView('records');`);
   assert(await p.$('#recCtl.recgrid'), 'remembered after reopening');
   await p.click('#recGridBtn'); assert(!(await p.$('#recCtl.recgrid')) && (await p.textContent('#recGridBtn')).includes('Big icons'), 'back to small tabs');
+  // Dashboard: same switch makes the date buttons and Reports big
+  await E(p, `showView('dashboard');`); await p.waitForTimeout(150);
+  assert((await p.textContent('#dashGridBtn')).includes('Big icons') && !(await p.$('#rangeCtl.recgrid')), 'dashboard starts small');
+  await p.click('#dashGridBtn'); await p.waitForTimeout(100);
+  assert(await p.$('#rangeCtl.recgrid') && await p.$('body.biggrid'), 'dashboard: big date tiles on');
+  const rt = await p.$$eval('#rangeCtl button', a => a.map(x => Math.round(x.getBoundingClientRect().height)));
+  assert(rt.every(h => h >= 70) && await p.isVisible('#rangeCtl [data-r="30"] .rcal'), 'date tiles are large with a calendar icon: '+rt);
+  const rb = await p.$eval('#reportsBtn', e => Math.round(e.getBoundingClientRect().height));
+  assert(rb >= 80 && await p.isVisible('#reportsBtn .rbi'), 'Reports is a big tile: '+rb);
+  await p.screenshot({ path: process.env.S+'/dashgrid.png' });
+  await p.click('#rangeCtl [data-r="30"]'); await p.waitForTimeout(150);
+  assert(await p.$('#rangeCtl [data-r="30"].on') && /30 days/.test(await p.textContent('#rangeCtl [data-r="30"]')), '30 days tile works');
+  await E(p, `showView('records');`);
+  assert(await p.$('#recCtl.recgrid'), 'one switch: Records follows');
   console.log('ERRORS', JSON.stringify(errs)); await b.close();
 })();
