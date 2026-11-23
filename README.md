@@ -439,7 +439,9 @@ Swiggy order types were built and then switched off at the owner's request; the 
   (saved as `settings.tableZones`). Then add items,
   **Send to kitchen** — no payment yet. More items for the same table join the same order (marked new for the
   kitchen). The bill is made from Live orders when the guests ask, then paid as usual (cash / UPI / udhaar,
-  discounts).
+  discounts). While a live order is loaded for billing, an orange **🧾 Billing Table 1 · ✕ Stop** bar shows; tapping
+  ✕ Stop, Takeaway or Delivery lets go of it (the order stays open in Live orders), and an order paid or cancelled
+  on another phone releases the Counter by itself.
 - **Takeaway**: pay first; the order goes to the kitchen.
 - **Delivery** (own rider): name, phone, address (room / ward for hospital orders) and delivery charge, then
   **Pay now** or **Cash on delivery** (collected when delivered).

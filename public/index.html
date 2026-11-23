@@ -259,6 +259,8 @@
   .ctables button.tbedit{border-style:dashed;}
   .surow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);} .surow > b{width:26px;height:26px;border-radius:13px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;background:#EFE8D8;font-size:13px;}
   .surow.done > b{background:#2E7D4F;color:#fff;} .surow.done .who{text-decoration:line-through;color:var(--ink-soft);} .surow > div{flex:1;min-width:0;}
+  .ctbilling{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;padding:9px 12px;border-radius:12px;background:#FFF1DC;border:1.5px solid #C9772B;font-size:14px;}
+  .ctbilling small{display:block;font-size:11.5px;color:var(--ink-soft);} .ctbilling button{flex:none;border:1.5px solid #A6402D;background:#fff;color:#A6402D;border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;font-size:13px;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -9829,6 +9831,8 @@ var CHANNELS = {
 var TYPE_KEY = "counter_type_v1";
 var counterType = (function(){ try{ var v = localStorage.getItem(TYPE_KEY); return CHANNELS[v] ? v : "take"; }catch(e){ return "take"; } })();
 var counterTable = null, counterTicket = null, counterMeta = {};
+// Let go of a live order loaded for billing. The order itself stays open in Live orders.
+function releaseCounterTicket(){ counterTicket = null; counterOrder = {}; counterDisc = null; counterMeta = {}; }
 function setCounterType(t){ counterType = t; counterTable = null; counterTicket = null; counterMeta = {}; try{ localStorage.setItem(TYPE_KEY, t); }catch(e){} }
 function isPlatform(t){ return !!(CHANNELS[t] && CHANNELS[t].platform); }
 // Zomato / Swiggy are switched off (the owner removed them); the code stays for a future direct link.
@@ -9932,6 +9936,8 @@ function counterBarLabel(){
   return "Bill ➜";
 }
 function counterTypeHtml(){
+  // An order billed, paid or cancelled on another phone must not keep this Counter stuck.
+  if(counterTicket){ var held = liveOrders.find(function(x){ return x.id===counterTicket; }); if(!held || held.paid || held.status==="done" || held.status==="cancelled") releaseCounterTicket(); }
   if(isPlatform(counterType) && !platformCfg(counterType).enabled && !counterTicket) setCounterType("take");
   var html = '<div class="ctype">'+Object.keys(CHANNELS).filter(function(k){ return !CHANNELS[k].platform || platformCfg(k).enabled; }).map(function(k){
     var c = CHANNELS[k]; return '<button data-ctype="'+k+'" class="'+k+(counterType===k?" on":"")+'"><span>'+c.i+'</span>'+c.t+'</button>'; }).join("")+'</div>';
@@ -9945,15 +9951,15 @@ function counterTypeHtml(){
         (o?'<i class="tbusy">'+rupee((o.items||[]).reduce(function(a,i){ return a+i.qty*i.price; },0))+'</i>':'<i>खाली · free</i>')+'</button>'; }).join("")+
       (canEditTables() ? '<button id="ct_tables" class="tbedit">✏️<i>Edit</i></button>' : '')+'</div>';
   }
-  if(counterTicket){ var tk = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk) html += '<div class="backupnote">Billing <b>'+esc(ticketLabel(tk))+'</b>. <a href="#" id="ct_unbill">Stop</a></div>'; }
+  if(counterTicket){ var tk = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk) html += '<div class="ctbilling"><span>🧾 Billing <b>'+esc(ticketLabel(tk))+'</b><small>The order stays in Live orders.</small></span><button id="ct_unbill">✕ Stop</button></div>'; }
   if(isPlatform(counterType)){ var pc = platformCfg(counterType); html += '<div class="backupnote">'+CHANNELS[counterType].t+' prices'+(pc.markup?' (+'+pc.markup+'%)':'')+'. Add the items exactly as in the '+CHANNELS[counterType].t+' app.</div>'; }
   return html;
 }
 function wireCounterType(el){
-  Array.prototype.forEach.call(el.querySelectorAll("[data-ctype]"), function(b){ b.addEventListener("click", function(){ if(counterTicket) return; setCounterType(b.getAttribute("data-ctype")); renderCounter(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ctype]"), function(b){ b.addEventListener("click", function(){ if(counterTicket) releaseCounterTicket(); setCounterType(b.getAttribute("data-ctype")); renderCounter(); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-table]"), function(b){ b.addEventListener("click", function(){ var tb = b.getAttribute("data-table"); counterTable = counterTable===tb ? null : tb; renderCounter(); }); });
   var te = el.querySelector("#ct_tables"); if(te) te.addEventListener("click", function(){ openTablesEditor(null); });
-  var ub = el.querySelector("#ct_unbill"); if(ub) ub.addEventListener("click", function(ev){ ev.preventDefault(); counterTicket = null; counterOrder = {}; counterDisc = null; renderCounter(); });
+  var ub = el.querySelector("#ct_unbill"); if(ub) ub.addEventListener("click", function(ev){ ev.preventDefault(); releaseCounterTicket(); counterTable = null; renderCounter(); });
 }
 // What "Bill / Send" does for the chosen order type.
 function counterGo(){
