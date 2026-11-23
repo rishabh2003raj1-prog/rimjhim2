@@ -420,7 +420,11 @@ At the top of the Counter: **🍽️ Dine-in · 🛍️ Takeaway · 🛵 Deliver
 Swiggy order types were built and then switched off at the owner's request; the code stays for a possible direct link later.
 - **Dine-in**: pick a table (busy tables show their running amount; owner / manager tap **✏️ Edit** at the end of the
   table row, or ⚙️ Settings → Edit tables, to rename, add, remove or reorder tables — a table with an open order
-  can't be removed or renamed), add items,
+  can't be removed or renamed). Each table is a picture for staff who don't read English: 🏠 a table inside a
+  house, brown, **अंदर · Indoor**, or ⛱️ a table under an umbrella with the sun, green, **बाहर · Outdoor**, with
+  the table number in a big badge and **खाली · free** or the running amount. Indoor / outdoor is guessed from the
+  name (outdoor, outside, बाहर, garden, terrace…) and switched by tapping the picture in ✏️ Edit tables
+  (saved as `settings.tableZones`). Then add items,
   **Send to kitchen** — no payment yet. More items for the same table join the same order (marked new for the
   kitchen). The bill is made from Live orders when the guests ask, then paid as usual (cash / UPI / udhaar,
   discounts).

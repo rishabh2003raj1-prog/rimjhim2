@@ -172,7 +172,7 @@ const STAFF_PUBLIC = ["id", "name", "role", "defaultShift", "status", "joinDate"
 const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
 // Readable by the manager but only the owner / partners can change them.
 const SETTINGS_OWNER = ["poManagerLimit"];
-const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays", "tables", "platforms", "deliveryCharge"];
+const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays", "tables", "tableZones", "platforms", "deliveryCharge"];
 const STAFF_PAY_CATS = ["Staff Salary", "Staff House Rent", "Staff Food Allowance", "Staff Travel Allowance", "Staff Bonus"];
 const CASH_MGR_TYPES = ["counter", "atm", "atmheld", "taken", "pass", "bank"];
 const CASH_BILL_TYPES = ["counter", "atm", "taken"];

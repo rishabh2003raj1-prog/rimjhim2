@@ -262,6 +262,16 @@
   .rentsw{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin:8px 0 2px;padding:8px 10px;border-radius:10px;background:#F6F1E6;font-size:13.5px;}
   .rentsw div{display:flex;gap:6px;} .rentsw button{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;font-weight:600;color:var(--ink);}
   .rentsw button.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .rentsw button.off{background:#A6402D;border-color:#A6402D;color:#fff;}
+  .ctables button.tbl{min-width:96px;padding:6px 8px 7px;gap:1px;}
+  .tpic{position:relative;display:block;width:52px;height:44px;} .tpic svg{width:52px;height:44px;}
+  .tpic b{position:absolute;right:-6px;top:-4px;min-width:24px;height:24px;border-radius:12px;background:var(--ink);color:#fff;font-size:14px;line-height:24px;text-align:center;padding:0 5px;}
+  .tbl.in .tpic svg{color:#8A5A2B;} .tbl.out .tpic svg{color:#2E7D4F;}
+  .tbl.in{background:#FBF3E8;} .tbl.out{background:#EEF6EC;}
+  .tzone{font-size:11.5px;font-weight:700;} .tbl.in .tzone{color:#8A5A2B;} .tbl.out .tzone{color:#2E7D4F;}
+  .tname{font-size:10.5px;font-weight:500;color:var(--ink-soft);max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ctables button.tbl.busy{background:#FFF1DC;border-color:#C9772B;} .tbusy{color:#B5651D !important;font-weight:700 !important;}
+  .tzbtn{width:46px !important;height:42px !important;padding:2px !important;} .tzbtn svg{width:36px;height:32px;} .tzbtn.in{color:#8A5A2B;background:#FBF3E8 !important;} .tzbtn.out{color:#2E7D4F;background:#EEF6EC !important;}
+  body.simple .ctables button.tbl{min-width:112px;} body.simple .tpic,body.simple .tpic svg{width:62px;height:52px;} body.simple .tzone{font-size:13px;}
   .pnotes{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
   .pnotes button{height:58px;border:none;border-radius:10px;font:inherit;font-size:20px;font-weight:800;color:#1d1d1d;box-shadow:inset 0 0 0 2px rgba(0,0,0,.08);}
   .pgot{margin:14px 0 6px;font-size:16px;display:flex;align-items:center;gap:8px;} .pgot b{font-size:22px;}
@@ -9718,6 +9728,13 @@ function setCounterType(t){ counterType = t; counterTable = null; counterTicket 
 function isPlatform(t){ return !!(CHANNELS[t] && CHANNELS[t].platform); }
 // Zomato / Swiggy are switched off (the owner removed them); the code stays for a future direct link.
 function platformCfg(p){ var c = (settings.platforms||{})[p] || {}; return { enabled: c.enabled===true && false, commission: c.commission===0 || +c.commission>0 ? +c.commission : 25, markup: +c.markup||0, packing: +c.packing||0, prep: +c.prep>0 ? +c.prep : 15 }; }
+// Indoor / outdoor for each table: set in the table editor, else guessed from the name.
+function tableZone(t){ var z = (settings.tableZones||{})[t]; if(z==="in" || z==="out") return z; return /out|outside|bahar|बाहर|terrace|garden|lawn|patio|footpath/i.test(t||"") ? "out" : "in"; }
+function tableNo(t){ var m = String(t||"").match(/(\d+)\s*$/) || String(t||"").match(/(\d+)/); return m ? m[1] : String(t||"").trim().charAt(0).toUpperCase(); }
+var TABLE_SVG = {
+  in:'<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M5 22 24 7l19 15" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 19v22h28V19" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/><rect x="14" y="27" width="20" height="3.5" rx="1.5" fill="currentColor"/><path d="M17 30.5v8M31 30.5v8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></svg>',
+  out:'<svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="39" cy="9" r="4.5" fill="#E9A826"/><path d="M8 21a16 9 0 0 1 32 0z" fill="currentColor"/><path d="M24 21v18" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><rect x="13" y="30" width="22" height="3.5" rx="1.5" fill="currentColor"/><path d="M16 33.5v7M32 33.5v7" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/><path d="M4 43h40" stroke="#7FB069" stroke-width="2.6" stroke-linecap="round"/></svg>'
+};
 function cafeTables(){ var t = settings.tables; return Array.isArray(t) && t.length ? t : ["Table 1","Table 2","Table 3","Table 4","Outside 1","Outside 2","Outside 3"]; }
 function deliveryCharge(){ var v = settings.deliveryCharge; return v===0 || +v>0 ? +v : 20; }
 // Price for the current order type: platforms can carry a markup to cover their commission.
@@ -9774,27 +9791,30 @@ function createTicket(o){
 // Edit the cafe's tables: rename, remove, add, reorder. A table with an open (unpaid) order can't be removed.
 function canEditTables(){ return isFullAccess() || myAccess()==="manager"; }
 function openTablesEditor(back){
-  var list = cafeTables().slice(), sheet = document.getElementById("sheet");
+  var list = cafeTables().slice(), sheet = document.getElementById("sheet"), zones = list.map(tableZone);
   function draw(){
-    var html = '<h2 class="serif">✏️ Tables · टेबल</h2><div class="backupnote">Name each table the way staff call it (e.g. Table 1, Window, Outside 2). Use ↑ ↓ to set the order they show on the Counter.</div>';
+    var html = '<h2 class="serif">✏️ Tables · टेबल</h2><div class="backupnote">Name each table the way staff call it (e.g. Table 1, Window, Outside 2). Tap the picture to switch 🏠 indoor / ⛱️ outdoor. Use ↑ ↓ to set the order on the Counter. Put the same number on each real table.</div>';
     html += list.map(function(t, i){ var busy = !!openTicketFor(t);
-      return '<div class="tblrow"><input data-tn="'+i+'" value="'+esc(t)+'"'+(busy?' disabled':'')+'><button data-tu="'+i+'"'+(i===0?' disabled':'')+'>↑</button><button data-td="'+i+'"'+(i===list.length-1?' disabled':'')+'>↓</button>'+
+      var z = zones[i] || tableZone(t);
+      return '<div class="tblrow"><button class="tzbtn '+z+'" data-tz="'+i+'" title="Indoor / outdoor">'+TABLE_SVG[z]+'</button><input data-tn="'+i+'" value="'+esc(t)+'"'+(busy?' disabled':'')+'><button data-tu="'+i+'"'+(i===0?' disabled':'')+'>↑</button><button data-td="'+i+'"'+(i===list.length-1?' disabled':'')+'>↓</button>'+
         (busy ? '<span class="muted" style="font-size:11px;">open order</span>' : '<button class="ndel" data-tr="'+i+'">×</button>')+'</div>'; }).join("");
     html += '<button class="btn-additem" id="tb_add" style="margin-top:6px;">+ Add table</button>';
     html += '<div class="err" id="tb_err"></div><div class="sheetbtns"><button class="btn-cancel" id="tb_c">Cancel</button><button class="btn-save" id="tb_s">Save</button></div>';
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     function sync(){ Array.prototype.forEach.call(sheet.querySelectorAll("[data-tn]"), function(inp){ list[+inp.getAttribute("data-tn")] = inp.value; }); }
     function on(sel, fn){ Array.prototype.forEach.call(sheet.querySelectorAll(sel), function(b){ b.addEventListener("click", function(){ sync(); fn(b); draw(); }); }); }
-    on("[data-tu]", function(b){ var i = +b.getAttribute("data-tu"); var x = list[i]; list[i] = list[i-1]; list[i-1] = x; });
-    on("[data-td]", function(b){ var i = +b.getAttribute("data-td"); var x = list[i]; list[i] = list[i+1]; list[i+1] = x; });
-    on("[data-tr]", function(b){ list.splice(+b.getAttribute("data-tr"), 1); });
-    on("#tb_add", function(){ var n = 1; while(list.some(function(t){ return String(t).trim().toLowerCase()==="table "+n; })) n++; list.push("Table "+n); });
+    on("[data-tu]", function(b){ var i = +b.getAttribute("data-tu"); var x = list[i]; list[i] = list[i-1]; list[i-1] = x; x = zones[i]; zones[i] = zones[i-1]; zones[i-1] = x; });
+    on("[data-td]", function(b){ var i = +b.getAttribute("data-td"); var x = list[i]; list[i] = list[i+1]; list[i+1] = x; x = zones[i]; zones[i] = zones[i+1]; zones[i+1] = x; });
+    on("[data-tr]", function(b){ var i = +b.getAttribute("data-tr"); list.splice(i, 1); zones.splice(i, 1); });
+    on("[data-tz]", function(b){ var i = +b.getAttribute("data-tz"); zones[i] = (zones[i] || tableZone(list[i]))==="out" ? "in" : "out"; });
+    on("#tb_add", function(){ var n = 1; while(list.some(function(t){ return String(t).trim().toLowerCase()==="table "+n; })) n++; list.push("Table "+n); zones.push("in"); });
     document.getElementById("tb_c").addEventListener("click", function(){ if(back) back(); else closeForm(); });
     document.getElementById("tb_s").addEventListener("click", function(){
       sync(); var clean = list.map(function(t){ return String(t||"").trim(); }).filter(Boolean), e = document.getElementById("tb_err");
       if(!clean.length){ e.textContent = "Keep at least one table."; e.style.display = "block"; return; }
       var seen = {}; if(clean.some(function(t){ var k = t.toLowerCase(); if(seen[k]) return true; seen[k] = 1; return false; })){ e.textContent = "Two tables have the same name."; e.style.display = "block"; return; }
-      settings.tables = clean; saveSettings(); if(counterTable && clean.indexOf(counterTable)<0) counterTable = null; renderAll(); if(back) back(); else closeForm();
+      var tz = {}; list.forEach(function(t, i){ t = String(t||"").trim(); if(t) tz[t] = zones[i] || tableZone(t); });
+      settings.tables = clean; settings.tableZones = tz; saveSettings(); if(counterTable && clean.indexOf(counterTable)<0) counterTable = null; renderAll(); if(back) back(); else closeForm();
     });
   }
   draw();
@@ -9812,7 +9832,12 @@ function counterTypeHtml(){
     var c = CHANNELS[k]; return '<button data-ctype="'+k+'" class="'+k+(counterType===k?" on":"")+'"><span>'+c.i+'</span>'+c.t+'</button>'; }).join("")+'</div>';
   if(counterType==="dine" && !counterTicket){
     html += '<div class="ctables">'+cafeTables().map(function(tb){ var o = openTicketFor(tb);
-      return '<button data-table="'+esc(tb)+'" class="'+(counterTable===tb?"on ":"")+(o?"busy":"")+'">'+esc(tb)+(o?'<i>'+rupee((o.items||[]).reduce(function(a,i){ return a+i.qty*i.price; },0))+'</i>':'<i>free</i>')+'</button>'; }).join("")+
+      var z = tableZone(tb);
+      return '<button data-table="'+esc(tb)+'" class="tbl '+z+(counterTable===tb?" on":"")+(o?" busy":"")+'" title="'+esc(tb)+'">'+
+        '<span class="tpic">'+TABLE_SVG[z]+'<b>'+esc(tableNo(tb))+'</b></span>'+
+        '<span class="tzone">'+(z==="out"?"बाहर · Outdoor":"अंदर · Indoor")+'</span>'+
+        '<span class="tname">'+esc(tb)+'</span>'+
+        (o?'<i class="tbusy">'+rupee((o.items||[]).reduce(function(a,i){ return a+i.qty*i.price; },0))+'</i>':'<i>खाली · free</i>')+'</button>'; }).join("")+
       (canEditTables() ? '<button id="ct_tables" class="tbedit">✏️<i>Edit</i></button>' : '')+'</div>';
   }
   if(counterTicket){ var tk = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk) html += '<div class="backupnote">Billing <b>'+esc(ticketLabel(tk))+'</b>. <a href="#" id="ct_unbill">Stop</a></div>'; }
