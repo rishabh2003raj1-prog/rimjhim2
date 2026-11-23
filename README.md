@@ -425,6 +425,9 @@ by ₹X), and the breakdown:
   separately as one-offs); partner money and loans never.
 - A running month scales sales and goods to the whole month. **Diagnosis:** goods % of sales vs the target food
   cost, rent % (aim 10–15%), staff % (aim 20–30%), and the break-even sales for the month and per day.
+**Opening date:** the first sale, or the date set in the sheet (**Cafe opened on**). Months before it show 🔒 "not
+open yet" and are left out of the 6-month list; in the opening month the monthly bills count only for the days the
+cafe was open (staff pay already follows joining dates).
 Owner / partner / full-access logins only.
 
 ### Smart management (Step 7)

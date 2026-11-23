@@ -7750,9 +7750,19 @@ function openDailySummary(d){
 // "Other" expenses, partner money and loans. Bills and pay count in the month they are FOR, and a
 // bill not paid yet counts at its expected amount, so a month never looks better than it is.
 var SURV_SKIP_PURCH = ["Kitchen tools & equipment","Repairs & maintenance"];
+// The day the cafe opened: set by the owner, else the first sale.
+function cafeOpenDate(){
+  if(/^\d{4}-\d{2}-\d{2}$/.test(settings.cafeOpened||"")) return settings.cafeOpened;
+  var first = ""; sales.forEach(function(x){ if(x && x.date && (!first || x.date < first)) first = x.date; });
+  return first;
+}
 function survivalFor(mKey){
   var today = fmtDate(new Date()), cur = today.slice(0,7), days = daysInMonthOf(mKey);
-  var running = mKey===cur, future = mKey > cur, elapsed = running ? Math.max(1, +today.slice(8,10)) : days;
+  var open = cafeOpenDate(), openMonth = open.slice(0,7);
+  if(open && mKey < openMonth) return { mKey:mKey, notOpen:true, open:open, sales:0, goods:0, need:0, gap:0, cover:0, bills:[], goodsBy:{}, staff:0, staffPaid:0, bank:0, fixedAll:0, salesP:0, goodsP:0, days:days, elapsed:0, notCounted:0, goodsRatio:null, breakEven:null };
+  // The month it opened: bills count only for the days it was open, and its pace is judged from opening day.
+  var firstDay = (open && mKey===openMonth) ? +open.slice(8,10) : 1, openDays = days - firstDay + 1, share = openDays / days;
+  var running = mKey===cur, future = mKey > cur, elapsed = running ? Math.max(1, +today.slice(8,10) - firstDay + 1) : openDays;
   function inM(d){ return !!d && d.slice(0,7)===mKey; }
   var salesAmt = sales.filter(function(x){ return inM(x.date); }).reduce(function(a,x){ return a+saleTotal(x); },0);
   var goods = 0, goodsBy = {}, skipped = 0;
@@ -7764,23 +7774,24 @@ function survivalFor(mKey){
   var planned = plannedFixed(mKey), bills = [];
   FIXED_CATS.forEach(function(c){
     var paid = actualInMonth([c], mKey), ent = billEntered(mKey, c), exp = ent!==null ? ent : (+planned[c]||0);
-    var amt = Math.max(paid, exp); if(amt>0) bills.push({ c:c, amt:amt, paid:paid, open: paid < amt - 0.5 });
+    var full = Math.max(paid, exp), amt = r2(full * share); if(amt>0) bills.push({ c:c, amt:amt, paid:paid, open: paid < amt - 0.5 });
   });
   var staffPaid = actualInMonth(STAFF_CATS, mKey), staffPlan = plannedStaffCost(mKey), staffAmt = Math.max(staffPaid, staffPlan);
   var bank = actualInMonth(["Bank charges"], mKey);
   var notCounted = skipped + expenses.filter(function(x){ return expenseMonth(x)===mKey && ["Maintenance","Staff Bonus","Other"].indexOf(x.category)>=0; }).reduce(function(a,x){ return a+expAmt(x); },0);
   var billsAmt = bills.reduce(function(a,b){ return a+b.amt; },0), fixedAll = billsAmt + staffAmt + bank;
   // A month still running is judged on its pace: sales and goods so far, scaled to the whole month.
-  var k = running ? days/elapsed : 1;
+  var k = running ? openDays/elapsed : 1;
   var salesP = salesAmt * k, goodsP = goods * k, need = goodsP + fixedAll;
   var cover = need > 0 ? salesP / need : (salesP > 0 ? 9 : 0);
   var goodsRatio = salesAmt > 0 ? goods / salesAmt : null;
   var breakEven = (goodsRatio!==null && goodsRatio < 0.95) ? fixedAll / (1 - goodsRatio) : null;
-  return { mKey:mKey, running:running, future:future, days:days, elapsed:elapsed, sales:salesAmt, salesP:salesP, goods:goods, goodsP:goodsP, goodsBy:goodsBy,
+  return { mKey:mKey, open:open, partial: share < 1, openDays:openDays, running:running, future:future, days:days, elapsed:elapsed, sales:salesAmt, salesP:salesP, goods:goods, goodsP:goodsP, goodsBy:goodsBy,
     bills:bills, billsAmt:billsAmt, staff:staffAmt, staffPaid:staffPaid, bank:bank, fixedAll:fixedAll, need:need, gap:salesP-need, cover:cover,
     goodsRatio:goodsRatio, breakEven:breakEven, notCounted:notCounted };
 }
 function survivalVerdict(r){
+  if(r.notOpen) return { i:"🔒", t:"Cafe not open yet", hi:"कैफ़े अभी शुरू नहीं हुआ था", cls:"" };
   if((r.need<=0 && r.sales<=0) || (r.sales<=0 && r.goods<=0)) return { i:"⚪", t:"No data yet", hi:"अभी डेटा नहीं", cls:"" };
   if(r.cover >= 1.1) return { i:"✅", t:"Survives — sales pay all essentials", hi:"ठीक है — बिक्री से सब ख़र्च निकल रहे हैं", cls:"ok" };
   if(r.cover >= 1) return { i:"⚠️", t:"Just covers — very little left over", hi:"मुश्किल से — बहुत कम बचता है", cls:"warn" };
@@ -7789,7 +7800,7 @@ function survivalVerdict(r){
 function survivalCard(){
   if(!isFullAccess() || !canReadKey(EXPENSE_KEY) || !canReadKey(PURCH_KEY)) return "";
   var cur = fmtDate(new Date()).slice(0,7), last = survivalFor(shiftMonth(cur,-1)), now = survivalFor(cur);
-  function line(r, lbl){ var v = survivalVerdict(r);
+  function line(r, lbl){ var v = survivalVerdict(r); if(r.notOpen) return '';
     return '<div class="survline '+v.cls+'"><span>'+v.i+' <b>'+esc(lbl)+'</b> · '+esc(monthLabel(r.mKey))+'</span><b>'+(r.need>0||r.sales>0 ? (r.gap>=0?'+':'−')+rupee(Math.abs(r.gap)) : '—')+'</b></div>'; }
   return '<div class="card survcard"><h3>🩺 Survival check · क्या कैफ़े अपने ख़र्च निकाल रहा है?</h3>'+
     '<div class="backupnote" style="margin:2px 0 6px;">Can sales pay for ingredients & goods, rent, electricity, gas, staff pay…? (Repairs and equipment not counted.)</div>'+
@@ -7805,9 +7816,13 @@ function openSurvivalSheet(mKey){
   html += '<div class="survverdict '+v.cls+'"><div class="svi">'+v.i+'</div><div><b>'+esc(v.t)+'</b><div>'+esc(v.hi)+'</div>'+
     (r.need>0 ? '<div class="svgap">'+(r.gap>=0 ? 'Left after essentials: <b>'+rupee(r.gap)+'</b>' : 'Short by <b>'+rupee(-r.gap)+'</b>')+(r.running?' (on pace for the month)':'')+'</div>' : '')+'</div></div>';
   if(r.need>0) html += '<div class="survbar"><i style="width:'+Math.min(100, pct)+'%"></i></div><div class="barsub" style="text-align:right;">Sales cover '+pct+'% of essentials</div>';
-  if(r.running) html += '<div class="backupnote">'+esc(monthLabel(mKey))+' is still running: day '+r.elapsed+' of '+r.days+'. Sales ('+rupee(r.sales)+' so far) and goods ('+rupee(r.goods)+') are scaled to the whole month; bills and pay are the full month’s.</div>';
+  if(r.notOpen){
+    html += '<div class="backupnote">The cafe opened on '+esc(fmtD(r.open))+' '+esc(r.open.slice(0,4))+', so there is nothing to check for '+esc(monthLabel(mKey))+'.</div>';
+  } else if(r.partial) html += '<div class="backupnote">Opened on '+esc(fmtD(r.open))+': monthly bills are counted for the '+r.openDays+' of '+r.days+' days the cafe was open.</div>';
+  if(r.running) html += '<div class="backupnote">'+esc(monthLabel(mKey))+' is still running: day '+r.elapsed+' of '+r.openDays+'. Sales ('+rupee(r.sales)+' so far) and goods ('+rupee(r.goods)+') are scaled to the whole month; bills and pay are the full month’s.</div>';
   function row(l, a, sub, cls){ return '<div class="psrow'+(cls?' '+cls:'')+'"><span>'+l+(sub?'<br><small class="muted">'+sub+'</small>':'')+'</span><b>'+rupee(a)+'</b></div>'; }
-  html += '<div class="card" style="margin-bottom:10px;"><h3>Money in</h3>'+row('Sales'+(r.running?' (month on pace)':''), r.salesP, r.running ? rupee(r.sales)+' so far' : '')+'</div>';
+  if(!r.notOpen) html += '<div class="card" style="margin-bottom:10px;"><h3>Money in</h3>'+row('Sales'+(r.running?' (month on pace)':''), r.salesP, r.running ? rupee(r.sales)+' so far' : '')+'</div>';
+  if(!r.notOpen){
   html += '<div class="card" style="margin-bottom:10px;"><h3>Essentials · ज़रूरी ख़र्च</h3>';
   var gk = Object.keys(r.goodsBy).sort(function(a,b){ return r.goodsBy[b]-r.goodsBy[a]; });
   html += row('🛒 Goods & ingredients'+(r.running?' (on pace)':''), r.goodsP, gk.slice(0,4).map(function(c){ return esc(c)+' '+rupee(r.goodsBy[c]); }).join(' · ')+(gk.length>4?' …':''));
@@ -7815,6 +7830,7 @@ function openSurvivalSheet(mKey){
   if(r.staff>0) html += row('🧑‍🍳 Staff pay', r.staff, r.staffPaid < r.staff - 0.5 ? (r.staffPaid>0 ? rupee(r.staffPaid)+' paid so far' : 'not paid yet — from the Salary tab') : 'paid');
   if(r.bank>0) html += row('🏦 Bank charges', r.bank);
   html += row('<b>Total essentials</b>', r.need, '', 'tot')+'</div>';
+  }
   // Diagnosis
   var tips = [];
   if(r.goodsRatio!==null){ var gp = Math.round(r.goodsRatio*100), tgt = targetFoodCost();
@@ -7828,9 +7844,16 @@ function openSurvivalSheet(mKey){
   if(r.notCounted>0) html += '<div class="backupnote">Not counted (one-off): '+rupee(r.notCounted)+' of repairs, maintenance, equipment, bonuses and “Other” expenses. Partner money and loans are never counted.</div>';
   // Trend
   html += '<div class="card" style="margin-bottom:10px;"><h3>Last 6 months</h3>'+[5,4,3,2,1,0].map(function(n){ var m = shiftMonth(cur,-n), t = survivalFor(m), tv = survivalVerdict(t);
-    return '<div class="psrow" data-sm="'+m+'" style="cursor:pointer;"><span>'+tv.i+' '+esc(monthLabel(m))+(t.running?' (on pace)':'')+'</span><b>'+(t.need>0 ? Math.round(t.cover*100)+'% · '+(t.gap>=0?'+':'−')+rupee(Math.abs(t.gap)) : '—')+'</b></div>'; }).join("")+'</div>';
+    if(t.notOpen) return '';
+    return '<div class="psrow" data-sm="'+m+'" style="cursor:pointer;"><span>'+tv.i+' '+esc(monthLabel(m))+(t.running?' (on pace)':'')+(t.partial?' (opened '+esc(fmtD(t.open))+')':'')+'</span><b>'+(t.need>0 ? Math.round(t.cover*100)+'% · '+(t.gap>=0?'+':'−')+rupee(Math.abs(t.gap)) : '—')+'</b></div>'; }).join("")+'</div>';
+  var od = cafeOpenDate();
+  html += '<div class="field"><label>Cafe opened on · कैफ़े कब शुरू हुआ</label><div style="display:flex;gap:8px;"><input type="date" id="sv_open" value="'+esc(od)+'" style="flex:1;">'+
+    (isFullAccess() ? '<button class="btn-cancel" id="sv_open_s" style="flex:none;padding:0 16px;">Set</button>' : '')+'</div>'+
+    '<div class="backupnote" style="margin:4px 0 0;">'+(settings.cafeOpened ? 'Set by you.' : 'Taken from the first sale — change it if the cafe opened on another day.')+' Months before it are not checked.</div></div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="sv_c" style="flex:1;">Close</button></div>';
-  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  sheet.innerHTML = html;
+  var svs = document.getElementById("sv_open_s");
+  if(svs) svs.addEventListener("click", function(){ var v = document.getElementById("sv_open").value; settings.cafeOpened = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ""; saveSettings(); renderAll(); openSurvivalSheet(mKey); }); document.getElementById("sheetBg").classList.add("on");
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-sm]"), function(b){ b.addEventListener("click", function(){ openSurvivalSheet(b.getAttribute("data-sm")); }); });
   document.getElementById("sv_c").addEventListener("click", closeForm);
 }

@@ -12,7 +12,7 @@ const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode
   const dis = () => p.click('#dlgBtns button', { timeout:1500 }).catch(()=>{});
   // last month = L, this month = C
   await E(p, `window.C = fmtDate(new Date()).slice(0,7); window.L = shiftMonth(C,-1); window.LN = monthLabel(L);
-    staff=[]; saveStaff && saveStaff(); settings.fixedCosts = {}; settings.fixedCostMonths = {}; saveSettings();
+    staff=[]; saveStaff && saveStaff(); settings.fixedCosts = {}; settings.fixedCostMonths = {}; settings.cafeOpened = shiftMonth(C,-8)+'-01'; saveSettings();
     sales=[{id:'s1',date:L+'-10',customer:'Walk-in',amount:100000,mode:'UPI'}];
     purchases=[{id:'p1',date:L+'-05',item:'Milk',vendor:'Dairy',qty:1,unit:'lot',rate:30000,category:'Dairy'},{id:'p2',date:L+'-12',item:'Fridge repair',vendor:'X',qty:1,unit:'job',rate:5000,category:'Repairs & maintenance'}];
     expenses=[{id:'e1',date:C+'-05',category:'Electricity',description:'Electricity bill',amount:4000,mode:'UPI'},
@@ -56,5 +56,25 @@ const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode
   await E(p, `sales[0].amount = 50000; saveSales(); openSurvivalSheet(L);`); await p.waitForTimeout(100);
   const st2 = (await p.textContent('#sheet')).replace(/\s+/g,' ');
   assert(/Short/.test(st2) && /Short by ₹19,000/.test(st2) && /To cover everything you need about/.test(st2), 'short month: shortfall and break-even sales');
+  // Opening date: months before it are not checked; the opening month counts bills only for the open days
+  await E(p, `closeForm(); sales[0].amount = 100000; sales[0].date = L+'-16'; delete settings.cafeOpened; saveSales(); saveSettings(); renderAll();`);
+  const o = await E(p, `(function(){ var b = survivalFor(shiftMonth(L,-1)), r = survivalFor(L); return { before:b.notOpen, v:survivalVerdict(b).i, open:cafeOpenDate(), partial:r.partial, days:r.openDays, of:r.days,
+    rent:(r.bills.filter(function(x){ return x.c==='Rent'; })[0]||{}).amt, staff:r.staff, goods:r.goods }; })()`);
+  console.log('   '+JSON.stringify(o));
+  const share = o.days / o.of;
+  assert(o.before===true && o.v==='🔒' && o.open.slice(8)==='16', 'month before the first sale: not open yet');
+  assert(o.partial && Math.abs(o.rent - Math.round(15000*share*100)/100) < 0.02 && o.staff===20000 && o.goods===30000, 'opening month: rent counted for the open days only ('+o.days+' of '+o.of+'), staff pay and goods as they were');
+  await E(p, `openSurvivalSheet(L);`); await p.waitForTimeout(100);
+  let sv = (await p.textContent('#sheet')).replace(/\s+/g,' ');
+  assert(/monthly bills are counted for the \d+ of \d+ days/.test(sv) && /Taken from the first sale/.test(sv), 'sheet explains the opening month and where the date comes from');
+  const rows = await p.$$eval('#sheet .card .psrow[data-sm]', a => a.map(x => x.textContent));
+  assert(rows.length===2 && /opened/.test(rows[0]), 'last 6 months lists only months since opening: '+rows.length);
+  await E(p, `openSurvivalSheet(shiftMonth(L,-2));`); await p.waitForTimeout(100);
+  assert(/Cafe not open yet/.test(await p.textContent('#sheet')), 'picking an earlier month says not open yet');
+  // owner sets the date by hand
+  await p.fill('#sv_open', await E(p, `L+'-01'`)); await p.click('#sv_open_s'); await p.waitForTimeout(150);
+  assert(await E(p, `settings.cafeOpened===L+'-01' && !survivalFor(L).partial`), 'owner can set the opening date');
+  await E(p, 'closeForm()'); await E(p, `showView('dashboard'); renderAll();`); await p.waitForTimeout(150);
+  assert(await p.$('#survivalBox .survcard') && !/not open/i.test(await p.textContent('#survivalBox')), 'Dashboard card still shows');
   console.log('ERRORS', JSON.stringify(errs)); await b.close();
 })();
