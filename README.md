@@ -225,6 +225,22 @@ repayments, withdrawals, own-pocket bills and paybacks) and every balance "as at
 - **Payslip:** A4 PDF with employee details, earnings vs deductions, gross, total deductions, net pay in words,
   payments, balance and signature lines; the same layout on screen and as WhatsApp text.
 
+### Posts (jobs) and who works which post, day & shift
+**Staff → Team → a person → Edit:** a **main post** (shown on payslips) and **Also does** chips — one person can
+hold several posts. The list is grouped:
+- Kitchen: Head Chef, Chef / Cook, Helper Chef, Tandoor Chef, Chinese Chef, South Indian Chef, Sweets / Halwai,
+  Barista / Tea Maker, Dishwasher
+- Service: Waiter, Captain / Supervisor, Counter Billing, Cashier, Host / Reception, Delivery Boy
+- Cleaning & safety: Sweeper & Cleaner, Housekeeping, Security Guard
+- Management & office: CEO, Owner / Director, Restaurant Manager, Operations Manager, Purchase Manager, Store Keeper,
+  HR, Accountant, Sales, Marketing
+- **+ Your own posts** for anything else (`settings.customPosts`). Older role names (Cook, Helper…) keep working.
+
+**Roster → One day:** assigning someone with several posts asks which post they work in that shift; each name shows
+its post (tap it to change) and each shift shows how many are on each post (🍽️ Waiter 2 · 🔥 Tandoor Chef 1).
+**Week** boxes show a small post icon when someone works a post other than their main one that day; changing shifts
+keeps the chosen post. Roster entries keep the post as `post`; staff phones see posts (`roles`) but never pay.
+
 ### Bills: fixed vs variable
 Every bill is either **Fixed** (same every month until changed — rent by default) or **Variable** (different every
 month — electricity, wifi, mobile and new bills by default). Variable bills are never copied between months: a month

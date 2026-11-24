@@ -297,6 +297,13 @@
   .wtbl{display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:70px;} .wtbl small{font-size:11px;text-align:center;}
   .wbody{flex:1;min-width:0;} .wbody .btn-save{width:100%;margin-top:8px;}
   body:has(.sheetbg.on) .waiterbar{display:none;}
+  .postchips{display:flex;flex-wrap:wrap;gap:6px;} .pgroup{width:100%;font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-top:6px;}
+  .pchip{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:6px 10px;font:inherit;font-size:12.5px;color:var(--ink);}
+  .pchip.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .pchip.main{box-shadow:0 0 0 2px #E9A826;}
+  .postpick{display:grid;grid-template-columns:1fr 1fr;gap:8px;} .postpick button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:12px 6px;font:inherit;font-weight:700;font-size:13.5px;color:var(--ink);} .postpick button.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+  .rpchip{display:inline-flex;align-items:center;gap:4px;} .rpost{border:1px solid var(--line);background:#fff;border-radius:999px;padding:2px 8px;font:inherit;font-size:12px;}
+  .postcover{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;font-size:12px;color:var(--ink-soft);} .postcover span{background:#F2EEE5;border-radius:8px;padding:3px 7px;}
+  .rpi{display:block;font-style:normal;font-size:11px;line-height:1;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -14345,7 +14352,7 @@ function renderTeamView(){
       var left = s.status==="Left";
       return '<div class="entry staffcard'+(left?" gone":"")+'" data-staff="'+s.id+'">'+
         '<div><div class="who">'+esc(s.name)+(left?' <span class="billclip">(left)</span>':'')+'</div>'+
-        '<div class="meta">'+esc(s.role)+' · '+esc(/shift/i.test(s.defaultShift||"") ? s.defaultShift : (s.defaultShift||"—")+" shift")+(isFullAccess() ? ' · '+rupee(s.salary||0)+'/mo'+
+        '<div class="meta">'+esc(staffPosts(s).map(postLabel).join(" · "))+' · '+esc(/shift/i.test(s.defaultShift||"") ? s.defaultShift : (s.defaultShift||"—")+" shift")+(isFullAccess() ? ' · '+rupee(s.salary||0)+'/mo'+
         (allowanceLabel(s) ? ' + '+esc(allowanceLabel(s)) : '') : '')+'</div>'+
         (perf.warns>0?'<div class="meta warnline">'+perf.warns+' warning'+(perf.warns!==1?'s':'')+' this month</div>':'')+
         '</div>'+
@@ -14364,10 +14371,78 @@ function renderTeamView(){
 // Week grid (staff × days, tap a cell to cycle through the shifts) or one day.
 var rosMode = "week";
 function weekStartOf(d){ var x = parseDate(d); x.setDate(x.getDate() - ((x.getDay()+6)%7)); return fmtDate(x); }
+// ---------- POSTS (jobs in the restaurant) ----------
+// A person has a main post (st.role, used on payslips) and can also do others (st.roles). The roster
+// says which post each person works on each day and shift (roster entry .post).
+var POST_GROUPS = [
+  ["Kitchen · रसोई", [["Head Chef","👨‍🍳","हेड शेफ"],["Chef / Cook","🧑‍🍳","कुक"],["Helper Chef","🥄","हेल्पर शेफ"],["Tandoor Chef","🔥","तंदूर शेफ"],["Chinese Chef","🥡","चाइनीज़ शेफ"],
+    ["South Indian Chef","🥞","साउथ इंडियन शेफ"],["Sweets / Halwai","🍮","हलवाई"],["Barista / Tea Maker","☕","चाय / कॉफ़ी"],["Dishwasher","🧽","बर्तन धोने वाला"]]],
+  ["Service · सर्विस", [["Waiter","🍽️","वेटर"],["Captain / Supervisor","🎖️","कैप्टन"],["Counter Billing","🧾","काउंटर बिलिंग"],["Cashier","💵","कैशियर"],["Host / Reception","🛎️","रिसेप्शन"],["Delivery Boy","🛵","डिलीवरी"]]],
+  ["Cleaning & safety · सफ़ाई", [["Sweeper & Cleaner","🧹","सफ़ाई कर्मचारी"],["Housekeeping","🧺","हाउसकीपिंग"],["Security Guard","💂","सिक्योरिटी गार्ड"]]],
+  ["Management & office · ऑफ़िस", [["CEO","👔","सीईओ"],["Owner / Director","🏢","मालिक"],["Restaurant Manager","📋","मैनेजर"],["Operations Manager","⚙️","ऑपरेशंस मैनेजर"],["Purchase Manager","🛒","परचेज़ मैनेजर"],
+    ["Store Keeper","📦","स्टोर कीपर"],["HR","🤝","एचआर"],["Accountant","🧮","अकाउंटेंट"],["Sales","📈","सेल्स"],["Marketing","📣","मार्केटिंग"]]]
+];
+var POST_INFO = {}; POST_GROUPS.forEach(function(g){ g[1].forEach(function(p){ POST_INFO[p[0]] = { i:p[1], hi:p[2], g:g[0] }; }); });
+// Older role names still work.
+var OLD_POST_ICON = { Manager:"📋", Cashier:"💵", Barista:"☕", Cook:"🧑‍🍳", Helper:"🥄", Waiter:"🍽️", Cleaner:"🧹" };
+function customPosts(){ return Array.isArray(settings.customPosts) ? settings.customPosts.filter(Boolean) : []; }
+function allPosts(){
+  var out = []; POST_GROUPS.forEach(function(g){ g[1].forEach(function(p){ out.push(p[0]); }); });
+  customPosts().concat(staff.map(function(s){ return s.role; }), [].concat.apply([], staff.map(function(s){ return s.roles||[]; })))
+    .forEach(function(n){ if(n && out.indexOf(n)<0) out.push(n); });
+  return out;
+}
+function postIcon(n){ return (POST_INFO[n] && POST_INFO[n].i) || OLD_POST_ICON[n] || "🧑"; }
+function postLabel(n){ return postIcon(n)+" "+n; }
+function staffPosts(st){ var out = []; [st && st.role].concat((st && st.roles) || []).forEach(function(n){ if(n && out.indexOf(n)<0) out.push(n); }); return out; }
+// Pick posts as chips (multi-select). Returns html; read back with readPostChips.
+function postChipsHtml(id, chosen, main){
+  var groups = POST_GROUPS.map(function(g){ return [g[0], g[1].map(function(p){ return p[0]; })]; });
+  var extra = allPosts().filter(function(n){ return !POST_INFO[n]; }); if(extra.length) groups.push(["Your own posts", extra]);
+  return '<div class="postchips" id="'+id+'">'+groups.map(function(g){ return '<div class="pgroup">'+esc(g[0])+'</div>'+g[1].map(function(n){
+    return '<button type="button" class="pchip'+(chosen.indexOf(n)>=0?' on':'')+(n===main?' main':'')+'" data-post="'+esc(n)+'">'+esc(postLabel(n))+'</button>'; }).join(""); }).join("")+'</div>';
+}
+function wirePostChips(root, onChange){
+  Array.prototype.forEach.call(root.querySelectorAll(".pchip"), function(b){ b.addEventListener("click", function(){ b.classList.toggle("on"); if(onChange) onChange(); }); });
+}
+function readPostChips(root){ return Array.prototype.map.call(root.querySelectorAll(".pchip.on"), function(b){ return b.getAttribute("data-post"); }); }
+function openPostPicker(title, options, cur, done){
+  var sheet = document.getElementById("sheet"), prevHtml = null;
+  var html = '<h2 class="serif">'+esc(title)+'</h2><div class="postpick">'+options.map(function(n){ return '<button data-pp="'+esc(n)+'" class="'+(n===cur?"on":"")+'">'+esc(postLabel(n))+'</button>'; }).join("")+'</div>'+
+    '<button class="btn-additem" id="pp_more" style="margin-top:8px;">Other post…</button><div class="sheetbtns"><button class="btn-cancel" id="pp_c" style="flex:1;">Cancel</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-pp]"), function(b){ b.addEventListener("click", function(){ done(b.getAttribute("data-pp")); }); });
+  document.getElementById("pp_c").addEventListener("click", function(){ done(null); });
+  document.getElementById("pp_more").addEventListener("click", function(){ openPostPicker(title, allPosts(), cur, done); });
+}
+function openCustomPosts(back){
+  var sheet = document.getElementById("sheet"), list = customPosts().slice();
+  function draw(){
+    var html = '<h2 class="serif">Your own posts</h2><div class="backupnote">Add jobs that are not in the list (e.g. Juice Maker, Valet). They show with the others everywhere.</div>';
+    html += list.map(function(n, i){ return '<div class="psrow"><span>'+esc(n)+'</span><button class="ndel" data-cpdel="'+i+'">×</button></div>'; }).join("");
+    html += '<div class="field" style="margin-top:8px;"><div style="display:flex;gap:8px;"><input type="text" id="cp_new" placeholder="New post name" style="flex:1;"><button class="btn-save" id="cp_add" style="flex:none;padding:0 16px;">Add</button></div></div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="cp_c">Cancel</button><button class="btn-save" id="cp_s">Save</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-cpdel]"), function(b){ b.addEventListener("click", function(){ list.splice(+b.getAttribute("data-cpdel"), 1); draw(); }); });
+    document.getElementById("cp_add").addEventListener("click", function(){ var v = document.getElementById("cp_new").value.trim(); if(v && allPosts().concat(list).map(function(x){ return x.toLowerCase(); }).indexOf(v.toLowerCase())<0) list.push(v.slice(0,40)); draw(); });
+    document.getElementById("cp_c").addEventListener("click", function(){ if(back) back(); else closeForm(); });
+    document.getElementById("cp_s").addEventListener("click", function(){ settings.customPosts = list; saveSettings(); if(back) back(); else closeForm(); renderAll(); });
+  }
+  draw();
+}
+// Small post icons for a week cell, shown when the person works as something other than their main post.
+function rosterPostIcons(st, d){
+  var ps = roster.filter(function(r){ return r.staffId===st.id && r.date===d; }).map(function(r){ return r.post || st.role; }).filter(function(v, i, a){ return v && a.indexOf(v)===i; });
+  if(!ps.length || (ps.length===1 && ps[0]===st.role)) return "";
+  return '<i class="rpi">'+ps.map(postIcon).join("")+'</i>';
+}
 function rosterShiftsOf(staffId, date){ return roster.filter(function(r){ return r.staffId===staffId && r.date===date; }).map(function(r){ return r.shift; }); }
 function setRosterShifts(staffId, date, names){
+  var old = roster.filter(function(r){ return r.staffId===staffId && r.date===date; }), st = staffById(staffId);
+  var keepPost = old.length ? old[0].post : "";
   roster = roster.filter(function(r){ return !(r.staffId===staffId && r.date===date); });
-  names.forEach(function(n){ roster.push({ id:uid(), date:date, shift:n, staffId:staffId }); });
+  names.forEach(function(n){ var o = old.find(function(r){ return r.shift===n; });
+    roster.push({ id:uid(), date:date, shift:n, staffId:staffId, post: (o && o.post) || keepPost || (st && st.role) || "" }); });
 }
 function usualShifts(st){
   var names = shiftList().map(function(x){ return x.name; });
@@ -14396,14 +14471,14 @@ function renderRosterView(){
         var dt = parseDate(d); return '<th class="'+(d===today?"rtoday":"")+'">'+dt.toLocaleDateString("en-IN",{weekday:"short"}).slice(0,2)+'<br><span>'+dt.getDate()+'</span></th>'; }).join("")+'<th>Shifts</th></tr></thead><tbody>';
       people.forEach(function(st){
         var n = 0;
-        html += '<tr><td class="rsname"><b>'+esc(st.name)+'</b><span>'+esc(st.defaultShift||"")+'</span></td>';
+        html += '<tr><td class="rsname"><b>'+esc(st.name)+'</b><span>'+esc(staffPosts(st).map(postIcon).join(""))+' '+esc(st.defaultShift||"")+'</span></td>';
         days.forEach(function(d){
           if(!employedOn(st, d)){ html += '<td class="rout">·</td>'; return; }
           var on = rosterShiftsOf(st.id, d), att = attendFor(d, st.id);
           n += on.length;
           var idx = on.length===1 ? shifts.findIndex(function(x){ return x.name===on[0]; }) : -1;
           html += '<td><button class="rcell'+(on.length>1?' rboth':idx>=0?' rsh'+(idx%4):on.length?' rsh3':'')+(att&&(att.status==="Absent"||att.status==="Leave")?' roff':'')+'" data-rc="'+st.id+'" data-rd="'+d+'" title="'+esc(on.join(" + ")||"Off")+'">'+
-                  (on.length ? on.map(shiftCode).join("+") : '–')+'</button></td>';
+                  (on.length ? on.map(shiftCode).join("+")+rosterPostIcons(st, d) : '–')+'</button></td>';
         });
         html += '<td class="rcount">'+n+'</td></tr>';
       });
@@ -14414,6 +14489,7 @@ function renderRosterView(){
           return '<td class="'+(c?'':'rnone')+'">'+c+'</td>'; }).join("")+'<td></td></tr>';
       });
       html += '</tbody></table></div>';
+      html += '<div class="backupnote" style="margin:6px 0 4px;">👥 Posts: small icons in a box show when someone works a different post that day. To choose posts, open <b>One day</b> and tap the post next to a name.</div>';
       html += '<div class="backupnote" style="margin:6px 0 10px;">Tap a box to change it: '+shifts.map(function(x){ return esc(x.name); }).join(" → ")+(shifts.length>1?' → both':'')+' → off. A faded box means they were marked absent or on leave that day.</div>';
       html += '<div class="billbtns"><button class="btn-additem" id="rw_fill">Fill empty days with usual shifts</button><button class="btn-additem" id="rw_copy">Copy last week</button></div>';
       html += '<button class="btn-additem" id="rw_clear" style="margin-top:8px;">Clear this week</button>';
@@ -14431,10 +14507,12 @@ function renderRosterView(){
               (covered?'<span class="pill ok">'+assigned.length+' on shift</span>':'<span class="pill bad">Not covered</span>')+'</div>';
       if(covered){
         html += '<div class="shiftpeople">'+assigned.map(function(r){
-          var st = staffById(r.staffId);
-          return '<span class="chip">'+esc(st?st.name:"(removed)")+'<button data-unassign="'+r.id+'" aria-label="Remove">×</button></span>';
+          var st = staffById(r.staffId), p = r.post || (st && st.role) || "";
+          return '<span class="chip rpchip"><b>'+esc(st?st.name:"(removed)")+'</b><button class="rpost" data-rpost="'+r.id+'">'+esc(postLabel(p))+' ▾</button><button data-unassign="'+r.id+'" aria-label="Remove">×</button></span>';
         }).join("")+'</div>';
       }
+      if(covered){ var byPost = {}; assigned.forEach(function(r){ var st = staffById(r.staffId), p = r.post || (st && st.role) || "—"; byPost[p] = (byPost[p]||0) + 1; });
+        html += '<div class="postcover">'+Object.keys(byPost).map(function(p){ return '<span>'+esc(postIcon(p))+' '+esc(p)+' <b>'+byPost[p]+'</b></span>'; }).join("")+'</div>'; }
       html += '<button class="btn-additem" data-assign="'+esc(sh.name)+'">+ Assign staff</button></div>';
     });
   }
@@ -14488,6 +14566,13 @@ function renderRosterView(){
     wireDateStepper("ros");
     Array.prototype.forEach.call(el.querySelectorAll("[data-assign]"), function(b){
       b.addEventListener("click", function(){ openAssignSheet(b.getAttribute("data-assign")); });
+    });
+    Array.prototype.forEach.call(el.querySelectorAll("[data-rpost]"), function(b){
+      b.addEventListener("click", function(){
+        var r = roster.find(function(x){ return x.id===b.getAttribute("data-rpost"); }); if(!r) return;
+        var st = staffById(r.staffId);
+        openPostPicker((st?st.name:"")+" · "+r.shift, staffPosts(st), r.post || (st && st.role), function(p){ if(p){ r.post = p; saveRoster(); } closeForm(); renderStaffSection(); });
+      });
     });
     Array.prototype.forEach.call(el.querySelectorAll("[data-unassign]"), function(b){
       b.addEventListener("click", function(){
@@ -14547,7 +14632,7 @@ function openAssignSheet(shiftName){
     html += avail.map(function(s){
       var other = roster.filter(function(r){ return r.date===staffDate && r.staffId===s.id; });
       var clash = other.length>0 ? ' <span class="billclip">(also on '+esc(other[0].shift)+')</span>' : '';
-      return '<div class="entry" data-pick="'+s.id+'"><div><div class="who">'+esc(s.name)+clash+'</div><div class="meta">'+esc(s.role)+'</div></div></div>';
+      return '<div class="entry" data-pick="'+s.id+'"><div><div class="who">'+esc(s.name)+clash+'</div><div class="meta">'+esc(staffPosts(s).map(postLabel).join(" · "))+'</div></div></div>';
     }).join("");
   }
   html += '<div class="sheetbtns" style="margin-top:14px;"><button class="btn-cancel" id="as_close" style="flex:1;">Close</button></div>';
@@ -14556,8 +14641,10 @@ function openAssignSheet(shiftName){
   document.getElementById("as_close").addEventListener("click", closeForm);
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-pick]"), function(b){
     b.addEventListener("click", function(){
-      roster.push({ id:uid(), date:staffDate, shift:shiftName, staffId:b.getAttribute("data-pick") });
-      saveRoster(); closeForm(); renderStaffSection();
+      var st = staffById(b.getAttribute("data-pick")), ps = staffPosts(st);
+      function put(post){ roster.push({ id:uid(), date:staffDate, shift:shiftName, staffId:st.id, post:post || st.role || "" }); saveRoster(); closeForm(); renderStaffSection(); }
+      if(ps.length > 1) openPostPicker(st.name+" works as… · "+shiftName, ps, st.role, function(p){ if(p) put(p); else openAssignSheet(shiftName); });
+      else put(ps[0]);
     });
   });
 }
@@ -14827,8 +14914,11 @@ function openStaffForm(staffId){
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">'+(s?"Edit staff":"Add staff member")+'</h2>';
   html += '<div class="field"><label>Name</label><input type="text" id="s_name" placeholder="Full name" value="'+esc(s?s.name:"")+'"></div>';
-  html += '<div class="field two"><div><label>Role</label><select id="s_role">'+STAFF_ROLES.map(function(r){ return '<option '+(s&&s.role===r?"selected":"")+'>'+r+'</option>'; }).join("")+'</select></div>';
+  var mainPost = s ? s.role : "Waiter";
+  html += '<div class="field two"><div><label>Main post · मुख्य काम</label><select id="s_role">'+allPosts().map(function(r){ return '<option value="'+esc(r)+'" '+(mainPost===r?"selected":"")+'>'+esc(postLabel(r))+'</option>'; }).join("")+'</select></div>';
   html += '<div><label>Usual shift</label><select id="s_shift">'+shiftList().map(function(sh){ return sh.name; }).concat(shiftList().length>1 ? ["Both shifts"] : []).concat(["Flexible"]).map(function(n){ return '<option '+(s&&s.defaultShift===n?"selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div></div>';
+  html += '<div class="field"><label>Also does · और काम (tap all that apply)</label>'+postChipsHtml("s_posts", s ? staffPosts(s) : [mainPost], mainPost)+
+    '<button type="button" class="linkbtn" id="s_ownposts" style="margin-top:4px;">+ Your own posts</button></div>';
   html += '<div class="field two"><div'+(isFullAccess()?'':' style="display:none;"')+'><label>Monthly salary (₹)</label><input type="number" inputmode="decimal" id="s_salary" value="'+(s?s.salary:"")+'"></div>';
   html += '<div><label>Phone</label><input type="text" inputmode="tel" id="s_phone" value="'+esc(s?s.phone:"")+'"></div></div>';
   var acNow = s ? allowConfig(s, fmtDate(new Date()).slice(0,7), true) : { houseRent:0, foodAllowance:0, travelAllowance:0, foodBasis:"month", travelBasis:"month" };
@@ -14850,6 +14940,10 @@ function openStaffForm(staffId){
   if(s) html += '<button class="btn-del" id="s_delete">Remove</button>';
   html += '<button class="btn-save" id="s_save">Save</button></div>';
   sheet.innerHTML = html;
+  var spc = document.getElementById("s_posts"); wirePostChips(spc);
+  document.getElementById("s_role").addEventListener("change", function(){ var v = this.value;
+    Array.prototype.forEach.call(spc.querySelectorAll(".pchip"), function(b){ var me = b.getAttribute("data-post")===v; b.classList.toggle("main", me); if(me) b.classList.add("on"); }); });
+  document.getElementById("s_ownposts").addEventListener("click", function(){ openCustomPosts(function(){ openStaffForm(staffId); }); });
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("s_cancel").addEventListener("click", closeForm);
   document.getElementById("s_status").addEventListener("change", function(){
@@ -14876,7 +14970,8 @@ function openStaffForm(staffId){
     var sal = parseFloat(document.getElementById("s_salary").value);
     if(!isFullAccess()) sal = s ? (+s.salary||0) : 0;   // pay is set by the owner; the server keeps it anyway
     if(isNaN(sal) || sal<0){ errEl.textContent = "Enter the monthly salary."; errEl.style.display="block"; return; }
-    var rec = { id: s?s.id:uid(), name:name, role:document.getElementById("s_role").value,
+    var mainP = document.getElementById("s_role").value, others = readPostChips(document.getElementById("s_posts")).filter(function(n){ return n!==mainP; });
+    var rec = { id: s?s.id:uid(), name:name, role:mainP, roles:[mainP].concat(others),
                 defaultShift:document.getElementById("s_shift").value, salary:sal,
                 houseRent: parseFloat(document.getElementById("s_rent").value)||0,
                 rentMode: document.getElementById("s_rentmode").value,
