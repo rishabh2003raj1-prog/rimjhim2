@@ -65,8 +65,24 @@ const dis = (p) => p.click('#dlgBtns button', { timeout:1500 }).catch(()=>{});
   assert(/Low margin/.test(rp) && /Gutka/.test(rp) && /5%/.test(rp), 'margin report flags Gutka at 5%');
   await O.screenshot({ path: process.env.S+'/store_report.png' });
   const oi = await E(O, `otherIncomeIn(function(d){ return d==="${t}"; })`);
-  assert(oi===r2v(300 + 40 - 204), 'profit: parking 300 + store sales 40 − stock bought 204 = '+oi);
-  function r2v(x){ return Math.round(x*100)/100; }
+  assert(oi===300, 'cafe profit gets parking (300) but not the store (own account): '+oi);
+  assert(await E(O, `cashMovement("${t}").inflow`)===300, 'cafe counter cash: parking yes, store no');
+  // Store's own money
+  await E(O, `storeSub='money'; renderStoreView();`);
+  await O.fill('#so_cash', '500'); await O.fill('#so_date', '${t}'.length ? await E(O,'fmtDate(new Date())') : ''); await O.click('#so_s'); await O.waitForTimeout(150);
+  await E(O, `storeSub='money'; renderStoreView();`);
+  assert(await E(O, `storeMoney(fmtDate(new Date())).cash`)===336, 'store drawer: 500 opening + 40 cash bill − 204 stock = 336');
+  await O.fill('#sm_cnt', '336'); await O.click('#sm_cnt_s'); await O.waitForTimeout(150);
+  assert(/₹336 ✔/.test(await O.textContent('#storeView')), 'store closing count matches');
+  await O.selectOption('#sm_type', 'deposit'); await O.fill('#sm_amt', '100'); await O.click('#sm_move'); await O.waitForTimeout(150);
+  assert(await E(O, `JSON.stringify(storeMoney(fmtDate(new Date())))`)==='{"cash":236,"bank":100}', 'deposit moves store cash to the store bank');
+  await O.screenshot({ path: process.env.S+'/store_money.png' });
+  // Cafe + parking closing split
+  await E(O, `openCashDayForm("${t}")`); await O.fill('#cd_counted', '1300');
+  const sp = (await O.textContent('#cd_split')).replace(/\s+/g,' ');
+  assert(/Parking cash — keep aside ?₹300/.test(sp) && /Cafe cash \(counted − parking\) ?₹1,000/.test(sp), 'closing split: parking ₹300 aside, cafe ₹1,000: '+sp);
+  await O.screenshot({ path: process.env.S+'/closing_split.png' });
+  await E(O, 'closeForm()');
   await E(O, `showView('dashboard'); renderAll();`);
   assert(/Other businesses/.test(await O.textContent('#extraBizBox')) && /Parking/.test(await O.textContent('#extraBizBox')), 'Dashboard shows other businesses');
   await O.waitForTimeout(2500);
@@ -77,6 +93,6 @@ const dis = (p) => p.click('#dlgBtns button', { timeout:1500 }).catch(()=>{});
   assert(await B.$eval('#recCtl [data-r="store"]', e => e.style.display!=='none') && !(await B.$('[data-ss="buy"]')), 'billing sees the store but not Buy stock');
   await B.click(`[data-sadd="${pid}"]`); await B.click('[data-spay="UPI"]'); await B.waitForTimeout(2500); await dis(B);
   const srv = await call(O, 'GET', '/api/data?outlet=rimjhim');
-  assert((srv.json.items.storesales_v1.value||[]).length===2 && srv.json.items.storesales_v1.value.some(x => x.by==='bill-1' && x.mode==='UPI'), 'billing store bill saved on the server');
+  assert((srv.json.items.storesales_v1.value||[]).filter(x => !x.kind).length===2 && srv.json.items.storesales_v1.value.some(x => x.by==='bill-1' && x.mode==='UPI'), 'billing store bill saved on the server');
   console.log('ERRORS', JSON.stringify(errs)); await b.close();
 })();

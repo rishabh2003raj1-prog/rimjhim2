@@ -545,9 +545,15 @@ to collect it at the counter" (✔ Collected) instead of serving at the table.
 ### 🅿️ Parking and 🛍️ General store (optional, per outlet)
 Both are **off by default**; Counter → ⚙️ Settings → **Extra businesses** switches each on for that outlet
 (`settings.parkingOn` / `storeOn`). When on, Records gets a Parking / Store tab, the Counter a 🅿️ / 🛍️ button, and
-the Dashboard an **Other businesses** card. Neither is mixed into cafe sales or food cost; parking charges and the
-store's profit (sales − stock bought) count in profit as other income, their cash in the counter's expected cash and
-their UPI in the bank check. A **Parking** and a **General store** switch are in Logins → What each role can use.
+the Dashboard an **Other businesses** card. Neither is mixed into cafe sales or food cost.
+- **Parking shares the cafe's account:** parking charges count in cafe profit as other income, parking cash in the
+  counter's expected cash and parking UPI in the bank check. At closing, the counter cash count shows **🅿️ Parking
+  cash** on its own line and a **Separate at closing** box: parking cash to keep aside, the cafe's share of the cash
+  counted, and today's UPI split cafe / parking.
+- **The general store has its own account:** its cash and UPI never enter the cafe counter, cafe bank check or cafe
+  profit. Store → **💰 Money** shows the store drawer's expected cash and the store bank (from its own opening
+  balances, cash / UPI bills, stock paid, and money moves: cash taken out, deposited to / withdrawn from the store
+  bank, paid from the store bank), a **closing count** (staff can count; shows ✔ or the difference) and recent counts. A **Parking** and a **General store** switch are in Logins → What each role can use.
 
 **Parking** (`parking_v1`): **Vehicle in** — type (🚌 Bus, 🚚 Truck, 🚛 Large container truck, 🛻 Tempo, 🚗 Car, 🏍️ Bike, each
 with its **rate per day**, editable), vehicle number, driver and phone, diesel level, what is **left with us** (🔑 key,

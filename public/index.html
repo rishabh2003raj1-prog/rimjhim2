@@ -7474,20 +7474,29 @@ function storeStock(it){
 }
 function storeMargin(it){ var s = +it.sell||0, c = +it.cost||0; return s>0 ? (s-c)/s : null; }
 function storeLowMargin(it){ var m = storeMargin(it); return m!==null && m < ((+settings.storeMinMargin||10)/100); }
-function storeSalesIn(test){ return storeSales.filter(function(s){ return test(s.date); }); }
+function storeSalesIn(test){ return storeSales.filter(function(s){ return !s.kind && test(s.date); }); }
 function storeSummary(test){
   var sales = 0, cogs = 0, by = {};
   storeSalesIn(test).forEach(function(s){ (s.lines||[]).forEach(function(l){ var r = (+l.qty||0)*(+l.price||0), c = (+l.qty||0)*(+l.cost||0); sales += r; cogs += c;
     var b = by[l.name] = by[l.name] || { qty:0, sales:0, profit:0 }; b.qty += +l.qty||0; b.sales += r; b.profit += r - c; }); });
-  var buys = storeBuys.filter(function(b){ return test(b.date); }).reduce(function(a,b){ return a+(+b.total||0); },0);
+  var buys = storeBuys.filter(function(b){ return !b.kind && test(b.date); }).reduce(function(a,b){ return a+(+b.total||0); },0);
   return { sales:r2(sales), cogs:r2(cogs), profit:r2(sales-cogs), margin: sales>0 ? (sales-cogs)/sales : 0, buys:r2(buys), by:by, bills:storeSalesIn(test).length };
 }
 function storeMoneyIn(test, cash){ return r2(storeSalesIn(test).filter(function(s){ return cash ? (s.mode||"Cash")==="Cash" : (s.mode||"Cash")!=="Cash"; }).reduce(function(a,s){ return a+(+s.total||0); },0)); }
-function storeBuysOut(test, cash){ return r2(storeBuys.filter(function(b){ return test(b.date) && (cash ? (b.mode||"Cash")==="Cash" : (b.mode||"Cash")!=="Cash" && b.mode!=="Credit"); }).reduce(function(a,b){ return a+(+b.total||0); },0)); }
+function storeBuysOut(test, cash){ return r2(storeBuys.filter(function(b){ return !b.kind && test(b.date) && (cash ? (b.mode||"Cash")==="Cash" : (b.mode||"Cash")!=="Cash" && b.mode!=="Credit"); }).reduce(function(a,b){ return a+(+b.total||0); },0)); }
+var STORE_MOVES = { out:"Cash taken out", deposit:"Deposited to store bank", withdraw:"Withdrawn from store bank", bankout:"Paid from store bank" };
+// The store's own money up to a day: cash in its drawer and its bank account.
+function storeMoney(upto){
+  var o = settings.storeOpening || {}, from = o.date || "", ok = function(d){ return !!d && (!from || d >= from) && d <= upto; };
+  var cash = (+o.cash||0) + storeMoneyIn(ok, true) - storeBuysOut(ok, true), bank = (+o.bank||0) + storeMoneyIn(ok, false) - storeBuysOut(ok, false);
+  storeBuys.forEach(function(m){ if(m.kind!=="move" || !ok(m.date)) return; var a = +m.amount||0;
+    if(m.type==="out") cash -= a; else if(m.type==="deposit"){ cash -= a; bank += a; } else if(m.type==="withdraw"){ cash += a; bank -= a; } else if(m.type==="bankout") bank -= a; });
+  return { cash:r2(cash), bank:r2(bank) };
+}
 function renderStoreView(){
   var el = document.getElementById("storeView"); if(!el) return;
   if(!storeOn()){ el.innerHTML = '<div class="empty">The general store is switched off for this outlet (Counter → ⚙️ Settings).</div>'; return; }
-  var subs = [["bill","🧾 Bill"],["stock","📦 Stock"],["order","📝 Order list"],["buy","🛒 Buy stock"],["report","📊 Margins"]].filter(function(s){ return s[0]!=="buy" || canWriteKey(STORE_BUYS_KEY); });
+  var subs = [["bill","🧾 Bill"],["money","💰 Money"],["stock","📦 Stock"],["order","📝 Order list"],["buy","🛒 Buy stock"],["report","📊 Margins"]].filter(function(s){ return s[0]!=="buy" || canWriteKey(STORE_BUYS_KEY); });
   if(!subs.some(function(s){ return s[0]===storeSub; })) storeSub = "bill";
   var html = '<div class="segctl recctl5" id="storeCtl" style="margin-bottom:10px;">'+subs.map(function(s){ return '<button data-ss="'+s[0]+'" class="'+(storeSub===s[0]?'on':'')+'">'+s[1]+'</button>'; }).join("")+'</div>';
   var today = fmtDate(new Date());
@@ -7501,6 +7510,23 @@ function renderStoreView(){
     html += storeItems.length ? '<div class="stgrid">'+storeItems.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); }).map(function(it){ var q = storeCart[it.id]||0, s = storeStock(it);
       return '<button class="sttile'+(q?' has':'')+(s<=0?' out':'')+'" data-sadd="'+esc(it.id)+'" data-name="'+esc((it.name||"").toLowerCase())+'"><b class="notr">'+esc(it.name)+'</b><span>'+rupee(it.sell)+'</span><small>'+(s<=0?'out of stock':s+' left')+'</small>'+(q?'<i>'+q+'</i>':'')+'</button>'; }).join("")+'</div>'
       : '<div class="empty">No store items yet. Add them in 📦 Stock.</div>';
+  } else if(storeSub==="money"){
+    var sm = storeMoney(today), td2 = function(d){ return d===today; };
+    html += '<div class="backupnote">The store has its <b>own account</b>: none of this goes into the cafe counter, cafe bank or cafe profit.</div>';
+    html += recKpis([["Store cash", rupee(sm.cash), "", "should be in the store drawer"], ["Store bank", rupee(sm.bank), "", "UPI in − UPI paid"], ["Today", rupee(storeMoneyIn(td2, true)+storeMoneyIn(td2, false)), "pos", rupee(storeMoneyIn(td2, true))+" cash · "+rupee(storeMoneyIn(td2, false))+" UPI"]]);
+    if(canWriteKey(STORE_SALES_KEY)) html += '<div class="card" style="margin-bottom:10px;"><h3>Closing count · गिनती</h3><div style="display:flex;gap:8px;"><input id="sm_cnt" type="number" inputmode="decimal" placeholder="Cash counted in the store drawer" style="flex:1;"><button class="btn-save" id="sm_cnt_s" style="flex:none;padding:0 16px;">Save</button></div></div>';
+    var counts = storeSales.filter(function(x){ return x.kind==="count"; }).sort(function(a,b){ return (b.at||0)-(a.at||0); }).slice(0, 7);
+    if(counts.length) html += '<div class="card" style="margin-bottom:10px;"><h3>Recent counts</h3>'+counts.map(function(c){ var d = r2(c.counted - c.expected);
+      return '<div class="psrow"><span>'+esc(fmtD(c.date))+' '+esc(c.time||"")+(c.byName?' · '+esc(c.byName):'')+'<br><small class="muted">expected '+rupee(c.expected)+'</small></span><b class="'+(Math.abs(d)<1?'ok':'bad')+'">'+rupee(c.counted)+(Math.abs(d)<1?' ✔':' ('+(d>0?'+':'−')+rupee(Math.abs(d))+')')+'</b></div>'; }).join("")+'</div>';
+    if(canWriteKey(STORE_BUYS_KEY)){
+      html += '<div class="card" style="margin-bottom:10px;"><h3>Move money</h3><div class="field two"><div><label>What</label><select id="sm_type"><option value="out">Cash taken out of the store</option><option value="deposit">Cash deposited to store bank</option><option value="withdraw">Cash withdrawn from store bank</option><option value="bankout">Paid from store bank (other)</option></select></div>'+
+        '<div><label>Amount (₹)</label><input id="sm_amt" type="number" inputmode="decimal"></div></div><div class="field"><input id="sm_note" placeholder="Note (e.g. given to owner)"></div><button class="btn-additem" id="sm_move">Save</button></div>';
+      var o = settings.storeOpening || {};
+      html += '<div class="card"><h3>Opening balances</h3><div class="field two"><div><label>Store cash (₹)</label><input id="so_cash" type="number" inputmode="decimal" value="'+esc(o.cash||0)+'"></div><div><label>Store bank (₹)</label><input id="so_bank" type="number" inputmode="decimal" value="'+esc(o.bank||0)+'"></div></div>'+
+        '<div class="field"><label>As on</label><input id="so_date" type="date" value="'+esc(o.date||today)+'"></div><button class="btn-additem" id="so_s">Save opening balances</button></div>';
+    }
+    var moves = storeBuys.filter(function(b){ return b.kind==="move"; }).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 10);
+    if(moves.length) html += '<div class="card" style="margin-top:10px;"><h3>Money moves</h3>'+moves.map(function(m){ return '<div class="psrow"><span>'+esc(fmtD(m.date))+' · '+esc(STORE_MOVES[m.type]||m.type)+(m.note?'<br><small class="muted">'+esc(m.note)+'</small>':'')+'</span><b>'+rupee(m.amount)+'</b></div>'; }).join("")+'</div>';
   } else if(storeSub==="stock"){
     var val = storeItems.reduce(function(a,it){ return a + Math.max(0, storeStock(it))*(+it.cost||0); },0);
     html += '<div class="backupnote">'+storeItems.length+' items · stock worth '+rupee(val)+' at buying price.</div>';
@@ -7517,7 +7543,7 @@ function renderStoreView(){
       : '<div class="empty">Nothing to order — every item is above its reorder level.</div>';
   } else if(storeSub==="buy"){
     html += '<button class="btn-big" id="st_buy" style="margin-bottom:10px;">+ Stock bought (bill)</button>';
-    html += storeBuys.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 20).map(function(b){
+    html += storeBuys.filter(function(b){ return !b.kind; }).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 20).map(function(b){
       return '<div class="psrow"><span>'+esc(fmtD(b.date))+' · '+esc(b.vendor||"")+'<br><small class="muted">'+(b.lines||[]).map(function(l){ var it = storeItem(l.itemId); return (it?it.name:"?")+' × '+l.qty; }).join(", ")+' · '+esc(b.mode||"Cash")+'</small></span><b>'+rupee(b.total)+'</b></div>'; }).join("") || '<div class="empty">No stock bought yet.</div>';
   } else {
     var mk = today.slice(0,7), ms = storeSummary(function(d){ return d && d.slice(0,7)===mk; }), td = storeSummary(function(d){ return d===today; });
@@ -7541,7 +7567,7 @@ function renderStoreView(){
     var lines = Object.keys(storeCart).filter(function(k){ return storeCart[k]>0 && storeItem(k); }).map(function(k){ var it = storeItem(k); return { itemId:k, name:it.name, qty:storeCart[k], price:+it.sell||0, cost:+it.cost||0 }; });
     if(!lines.length) return;
     var now = new Date(), tot = r2(lines.reduce(function(a,l){ return a+l.qty*l.price; },0));
-    var no = 1 + storeSales.filter(function(s){ return s.date===fmtDate(now); }).length;
+    var no = 1 + storeSales.filter(function(s){ return !s.kind && s.date===fmtDate(now); }).length;
     storeSales.push({ id:uid(), date:fmtDate(now), time:nowHM(), at:now.getTime(), no:no, lines:lines, total:tot, mode:b.getAttribute("data-spay"), byName:myName() });
     storeCart = {}; saveStoreSales(); renderAll(); appAlert("Store bill "+no+" saved · "+rupee(tot)+" ("+b.getAttribute("data-spay")+")"); }); });
   var ad = el.querySelector("#st_add"); if(ad) ad.addEventListener("click", function(){ openStoreItemForm(null); });
@@ -7551,6 +7577,11 @@ function renderStoreView(){
     var low = storeItems.filter(function(it){ return storeStock(it) <= (+it.min||0); });
     var t = OUTLET.name+" – store order\n\n"+low.map(function(it){ return "• "+it.name+": "+Math.max(1, Math.ceil((+it.min||0)*2 - storeStock(it)))+" "+(it.unit||"pcs")+(it.vendor?" ("+it.vendor+")":""); }).join("\n");
     try{ window.open("https://wa.me/?text="+encodeURIComponent(t), "_blank"); }catch(e){} });
+  var smc = el.querySelector("#sm_cnt_s"); if(smc) smc.addEventListener("click", function(){ var v = parseFloat(el.querySelector("#sm_cnt").value); if(isNaN(v)) return; var now = new Date();
+    storeSales.push({ id:uid(), kind:"count", date:fmtDate(now), time:nowHM(), at:now.getTime(), counted:v, expected:storeMoney(fmtDate(now)).cash, byName:myName() }); saveStoreSales(); renderAll(); });
+  var smv = el.querySelector("#sm_move"); if(smv) smv.addEventListener("click", function(){ var a = parseFloat(el.querySelector("#sm_amt").value); if(!(a>0)) return;
+    storeBuys.push({ id:uid(), kind:"move", type:el.querySelector("#sm_type").value, amount:a, note:el.querySelector("#sm_note").value.trim(), date:today, at:Date.now(), byName:myName() }); saveStoreBuys(); renderAll(); });
+  var sos = el.querySelector("#so_s"); if(sos) sos.addEventListener("click", function(){ settings.storeOpening = { cash:parseFloat(el.querySelector("#so_cash").value)||0, bank:parseFloat(el.querySelector("#so_bank").value)||0, date:el.querySelector("#so_date").value || today }; saveSettings(); renderAll(); });
   var mm = el.querySelector("#st_minm"); if(mm) mm.addEventListener("change", function(){ var v = parseFloat(mm.value); settings.storeMinMargin = v>=0 ? v : 10; saveSettings(); renderStoreView(); });
   if(recSub==="store") updateRecordsTotal();
 }
@@ -7618,7 +7649,8 @@ function extraBizCard(){
     html += '<div class="psrow" data-xb="parking" style="cursor:pointer;"><span>🅿️ Parking · '+pin.length+' parked now'+(due>0?' · '+rupee(due)+' to collect':'')+'</span><b>'+rupee(parkPaymentsIn(inM))+'</b></div>'; }
   if(storeOn()){ var ss = storeSummary(inM), lm = storeItems.filter(storeLowMargin).length, low = storeItems.filter(function(it){ return storeStock(it) <= (+it.min||0); }).length;
     html += '<div class="psrow" data-xb="store" style="cursor:pointer;"><span>🛍️ Store · sales '+rupee(ss.sales)+' · '+Math.round(ss.margin*100)+'% margin'+(lm?' · ⚠️ '+lm+' low-margin':'')+(low?' · '+low+' to reorder':'')+'</span><b>'+rupee(ss.profit)+'</b></div>'; }
-  return html+'<div class="backupnote" style="margin:4px 0 0;">Kept apart from cafe sales; counted in profit as other income.</div></div>';
+  if(storeOn()){ var smn = storeMoney(fmtDate(new Date())); html += '<div class="psrow" data-xb="store" style="cursor:pointer;"><span>🛍️ Store account · cash '+rupee(smn.cash)+' · bank '+rupee(smn.bank)+'</span><b>›</b></div>'; }
+  return html+'<div class="backupnote" style="margin:4px 0 0;">Parking money is in the cafe account and counted in cafe profit; the store has its own account and is not.</div></div>';
 }
 function attentionItems(){
   var out = [];
@@ -11709,12 +11741,9 @@ function bankRows(){
   var byDay = {};
   sales.forEach(function(x){ if(x.date && (x.mode==="UPI" || x.mode==="Card")) byDay[x.date] = (byDay[x.date]||0) + saleTotal(x); });
   Object.keys(byDay).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:byDay[d], text:"UPI / card sales", ref:d }); });
-  // Parking and general store money by UPI, and store stock paid by UPI.
+  // Parking money by UPI goes to the cafe account (the store has its own account).
   var xd = {}; parking.forEach(function(p){ (p.payments||[]).forEach(function(x){ if(x.date && (x.mode||"Cash")!=="Cash") xd[x.date] = (xd[x.date]||0) + (+x.amount||0); }); });
   Object.keys(xd).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:xd[d], text:"Parking (UPI)", ref:"park"+d }); });
-  var sd = {}; storeSales.forEach(function(x){ if(x.date && (x.mode||"Cash")!=="Cash") sd[x.date] = (sd[x.date]||0) + (+x.total||0); });
-  Object.keys(sd).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:sd[d], text:"General store (UPI)", ref:"store"+d }); });
-  storeBuys.forEach(function(b){ if(b.date && b.mode && b.mode!=="Cash" && b.mode!=="Credit") rows.push({ date:b.date, kind:"purchases", amt:-(+b.total||0), text:"Store stock · "+(b.vendor||""), ref:b.id }); });
   (settings.platformPayouts||[]).forEach(function(x){ if(x && x.date) rows.push({ date:x.date, kind:"sales", amt:+x.amount||0, text:(CHANNELS[x.platform]?CHANNELS[x.platform].t:"Online")+" payout", ref:x.id }); });
   creditPayments.forEach(function(x){
     if(x.date && x.mode && x.mode!=="Cash"){ var c = custById ? custById(x.customerId) : null;
@@ -12046,8 +12075,8 @@ function renderHandoverView(){
 
 // Other income: bank interest, counted in profit on the day it was credited.
 function otherIncomeIn(test){
-  // Interest, parking charges collected, and the general store's sales less the stock it bought.
-  var extra = parkPaymentsIn(test) + r2(storeSalesIn(test).reduce(function(a,s){ return a+(+s.total||0); },0)) - r2(storeBuys.filter(function(b){ return test(b.date); }).reduce(function(a,b){ return a+(+b.total||0); },0));
+  // Interest and parking charges collected. The general store has its own account and is not counted here.
+  var extra = parkPaymentsIn(test);
   return r2(extra + cashMoves.filter(function(m){ return m.type==="interest" && test(m.date); }).reduce(function(a,m){ return a+(+m.amount||0); },0));
 }
 // ---------- LOANS ----------
@@ -13077,9 +13106,9 @@ function cashMovement(dateStr){
   var inCredit = creditPayments.filter(function(p){ return p.date===dateStr && (p.mode||"Cash")==="Cash"; })
                     .reduce(function(a,p){ return a+(+p.amount||0); },0);
   inflow += inCredit;
-  // Parking charges and store bills paid in cash go into the counter; store stock paid in cash comes out of it.
-  var oneDay = function(d){ return d===dateStr; }, inPark = parkPaymentsIn(oneDay, "Cash"), inStore = storeMoneyIn(oneDay, true), outStore = storeBuysOut(oneDay, true);
-  inflow += inPark + inStore;
+  // Parking charges paid in cash go into the same counter (the store keeps its own cash).
+  var oneDay = function(d){ return d===dateStr; }, inPark = parkPaymentsIn(oneDay, "Cash");
+  inflow += inPark;
   var outPurch = purchases.filter(function(p){ return p.date===dateStr && paidFromTill(p); })
                     .reduce(function(a,p){ return a+purchTotal(p); },0);
   var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash" && !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); })
@@ -13102,8 +13131,7 @@ function cashMovement(dateStr){
     if(loanIsIn(l)) loanIn += (+l.amount||0); else loanOut += (+l.amount||0);
   });
   inflow += loanIn;
-  outPurch += outStore;
-  return { inflow: inflow, inCredit: inCredit, inPark: inPark, inStore: inStore, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, loanIn: loanIn, loanOut: loanOut, outflow: outPurch + outExp + takenOut + repaid + invOut + loanOut, outPurch: outPurch, outExp: outExp };
+  return { inflow: inflow, inCredit: inCredit, inPark: inPark, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, loanIn: loanIn, loanOut: loanOut, outflow: outPurch + outExp + takenOut + repaid + invOut + loanOut, outPurch: outPurch, outExp: outExp };
 }
 
 function openingCashFor(dateStr){
@@ -13206,7 +13234,8 @@ function renderCashView(){
   html += '<div class="card" style="margin-bottom:14px;"><h3>'+(cd===today?'Counter today':'Counter')+' <span class="muted">· '+parseDate(cd).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"})+'</span></h3>';
   var m = cashMovement(cd);
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(cd))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales'+(m.inPark?' (cafe)':'')+'</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn - (m.inPark||0))+'</b></div>';
+  if(m.inPark) html += '<div class="psrow"><span>+ 🅿️ Parking cash</span><b>'+rupee(m.inPark)+'</b></div>';
   if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
   if(m.invOut) html += '<div class="psrow"><span>− Partner withdrawal in cash</span><b>'+rupee(m.invOut)+'</b></div>';
   if(m.loanIn) html += '<div class="psrow"><span>+ Loan money in (cash)</span><b>'+rupee(m.loanIn)+'</b></div>';
@@ -13377,7 +13406,8 @@ function openCashDayForm(dateStr){
   if(blind) html += '<div class="backupnote">Count all the cash in the counter and enter it below. The manager checks it against the sales.</div>';
   html += '<div class="card" style="margin-bottom:12px;'+(blind?'display:none;':'')+'">';
   html += '<div class="psrow"><span>Opening cash</span><b>'+rupee(openingCashFor(dateStr))+'</b></div>';
-  html += '<div class="psrow"><span>+ Cash sales</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn)+'</b></div>';
+  html += '<div class="psrow"><span>+ Cash sales'+(m.inPark?' (cafe)':'')+'</span><b>'+rupee(m.inflow - m.inCredit - m.backIn - m.invIn - m.loanIn - (m.inPark||0))+'</b></div>';
+  if(m.inPark) html += '<div class="psrow"><span>+ 🅿️ Parking cash</span><b>'+rupee(m.inPark)+'</b></div>';
   if(m.invIn) html += '<div class="psrow"><span>+ Partner investment in cash</span><b>'+rupee(m.invIn)+'</b></div>';
   if(m.invOut) html += '<div class="psrow"><span>− Partner withdrawal in cash</span><b>'+rupee(m.invOut)+'</b></div>';
   if(m.loanIn) html += '<div class="psrow"><span>+ Loan money in (cash)</span><b>'+rupee(m.loanIn)+'</b></div>';
@@ -13390,6 +13420,7 @@ function openCashDayForm(dateStr){
   html += '<div class="psrow"><span><b>Should be in counter</b></span><b>'+rupee(exp)+'</b></div></div>';
 
   html += '<div class="field"><label>Cash actually counted (₹)</label><input type="number" inputmode="decimal" id="cd_counted" value="'+(rec&&rec.counted!==null&&rec.counted!==undefined?rec.counted:"")+'"></div>';
+  if(parkingOn() || m.inPark) html += '<div class="card splitbox" id="cd_split"></div>';
   html += '<div class="field"><label>Shift incharge (who was running the counter)</label><select id="cd_incharge"><option value="">Select</option>'+
           people.map(function(n){ return '<option value="'+esc(n)+'" '+(rec&&rec.incharge===n?"selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div>';
   var floatVal = (rec && rec.floatLeft!==null && rec.floatLeft!==undefined && rec.floatLeft!=="") ? rec.floatLeft : defaultFloat();
@@ -13407,6 +13438,19 @@ function openCashDayForm(dateStr){
   html += '<button class="btn-save" id="cd_save">Save</button></div>';
   sheet.innerHTML = html;
   document.getElementById("sheetBg").classList.add("on");
+  // Cafe and parking share the counter: show how much of the money is parking, to keep apart at closing.
+  function updateSplit(){
+    var box = document.getElementById("cd_split"); if(!box) return;
+    var day = function(d){ return d===dateStr; }, pc = parkPaymentsIn(day, "Cash"), pu = parkPaymentsIn(day, "UPI");
+    var cu = sales.filter(function(x){ return x.date===dateStr && (x.mode==="UPI" || x.mode==="Card"); }).reduce(function(a,x){ return a+saleTotal(x); },0);
+    var cnt = parseFloat(document.getElementById("cd_counted").value);
+    box.innerHTML = '<h3>Separate at closing · अलग करें</h3>'+
+      '<div class="psrow"><span>🅿️ Parking cash — keep aside</span><b>'+rupee(pc)+'</b></div>'+
+      (isNaN(cnt) ? '<div class="backupnote" style="margin:4px 0;">Enter the cash counted to see the cafe’s share.</div>' : '<div class="psrow"><span>☕ Cafe cash (counted − parking)</span><b>'+rupee(cnt - pc)+'</b></div>')+
+      '<div class="psrow"><span>UPI today: ☕ cafe · 🅿️ parking</span><b>'+rupee(cu)+' · '+rupee(pu)+'</b></div>'+
+      '<div class="backupnote" style="margin:4px 0 0;">Both are in the same account; this tells you how much of today’s money is parking.</div>';
+  }
+  updateSplit(); var cdc = document.getElementById("cd_counted"); if(cdc) cdc.addEventListener("input", updateSplit);
   function updateHandBox(){
     var c = parseFloat(document.getElementById("cd_counted").value);
     var f = parseFloat(document.getElementById("cd_float").value);
