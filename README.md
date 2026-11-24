@@ -236,10 +236,11 @@ hold several posts. The list is grouped:
   HR, Accountant, Sales, Marketing
 - **+ Your own posts** for anything else (`settings.customPosts`). Older role names (Cook, Helper…) keep working.
 
-**Roster → One day:** assigning someone with several posts asks which post they work in that shift; each name shows
-its post (tap it to change) and each shift shows how many are on each post (🍽️ Waiter 2 · 🔥 Tandoor Chef 1).
+**Roster → One day:** assigning someone with several posts asks which post(s) they work in that shift — **more than
+one post in the same shift is allowed** (e.g. Waiter + Counter Billing in the morning); each name shows its posts
+(tap to change) and each shift shows how many are on each post (🍽️ Waiter 2 · 🔥 Tandoor Chef 1).
 **Week** boxes show a small post icon when someone works a post other than their main one that day; changing shifts
-keeps the chosen post. Roster entries keep the post as `post`; staff phones see posts (`roles`) but never pay.
+keeps the chosen post. Roster entries keep the posts as `posts` (and the first as `post`); staff phones see posts (`roles`) but never pay.
 
 ### Bills: fixed vs variable
 Every bill is either **Fixed** (same every month until changed — rent by default) or **Variable** (different every

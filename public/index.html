@@ -14406,14 +14406,25 @@ function wirePostChips(root, onChange){
   Array.prototype.forEach.call(root.querySelectorAll(".pchip"), function(b){ b.addEventListener("click", function(){ b.classList.toggle("on"); if(onChange) onChange(); }); });
 }
 function readPostChips(root){ return Array.prototype.map.call(root.querySelectorAll(".pchip.on"), function(b){ return b.getAttribute("data-post"); }); }
+// The posts someone works in one roster entry (one shift): several are allowed.
+function rPosts(r, st){ var a = Array.isArray(r.posts) && r.posts.length ? r.posts : [r.post || (st && st.role) || ""]; return a.filter(Boolean); }
+function setRPosts(r, list){ r.posts = list.slice(); r.post = list[0] || ""; }
+// Choose one or more posts. done(list) — or done(null) when cancelled.
 function openPostPicker(title, options, cur, done){
-  var sheet = document.getElementById("sheet"), prevHtml = null;
-  var html = '<h2 class="serif">'+esc(title)+'</h2><div class="postpick">'+options.map(function(n){ return '<button data-pp="'+esc(n)+'" class="'+(n===cur?"on":"")+'">'+esc(postLabel(n))+'</button>'; }).join("")+'</div>'+
-    '<button class="btn-additem" id="pp_more" style="margin-top:8px;">Other post…</button><div class="sheetbtns"><button class="btn-cancel" id="pp_c" style="flex:1;">Cancel</button></div>';
-  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
-  Array.prototype.forEach.call(sheet.querySelectorAll("[data-pp]"), function(b){ b.addEventListener("click", function(){ done(b.getAttribute("data-pp")); }); });
-  document.getElementById("pp_c").addEventListener("click", function(){ done(null); });
-  document.getElementById("pp_more").addEventListener("click", function(){ openPostPicker(title, allPosts(), cur, done); });
+  var sheet = document.getElementById("sheet"), pick = (cur||[]).slice(), opts = options.slice();
+  pick.forEach(function(n){ if(opts.indexOf(n)<0) opts.push(n); });
+  function draw(){
+    var html = '<h2 class="serif">'+esc(title)+'</h2><div class="backupnote">Tap every post for this shift — one person can do more than one (e.g. Waiter + Counter Billing).</div>'+
+      '<div class="postpick">'+opts.map(function(n){ return '<button data-pp="'+esc(n)+'" class="'+(pick.indexOf(n)>=0?"on":"")+'">'+(pick.indexOf(n)>=0?"✔ ":"")+esc(postLabel(n))+'</button>'; }).join("")+'</div>'+
+      '<button class="btn-additem" id="pp_more" style="margin-top:8px;">Other post…</button><div class="err" id="pp_err"></div>'+
+      '<div class="sheetbtns"><button class="btn-cancel" id="pp_c">Cancel</button><button class="btn-save" id="pp_ok">Done'+(pick.length>1?' ('+pick.length+' posts)':'')+'</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-pp]"), function(b){ b.addEventListener("click", function(){ var n = b.getAttribute("data-pp"), k = pick.indexOf(n); if(k>=0) pick.splice(k,1); else pick.push(n); draw(); }); });
+    document.getElementById("pp_c").addEventListener("click", function(){ done(null); });
+    document.getElementById("pp_more").addEventListener("click", function(){ allPosts().forEach(function(n){ if(opts.indexOf(n)<0) opts.push(n); }); draw(); });
+    document.getElementById("pp_ok").addEventListener("click", function(){ if(!pick.length){ var e = document.getElementById("pp_err"); e.textContent = "Pick at least one post."; e.style.display = "block"; return; } done(pick); });
+  }
+  draw();
 }
 function openCustomPosts(back){
   var sheet = document.getElementById("sheet"), list = customPosts().slice();
@@ -14432,17 +14443,17 @@ function openCustomPosts(back){
 }
 // Small post icons for a week cell, shown when the person works as something other than their main post.
 function rosterPostIcons(st, d){
-  var ps = roster.filter(function(r){ return r.staffId===st.id && r.date===d; }).map(function(r){ return r.post || st.role; }).filter(function(v, i, a){ return v && a.indexOf(v)===i; });
+  var ps = [].concat.apply([], roster.filter(function(r){ return r.staffId===st.id && r.date===d; }).map(function(r){ return rPosts(r, st); })).filter(function(v, i, a){ return v && a.indexOf(v)===i; });
   if(!ps.length || (ps.length===1 && ps[0]===st.role)) return "";
   return '<i class="rpi">'+ps.map(postIcon).join("")+'</i>';
 }
 function rosterShiftsOf(staffId, date){ return roster.filter(function(r){ return r.staffId===staffId && r.date===date; }).map(function(r){ return r.shift; }); }
 function setRosterShifts(staffId, date, names){
   var old = roster.filter(function(r){ return r.staffId===staffId && r.date===date; }), st = staffById(staffId);
-  var keepPost = old.length ? old[0].post : "";
+  var keep = old.length ? rPosts(old[0], st) : [];
   roster = roster.filter(function(r){ return !(r.staffId===staffId && r.date===date); });
-  names.forEach(function(n){ var o = old.find(function(r){ return r.shift===n; });
-    roster.push({ id:uid(), date:date, shift:n, staffId:staffId, post: (o && o.post) || keepPost || (st && st.role) || "" }); });
+  names.forEach(function(n){ var o = old.find(function(r){ return r.shift===n; }), ps = o ? rPosts(o, st) : (keep.length ? keep : [(st && st.role) || ""].filter(Boolean));
+    var e = { id:uid(), date:date, shift:n, staffId:staffId }; setRPosts(e, ps); roster.push(e); });
 }
 function usualShifts(st){
   var names = shiftList().map(function(x){ return x.name; });
@@ -14507,11 +14518,11 @@ function renderRosterView(){
               (covered?'<span class="pill ok">'+assigned.length+' on shift</span>':'<span class="pill bad">Not covered</span>')+'</div>';
       if(covered){
         html += '<div class="shiftpeople">'+assigned.map(function(r){
-          var st = staffById(r.staffId), p = r.post || (st && st.role) || "";
-          return '<span class="chip rpchip"><b>'+esc(st?st.name:"(removed)")+'</b><button class="rpost" data-rpost="'+r.id+'">'+esc(postLabel(p))+' ▾</button><button data-unassign="'+r.id+'" aria-label="Remove">×</button></span>';
+          var st = staffById(r.staffId), ps = rPosts(r, st);
+          return '<span class="chip rpchip"><b>'+esc(st?st.name:"(removed)")+'</b><button class="rpost" data-rpost="'+r.id+'">'+esc(ps.length ? ps.map(postLabel).join(" + ") : "Choose post")+' ▾</button><button data-unassign="'+r.id+'" aria-label="Remove">×</button></span>';
         }).join("")+'</div>';
       }
-      if(covered){ var byPost = {}; assigned.forEach(function(r){ var st = staffById(r.staffId), p = r.post || (st && st.role) || "—"; byPost[p] = (byPost[p]||0) + 1; });
+      if(covered){ var byPost = {}; assigned.forEach(function(r){ var st = staffById(r.staffId); (rPosts(r, st).length ? rPosts(r, st) : ["—"]).forEach(function(p){ byPost[p] = (byPost[p]||0) + 1; }); });
         html += '<div class="postcover">'+Object.keys(byPost).map(function(p){ return '<span>'+esc(postIcon(p))+' '+esc(p)+' <b>'+byPost[p]+'</b></span>'; }).join("")+'</div>'; }
       html += '<button class="btn-additem" data-assign="'+esc(sh.name)+'">+ Assign staff</button></div>';
     });
@@ -14571,7 +14582,7 @@ function renderRosterView(){
       b.addEventListener("click", function(){
         var r = roster.find(function(x){ return x.id===b.getAttribute("data-rpost"); }); if(!r) return;
         var st = staffById(r.staffId);
-        openPostPicker((st?st.name:"")+" · "+r.shift, staffPosts(st), r.post || (st && st.role), function(p){ if(p){ r.post = p; saveRoster(); } closeForm(); renderStaffSection(); });
+        openPostPicker((st?st.name:"")+" · "+r.shift, staffPosts(st), rPosts(r, st), function(ps){ if(ps){ setRPosts(r, ps); saveRoster(); } closeForm(); renderStaffSection(); });
       });
     });
     Array.prototype.forEach.call(el.querySelectorAll("[data-unassign]"), function(b){
@@ -14642,9 +14653,9 @@ function openAssignSheet(shiftName){
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-pick]"), function(b){
     b.addEventListener("click", function(){
       var st = staffById(b.getAttribute("data-pick")), ps = staffPosts(st);
-      function put(post){ roster.push({ id:uid(), date:staffDate, shift:shiftName, staffId:st.id, post:post || st.role || "" }); saveRoster(); closeForm(); renderStaffSection(); }
-      if(ps.length > 1) openPostPicker(st.name+" works as… · "+shiftName, ps, st.role, function(p){ if(p) put(p); else openAssignSheet(shiftName); });
-      else put(ps[0]);
+      function put(list){ var e = { id:uid(), date:staffDate, shift:shiftName, staffId:st.id }; setRPosts(e, list && list.length ? list : [st.role || ""].filter(Boolean)); roster.push(e); saveRoster(); closeForm(); renderStaffSection(); }
+      if(ps.length > 1) openPostPicker(st.name+" works as… · "+shiftName, ps, [st.role], function(list){ if(list) put(list); else openAssignSheet(shiftName); });
+      else put(ps);
     });
   });
 }

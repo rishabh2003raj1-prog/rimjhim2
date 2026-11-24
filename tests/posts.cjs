@@ -26,22 +26,45 @@ async function call(p, method, path, body){ return p.evaluate(async ([m, u, bd])
   await E(p, `closeForm(); staffDate=fmtDate(new Date()); rosMode='day'; switchStaffSub('roster'); renderStaffSection();`);
   await p.click('[data-assign="Morning"]'); await p.click('[data-pick]'); await p.waitForSelector('[data-pp]');
   assert((await p.$$('[data-pp]')).length===3, 'asks which post (his three)');
-  await p.click('[data-pp="Counter Billing"]'); await p.waitForTimeout(150);
-  await p.click('[data-assign="Evening"]'); await p.click('[data-pick]'); await p.click('[data-pp="Waiter"]'); await p.waitForTimeout(150);
-  let r = await E(p, `roster.map(function(x){ return x.shift+':'+x.post; }).sort().join(',')`);
-  assert(r==='Evening:Waiter,Morning:Counter Billing', 'morning on billing, evening as waiter: '+r);
-  assert(/Counter Billing 1/.test((await p.textContent('#rosterView')).replace(/\s+/g,' ')), 'shift shows how many on each post');
+  // Morning: Waiter AND Counter Billing in the same shift (main post starts ticked)
+  assert(await p.$('[data-pp="Waiter"].on'), 'main post starts ticked');
+  await p.click('[data-pp="Counter Billing"]'); await p.click('#pp_ok'); await p.waitForTimeout(150);
+  // Evening: only Waiter
+  await p.click('[data-assign="Evening"]'); await p.click('[data-pick]'); await p.click('#pp_ok'); await p.waitForTimeout(150);
+  let r = await E(p, `roster.map(function(x){ return x.shift+':'+rPosts(x).join('+'); }).sort().join(',')`);
+  assert(r==='Evening:Waiter,Morning:Waiter+Counter Billing', 'one person, two posts in the same morning shift: '+r);
+  const txt = (await p.textContent('#rosterView')).replace(/\s+/g,' ');
+  assert(/Waiter \+ 🧾 Counter Billing/.test(txt) && /Counter Billing 1/.test(txt) && /Waiter 1/.test(txt), 'name shows both posts; both counted for the shift');
   await p.screenshot({ path: process.env.S+'/posts_roster.png' });
-  // change a post from the chip
+  // change: add Sweeper & Cleaner too, remove Waiter
   const mid = await E(p, `roster.find(function(x){ return x.shift==='Morning'; }).id`);
-  await p.click(`[data-rpost="${mid}"]`); await p.click('[data-pp="Sweeper & Cleaner"]'); await p.waitForTimeout(150);
-  assert(await E(p, `roster.find(function(x){ return x.id==='${mid}'; }).post`)==='Sweeper & Cleaner', 'post changed from the roster');
+  await p.click(`[data-rpost="${mid}"]`); await p.click('[data-pp="Sweeper & Cleaner"]'); await p.click('[data-pp="Waiter"]'); await p.click('#pp_ok'); await p.waitForTimeout(150);
+  assert(await E(p, `rPosts(roster.find(function(x){ return x.id==='${mid}'; })).join('+')`)==='Counter Billing+Sweeper & Cleaner', 'posts changed from the roster');
+  await p.click(`[data-rpost="${mid}"]`); await p.click('[data-pp="Counter Billing"]'); await p.click('[data-pp="Sweeper & Cleaner"]'); await p.click('#pp_ok');
+  assert(/at least one post/.test(await p.textContent('#pp_err')), 'cannot leave a shift with no post'); await p.click('#pp_c');
+  await E(p, `closeForm(); renderStaffSection();`);
   // week view keeps posts when shifts change, and shows icons
   await E(p, `rosMode='week'; renderStaffSection();`);
   const cell = await p.textContent(`[data-rc][data-rd="${await E(p,'staffDate')}"]`);
   assert(/🧹/.test(cell), 'week box shows the other post icon: '+cell);
   await E(p, `setRosterShifts(staff[0].id, staffDate, ['Morning']); saveRoster();`);
-  assert(await E(p, `roster.filter(function(x){ return x.date===staffDate; }).map(function(x){ return x.post; }).join()`)==='Sweeper & Cleaner', 'changing shifts keeps the post');
+  assert(await E(p, `roster.filter(function(x){ return x.date===staffDate; }).map(function(x){ return rPosts(x).join('+'); }).join()`)==='Counter Billing+Sweeper & Cleaner', 'changing shifts keeps the posts');
+  // More than two: a small outlet's all-rounder does 4 posts in one shift, plus one picked from "Other post…"
+  await E(p, `staff.push({id:'s2',name:'Mohan',role:'Waiter',roles:['Waiter','Counter Billing','Sweeper & Cleaner','Security Guard'],status:'Active',defaultShift:'Morning'}); saveStaff(); rosMode='day'; renderStaffSection();`);
+  await p.click('[data-assign="Morning"]'); await p.click('[data-pick="s2"]'); await p.waitForSelector('[data-pp]');
+  for (const n of ['Counter Billing','Sweeper & Cleaner','Security Guard']) await p.click(`[data-pp="${n}"]`);
+  await p.click('#pp_more'); await p.click('[data-pp="Delivery Boy"]');
+  assert(/Done \(5 posts\)/.test(await p.textContent('#pp_ok')), 'picker counts 5 posts');
+  await p.screenshot({ path: process.env.S+'/posts_many.png' });
+  await p.click('#pp_ok'); await p.waitForTimeout(150);
+  const mo = await E(p, `rPosts(roster.find(function(x){ return x.staffId==='s2'; })).join('+')`);
+  assert(mo==='Waiter+Counter Billing+Sweeper & Cleaner+Security Guard+Delivery Boy', 'five posts in one morning shift: '+mo);
+  const cov = (await p.textContent('#rosterView')).replace(/\s+/g,' ');
+  assert(/Security Guard 1/.test(cov) && /Delivery Boy 1/.test(cov), 'shift counts every post he covers');
+  await E(p, `rosMode='week'; renderStaffSection();`);
+  const wc = await p.textContent(`[data-rc="s2"][data-rd="${await E(p,'staffDate')}"]`);
+  assert(/🧾/.test(wc) && /🧹/.test(wc) && /💂/.test(wc) && /🛵/.test(wc), 'week box shows all the other post icons: '+wc);
+  await E(p, `rosMode='day'; renderStaffSection();`);
   // own posts
   await E(p, `openCustomPosts()`); await p.fill('#cp_new', 'Juice Maker'); await p.click('#cp_add'); await p.click('#cp_s'); await p.waitForTimeout(150);
   assert(await E(p, `allPosts().indexOf('Juice Maker')>=0`), 'own post added');
