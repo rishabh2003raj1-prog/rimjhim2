@@ -1209,8 +1209,11 @@ var cloud = {
 };
 
 function metaKey(){ return storeKey("__sync_meta"); }
+var cachePurging = false;
 function cacheWrite(key){
   // Best effort only - the server is the real store, so a full phone is not a problem.
+  // Never while the phone is being cleared for another login, nor for lists this login may not see.
+  if(cachePurging || (cloud.who && !canReadKey(key))) return;
   try{
     localStorage.setItem(storeKey(key), JSON.stringify(cloud.values[key]));
     if(cloud.dirty[key] && cloud.base[key]!==undefined) localStorage.setItem(storeKey("__base_"+key), cloud.base[key]);
@@ -1591,6 +1594,7 @@ function applyWho(w){
     // so nobody sees data left behind by someone with more access.
     var me = w.role==="store" ? "u:"+w.login : "owner", prevOwner = localStorage.getItem(DATA_OWNER);
     if(prevOwner && prevOwner!==me){
+      cachePurging = true;   // a sync still in flight must not write the old login's data back
       purgeOutletCaches(null);
       localStorage.setItem(DATA_OWNER, me);
       location.reload(); return true;
@@ -1598,11 +1602,13 @@ function applyWho(w){
     localStorage.setItem(DATA_OWNER, me);
     // Lists this login may not see never stay on the phone.
     SYNC_KEYS.forEach(function(k){
-      if(!canReadKey(k) && (cloud.values[k]!==undefined || cloud.dirty[k])){
+      if(canReadKey(k)) return;
+      if(cloud.values[k]!==undefined || cloud.dirty[k]){
         delete cloud.values[k]; delete cloud.dirty[k]; delete cloud.base[k]; delete cloud.rev[k];
-        try{ localStorage.removeItem(storeKey(k)); localStorage.removeItem(storeKey("__base_"+k)); }catch(e){}
         setKeyValue(k, k===SETTINGS_KEY ? {} : []);
       }
+      // Remove the saved copy even if it was never loaded (e.g. written back during a sign-in switch).
+      try{ localStorage.removeItem(storeKey(k)); localStorage.removeItem(storeKey("__base_"+k)); }catch(e){}
     });
     if(w.role==="store" && w.outlet==="*"){
       // A partner for every store opens stores like the owner.
@@ -7743,6 +7749,9 @@ function poNo(po){ return "PO-"+("000"+(po.no||0)).slice(-4); }
 function nextPoNo(){ return 1 + pos.reduce(function(a,p){ return Math.max(a, +p.no||0); },0); }
 function myLogin(){ var w = cloud.who; return w && w.role==="store" ? w.login : "owner"; }
 function poMine(po){ return po.by===myLogin(); }
+// Owner's own orders: wait for a separate ✔ Approve (default), or approve on saving (setting).
+function poSelfApprove(){ return settings.poSelfApprove === true; }
+function poLinesKey(lines){ return JSON.stringify((lines||[]).map(function(l){ return [String(l.item||"").trim().toLowerCase(), +l.qty||0, String(l.unit||""), +l.rate||0]; })); }
 function canApprovePo(po){ var a = myAccess(); return isFullAccess() || (a==="manager" && poTotalOf(po) <= poManagerLimit()+0.5); }
 function isMgrOrFull(){ return isFullAccess() || myAccess()==="manager"; }
 function stamp(){ var d = new Date(); return fmtDate(d)+" "+nowHM(); }
@@ -7794,7 +7803,7 @@ function renderOrdersView(){
     if(lv.length) html += '<div class="card" style="margin-bottom:12px;"><h3>From low stock</h3>'+lv.sort().map(function(v){
       return '<div class="psrow"><span>'+esc(v||"No usual vendor")+' · '+lowV[v]+' item'+(lowV[v]!==1?'s':'')+'</span><button class="btn-additem" style="width:auto;padding:6px 12px;" data-polow="'+esc(v)+'">Make request</button></div>'; }).join("")+'</div>';
   }
-  if(isFullAccess()) html += '<div class="backupnote">Managers can approve orders up to <b>'+rupee(poManagerLimit())+'</b>; bigger ones come to you. <a href="#" id="po_limit">Change</a></div>';
+  if(isFullAccess()) html += '<div class="backupnote">Managers can approve orders up to <b>'+rupee(poManagerLimit())+'</b>; bigger ones come to you. Your own orders '+(poSelfApprove() ? 'are approved when you save them' : 'wait for you to tap ✔ Approve')+'. <a href="#" id="po_limit">Change</a></div>';
   else if(myAccess()==="manager") html += '<div class="backupnote">You can approve orders up to <b>'+rupee(poManagerLimit())+'</b>. Bigger ones go to the owner.</div>';
   var mine = pos.filter(poNeedsMe);
   var order = ["review","requested","approved","ordered","partial","received","rejected","cancelled"];
@@ -7823,14 +7832,16 @@ function poRow(po){
 }
 function openPoLimit(){
   var sheet = document.getElementById("sheet");
-  sheet.innerHTML = '<h2 class="serif">Manager approval limit</h2><div class="backupnote">Orders up to this amount can be approved by a manager. Bigger orders need you or a partner. Only the owner and partners can change this.</div>'+
-    '<div class="field"><label>Limit (₹)</label><input type="number" inputmode="numeric" id="pl_v" value="'+poManagerLimit()+'"></div><div class="err" id="pl_err"></div>'+
+  sheet.innerHTML = '<h2 class="serif">Approval rules</h2><div class="backupnote">Orders up to this amount can be approved by a manager. Bigger orders need you or a partner. Only the owner and partners can change this.</div>'+
+    '<div class="field"><label>Manager limit (₹)</label><input type="number" inputmode="numeric" id="pl_v" value="'+poManagerLimit()+'"></div>'+
+    '<div class="field"><label>Orders you (owner / partner) create</label><select id="pl_self"><option value="sep"'+(!poSelfApprove()?' selected':'')+'>Wait for a separate ✔ Approve (recommended)</option><option value="auto"'+(poSelfApprove()?' selected':'')+'>Approve as soon as I save</option></select></div>'+
+    '<div class="err" id="pl_err"></div>'+
     '<div class="sheetbtns"><button class="btn-cancel" id="pl_c">Cancel</button><button class="btn-save" id="pl_s">Save</button></div>';
   document.getElementById("sheetBg").classList.add("on");
   document.getElementById("pl_c").addEventListener("click", closeForm);
   document.getElementById("pl_s").addEventListener("click", function(){ var v = parseFloat(document.getElementById("pl_v").value);
     if(!(v>=0)){ var e = document.getElementById("pl_err"); e.textContent = "Enter an amount (0 means every order comes to you)."; e.style.display = "block"; return; }
-    settings.poManagerLimit = v; saveSettings(); closeForm(); renderAll(); });
+    settings.poManagerLimit = v; settings.poSelfApprove = document.getElementById("pl_self").value==="auto"; saveSettings(); closeForm(); renderAll(); });
 }
 // New / edit request.
 function openPoForm(id, preset){
@@ -7861,7 +7872,7 @@ function openPoForm(id, preset){
     html += '<button class="btn-additem" id="po_addl">+ Add item</button>';
     html += '<div class="backupnote" id="po_tot" style="margin-top:10px;"></div>';
     html += '<div class="field"><label>Note (optional)</label><input id="po_note" value="'+esc(d.note||"")+'" placeholder="e.g. need fresh paneer, not frozen"></div>';
-    var act = isFullAccess() ? "Save & approve" : myAccess()==="manager" ? "Save" : "Send request";
+    var act = po ? "Save changes" : (isFullAccess() && poSelfApprove()) ? "Save & approve" : (isFullAccess() || myAccess()==="manager") ? "Save" : "Send request";
     html += '<div class="err" id="po_err"></div><div class="sheetbtns"><button class="btn-cancel" id="po_cancel">Cancel</button><button class="btn-save" id="po_save">'+act+'</button></div>';
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     totalBox();
@@ -7889,11 +7900,16 @@ function openPoForm(id, preset){
       if(!d.vendor) return bad("Who are we buying from?");
       d.lines.forEach(function(l){ l.item = l.item.trim(); l.qty = +l.qty; l.rate = +l.rate||0; });
       if(po){
-        Object.assign(po, { vendor:d.vendor, needBy:d.needBy, note:d.note, lines:d.lines }); poLog(po, "edited");
+        // Changing items, quantities, rates or the vendor of an approved order needs a fresh approval.
+        var changed = poLinesKey(po.lines) !== poLinesKey(d.lines) || (po.vendor||"") !== d.vendor;
+        Object.assign(po, { vendor:d.vendor, needBy:d.needBy, note:d.note, lines:d.lines });
+        if(changed && po.status==="approved"){ po.status = isFullAccess() ? "review" : "requested"; delete po.approvedBy; delete po.approvedRole; delete po.approvedAt; poLog(po, "edited — needs approval again"); }
+        else poLog(po, "edited");
       } else {
         po = { id:d.id, no:nextPoNo(), date:fmtDate(new Date()), vendor:d.vendor, needBy:d.needBy, note:d.note, lines:d.lines, status:"requested", byName:myName(), history:[] };
         poLog(po, "requested"); pos.push(po);
-        if(isFullAccess()){ po.status = "approved"; poLog(po, "approved"); }
+        // The owner's own order waits for a separate approval unless "approve as soon as I save" is chosen.
+        if(isFullAccess()){ if(poSelfApprove()){ po.status = "approved"; poLog(po, "approved"); } else po.status = "review"; }
       }
       savePos(); closeForm(); renderAll();
       if(!isFullAccess() && myAccess()!=="manager") appAlert(poNo(po)+" sent. The manager will check it.");
@@ -7928,10 +7944,10 @@ function openPoDetail(id){
     if((po.status==="requested" && mgr && canApprovePo(po)) || (po.status==="review" && isFullAccess())) b.push(['pd_ok','btn-save','✔ Approve']);
     if(po.status==="requested" && myAccess()==="manager") b.push(['pd_up','btn-cancel','Send to owner']);
     if((po.status==="requested" && mgr) || (po.status==="review" && isFullAccess())) b.push(['pd_no','btn-del','Reject']);
-    if(mgr || (poMine(po) && po.status==="requested")) b.push(['pd_edit','btn-cancel','Edit']);
+    if(mgr || (poMine(po) && po.status==="requested")) b.push(['pd_edit','btn-cancel','✏️ Edit']);
     if(poMine(po) && po.status==="requested") b.push(['pd_cx','btn-del','Cancel request']);
   }
-  if(po.status==="approved" && mgr){ b.push(['pd_wa','btn-save','📲 Send to vendor on WhatsApp']); b.push(['pd_ord','btn-cancel','Ordered by phone']); }
+  if(po.status==="approved" && mgr){ b.push(['pd_wa','btn-save','📲 Send to vendor on WhatsApp']); b.push(['pd_ord','btn-cancel','Ordered by phone']); b.push(['pd_edit','btn-cancel','✏️ Edit']); }
   if((po.status==="ordered" || po.status==="partial") && canWriteKey(PURCH_KEY)) b.push(['pd_rcv','btn-save','📦 Goods arrived — check & receive']);
   if(po.status==="requested" && myAccess()==="manager" && !canApprovePo(po)) html += '<div class="backupnote warnamt">'+rupee(tot)+' is above your '+rupee(poManagerLimit())+' limit. Send it to the owner.</div>';
   html += '<div class="pdacts">'+b.map(function(x){ return '<button class="'+x[1]+'" id="'+x[0]+'">'+x[2]+'</button>'; }).join("")+'</div>';

@@ -421,6 +421,12 @@ owner → owner / partner approves → sent to the vendor → goods received and
   limit; chef / counter logins can only create requests, edit or cancel their own pending ones, and receive goods for
   ordered items — they can't approve, reject or delete.
 
+**Approval rules** (Orders → "Change", owner / partner): manager limit, and whether **orders you create wait for a
+separate ✔ Approve** (default) or are approved as soon as you save. **✏️ Edit** works on waiting and approved orders
+(until sent to the vendor); changing items, quantities, rates or the vendor of an approved order sends it back for
+approval (the old approval is cleared; the server refuses a manager raising an approved order above their limit),
+while changing only the note or date keeps it approved.
+
 ### Kitchen: picture screen for staff
 The **Kitchen** tab (first tab for chef logins; also for manager and counter) does stock and buying the same way
 the Counter does billing: big pictures (the item's photo, or a food picture), Hindi words, few choices, Big & simple

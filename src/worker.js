@@ -341,9 +341,11 @@ function poTotal(po) { return arr(po && po.lines).reduce((a, l) => a + (+(l && l
 function poStamp(o, r, who) {
   if (!r || typeof r !== "object") return r;
   const out = omit(r, PO_STAMP);
-  if (o && o.approvedBy) return Object.assign(out, pick(o, PO_STAMP));
-  if (PO_APPROVED.indexOf(r.status) >= 0) return Object.assign(out, { approvedBy: who.role === "owner" ? "owner" : who.login, approvedRole: accessOf(who), approvedAt: Date.now() });
-  return out;
+  // Not approved (e.g. edited and sent back for approval): no approval stamp.
+  if (PO_APPROVED.indexOf(r.status) < 0) return out;
+  // Still approved: keep who approved it; newly approved: stamp who did it now.
+  if (o && o.approvedBy && PO_APPROVED.indexOf(o.status) >= 0) return Object.assign(out, pick(o, PO_STAMP));
+  return Object.assign(out, { approvedBy: who.role === "owner" ? "owner" : who.login, approvedRole: accessOf(who), approvedAt: Date.now() });
 }
 function poHistory(o, r) { const h = arr(o && o.history); return h.concat(arr(r && r.history).slice(h.length)); }
 async function poWrite(env, outlet, cur, sent, who) {
@@ -360,6 +362,8 @@ async function poWrite(env, outlet, cur, sent, who) {
       const o = r && old.get(String(r.id));
       const was = !!o && PO_APPROVED.indexOf(o.status) >= 0, now = !!r && PO_APPROVED.indexOf(r.status) >= 0;
       if (acc === "manager" && now && !was && poTotal(r) > limit + 0.5) return { error: "Above your approval limit (Rs " + limit + "). Send it to the owner." };
+      // A manager can't raise the amount of an order that is already approved without a fresh approval.
+      if (acc === "manager" && now && was && poTotal(r) > poTotal(o) + 0.5 && poTotal(r) > limit + 0.5) return { error: "This change needs approval again (above your limit)." };
       const x = poStamp(o, r, who);
       if (x && typeof x === "object") x.by = (o && o.by) || x.by || me;
       out.push(x);
