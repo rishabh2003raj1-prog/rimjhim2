@@ -278,6 +278,17 @@
   body.biggrid #reportsBtn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:16px 10px;font-size:16px;border-radius:16px;}
   body.biggrid #reportsBtn .rbi{font-size:40px;margin:0;line-height:1;}
   #dashGridBtn{margin:0 0 8px auto;}
+  .zgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px;}
+  .ztile{display:flex;flex-direction:column;align-items:center;gap:3px;text-align:center;padding:12px 8px;border:1.5px solid var(--line);background:var(--panel);border-radius:16px;font:inherit;color:var(--ink);}
+  .ztile .zi{font-size:36px;line-height:1.1;} .ztile b{font-size:14.5px;} .ztile small{font-size:12px;color:var(--ink-soft);}
+  .ztile.due{border-color:#C9772B;background:#FFF6EA;} .ztile.bad{border-color:#A6402D;background:#FBEDEA;}
+  .zst{font-size:11.5px;font-weight:700;color:var(--ink-soft);margin-top:2px;} .zst.ok{color:#2E7D4F;} .zst.warn{color:#B5651D;} .zst.bad{color:#A6402D;} .zin{font-weight:600;}
+  .zbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0 12px;} .zbtns button{width:100%;margin:0;}
+  .zsug{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0;} .zsugb{display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px;border:1.5px solid var(--line);background:var(--panel);border-radius:14px;font:inherit;color:var(--ink);}
+  .zsugb span{font-size:30px;} .zsugb small{font-size:11.5px;color:var(--ink-soft);} .zsugb.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .zsugb.on small{color:#e6f2ea;} .zsugb.got{opacity:.5;}
+  .zicons{display:flex;flex-wrap:wrap;gap:6px;} .zicons button{width:44px;height:44px;font-size:24px;border:1.5px solid var(--line);background:var(--panel);border-radius:10px;padding:0;} .zicons button.on{border-color:var(--ink);background:#EFE8DA;}
+  .zpt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px;} .zpt div{display:flex;gap:6px;flex:none;}
+  .zpt button{width:46px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font-size:18px;font-weight:700;} .zpt .zok.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .zpt .zno.on{background:#A6402D;border-color:#A6402D;color:#fff;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -754,6 +765,7 @@
         <button data-r="fixed">Bills</button>
         <button data-r="customers">Customers</button>
         <button data-r="assets">Assets</button>
+        <button data-r="zones">Zones</button>
         <button data-r="vendors">Vendors</button>
         <button data-r="menu">Menu</button>
         <button data-r="stock">Stock</button>
@@ -772,6 +784,7 @@
       <div id="fixedView" class="reclist" style="display:none;"></div>
       <div id="customersView" class="reclist" style="display:none;"></div>
       <div id="assetsView" class="reclist" style="display:none;"></div>
+      <div id="zonesView" class="reclist" style="display:none;"></div>
       <div id="vendorsView" class="reclist" style="display:none;"></div>
       <div id="menuView" class="reclist" style="display:none;"></div>
       <div id="stockView" class="reclist" style="display:none;"></div>
@@ -1582,9 +1595,9 @@ function canSwitchStores(){ return isOwner() || (cloud.who && cloud.who.outlet==
 var ACCESS_LABEL = { owner:"Owner", partner:"Partner", full:"Full access", manager:"Manager", chef:"Chef / kitchen", billing:"Billing / counter" };
 // Each role's screens. Anything not listed is hidden.
 var ROLE_SCREENS = {
-  manager: { nav:["dashboard","counter","kitchen","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
-  chef:    { nav:["kitchen","notes","staff","records"], rec:["purchases","orders","menu","stock","assets","vendors"], staff:["roster","attendance","tasks","meals"] },
-  billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash"], staff:["roster","attendance","tasks"] }
+  manager: { nav:["dashboard","counter","kitchen","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","zones","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
+  chef:    { nav:["kitchen","notes","staff","records"], rec:["purchases","orders","menu","stock","assets","zones","vendors"], staff:["roster","attendance","tasks","meals"] },
+  billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash","zones"], staff:["roster","attendance","tasks"] }
 };
 // Owner's feature switches (Logins → What each role can use). The server sends this login's
 // { feature: on/off } as who.features and withholds the lists of features that are off.
@@ -1597,6 +1610,7 @@ var FEATURE_UI = [
   { id:"orders",    i:"📝", t:"Purchase orders", hi:"ऑर्डर", d:"Ask for stock, approvals, receive deliveries", rec:["orders"] },
   { id:"vendors",   i:"🏪", t:"Vendors", hi:"वेंडर", d:"Suppliers and what is owed to them", rec:["vendors"] },
   { id:"assets",    i:"🪑", t:"Assets & checklists", hi:"सामान और चेकलिस्ट", d:"Equipment, daily checks", rec:["assets"] },
+  { id:"zones",     i:"🗺️", t:"Zones (areas)", hi:"जगहें", d:"Kitchen, store, washroom, seating… checks and problems", rec:["zones"] },
   { id:"expenses",  i:"💸", t:"Expenses & bills", hi:"खर्च", d:"Expenses, rent, electricity, fixed bills", rec:["expenses","fixed"] },
   { id:"customers", i:"👥", t:"Customers & udhaar", hi:"ग्राहक और उधार", d:"Customer list, udhaar, customer app codes", rec:["customers"] },
   { id:"cash",      i:"💵", t:"Cash count & handover", hi:"कैश", d:"Day's cash count, cash with each person", rec:["cash","handover"] },
@@ -1611,9 +1625,9 @@ var FEATURE_UI = [
 ];
 var FEATURE_DEFAULTS_UI = {
   partner: FEATURE_UI.map(function(f){ return f.id; }),
-  manager: ["billing","kitchen","menu","stock","purchases","orders","vendors","assets","expenses","customers","cash","staff","meals","dashboard","calendar","notes"],
-  chef:    ["kitchen","menu","stock","purchases","orders","vendors","assets","staff","meals","notes"],
-  billing: ["billing","kitchen","orders","customers","cash","staff","notes"]
+  manager: ["billing","kitchen","menu","stock","purchases","orders","vendors","assets","zones","expenses","customers","cash","staff","meals","dashboard","calendar","notes"],
+  chef:    ["kitchen","menu","stock","purchases","orders","vendors","assets","zones","staff","meals","notes"],
+  billing: ["billing","kitchen","orders","customers","cash","zones","staff","notes"]
 };
 function myFeatures(){ return (cloud.who && cloud.who.features) || null; }
 function featOn(id){ var f = myFeatures(); return !f || f[id]!==false; }
@@ -2455,6 +2469,7 @@ function renderAll(){
   renderFixedView();
   renderCustomersView();
   renderAssetsView();
+  try{ renderZonesView(); }catch(e){}
   renderVendorsView();
   renderMenuView();
   renderStockView();
@@ -3751,7 +3766,7 @@ function wireEntryClicks(root){
 
 // ---------- RECORDS (Sales / Purchases / Investments / Expenses) ----------
 // Records tabs: a scrolling strip, or (▦ Big icons, remembered per phone) a grid of large icon tiles.
-var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"🤝", expenses:"💸", fixed:"💡", customers:"👥", assets:"🪑", vendors:"🏪",
+var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"🤝", expenses:"💸", fixed:"💡", customers:"👥", assets:"🪑", zones:"🗺️", vendors:"🏪",
   menu:"📖", stock:"📦", cash:"💵", handover:"🔁", bank:"🏦", review:"🔍", loans:"💰", partners:"👔" };
 var REC_FULL = { purchases:"Purchases", expenses:"Expenses" }, REC_GRID_KEY = "rec_grid_v1";
 function recGridOn(){ try{ return localStorage.getItem(REC_GRID_KEY)==="1"; }catch(e){ return false; } }
@@ -3785,9 +3800,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", orders:"ordersView", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", orders:"ordersView", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", zones:"zonesView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", orders:"Purchase orders", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", orders:"Purchase orders", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", zones:"Zones · areas", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -3800,6 +3815,7 @@ function updateRecordsTotal(){
   else if(recSub==="investments"){ var li = recInvestIn(); lbl.textContent = rl+" · net "+rupeeSigned(li.reduce(function(a,v){return a+investAmt(v);},0)); }
   else if(recSub==="expenses"){ var le = recExpIn(); lbl.textContent = rl+" · "+rupee(le.reduce(function(a,x){return a+expAmt(x);},0)); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
+  else if(recSub==="zones"){ var zz = cafeZones(), zd = zz.filter(function(z){ var st = zoneStatus(z); return st.due && !st.never; }).length, zo = zoneIssues(null, true).length; lbl.textContent = zz.length+" zone"+(zz.length!==1?"s":"")+(zd?" · "+zd+" due":"")+(zo?" · "+zo+" problem"+(zo!==1?"s":""):""); }
   else if(recSub==="orders"){ var op = pos.filter(function(p){ return ["received","rejected","cancelled"].indexOf(p.status)<0; }); lbl.textContent = op.length+" open · "+rupee(op.reduce(function(a,p){ return a+poTotalOf(p); },0)); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
   else if(recSub==="bank"){ lbl.textContent = rupee(bankBalanceNow())+" now"; }
@@ -7090,6 +7106,180 @@ function openChecklistEditor(){
   draw();
 }
 // Everything that needs attention today, for the Dashboard and the nav badge.
+// ---------- ZONES (areas of each outlet) ----------
+// Each outlet lists its areas (settings.zones): who is in charge, how often it must be checked, and
+// the points to look at. Staff tick a check or report a problem (both kept in the checks list, so
+// the server's rules for checks apply); assets can be placed in a zone.
+var ZONE_SUGGEST = [
+  { k:"kitchen", i:"🍳", n:"Kitchen", hi:"रसोई", every:"twice", points:["Counters & floor clean","Gas off after closing","Dustbin emptied","Fridge temperature OK"] },
+  { k:"store", i:"📦", n:"Store Room", hi:"स्टोर रूम", every:"daily", points:["Stock arranged & labelled","No damp, rats or insects","Door locked"] },
+  { k:"shop", i:"🏪", n:"General Store Shop", hi:"जनरल स्टोर", every:"daily", points:["Shelves filled","Expiry dates checked","Counter clean"] },
+  { k:"washroom", i:"🚻", n:"Washroom", hi:"वॉशरूम", every:"twice", points:["Floor clean & dry","Soap & tissue there","Dustbin emptied","Water & flush working"] },
+  { k:"indoor", i:"🪑", n:"Indoor Seating", hi:"अंदर बैठने की जगह", every:"twice", points:["Tables wiped","Floor clean","Fans, AC & lights working"] },
+  { k:"hall", i:"🏛️", n:"Hall Seating", hi:"हॉल", every:"daily", points:["Tables & chairs arranged","Floor clean","Fans, AC & lights working"] },
+  { k:"outdoor", i:"⛱️", n:"Outdoor Seating", hi:"बाहर बैठने की जगह", every:"daily", points:["Tables & chairs clean","Area swept","Umbrellas & lights OK"] },
+  { k:"reception", i:"🛎️", n:"Reception", hi:"रिसेप्शन", every:"daily", points:["Desk tidy","Menu cards & QR in place","Entrance clean"] },
+  { k:"counter", i:"🧾", n:"Billing Counter", hi:"बिलिंग काउंटर", every:"daily", points:["Counter clean","Bill rolls & change ready","Card / UPI machine charged"] },
+  { k:"parking", i:"🅿️", n:"Parking", hi:"पार्किंग", every:"daily", points:["Area clean","Lights working","Nothing blocking the way"] },
+  { k:"dishwash", i:"🧽", n:"Dish Wash Area", hi:"बर्तन धुलाई", every:"twice", points:["Sink clear","Drain not blocked","Clean dishes stacked"] },
+  { k:"entrance", i:"🚪", n:"Entrance", hi:"प्रवेश द्वार", every:"daily", points:["Swept & clean","Signboard & lights OK"] },
+  { k:"terrace", i:"🌇", n:"Terrace", hi:"छत", every:"weekly", points:["Water tank OK","Clean, no water standing"] },
+  { k:"office", i:"🗄️", n:"Office", hi:"ऑफ़िस", every:"weekly", points:["Files & cash box locked","Clean"] }
+];
+var ZONE_ICONS = ["🍳","📦","🏪","🚻","🪑","🏛️","⛱️","🛎️","🧾","🅿️","🧽","🚪","🌇","🗄️","🧊","🔌","🌿","🎉","👶","🧹"];
+var ZONE_EVERY = { twice:{ t:"Twice a day", hi:"दिन में 2 बार", h:12 }, daily:{ t:"Every day", hi:"रोज़", h:24 }, weekly:{ t:"Every week", hi:"हर हफ़्ते", h:168 }, none:{ t:"No fixed check", hi:"तय नहीं", h:0 } };
+function cafeZones(){ return Array.isArray(settings.zones) ? settings.zones.filter(function(z){ return z && z.id && z.name; }) : []; }
+function zoneById(id){ return cafeZones().find(function(z){ return z.id===id; }) || null; }
+function canEditZones(){ return canWriteKey(SETTINGS_KEY); }
+function checkAt(c){ return c.at || (c.date ? new Date(c.date+"T"+(c.time||"00:00")).getTime() : 0); }
+function zoneChecks(zid){ return checks.filter(function(c){ return c.kind==="zone" && c.zoneId===zid; }).sort(function(a,b){ return checkAt(b)-checkAt(a); }); }
+function zoneIssues(zid, openOnly){ return checks.filter(function(c){ return c.kind==="zoneissue" && (!zid || c.zoneId===zid) && (!openOnly || !c.fixedAt); }).sort(function(a,b){ return checkAt(b)-checkAt(a); }); }
+function zonesInUse(){ return checks.some(function(c){ return c.kind==="zone"; }); }
+function agoText(ms){ var m = Math.round((Date.now()-ms)/60000); if(m < 60) return m<=1 ? "just now" : m+" min ago"; var h = Math.round(m/60); if(h < 24) return h+" hr ago"; var d = Math.round(h/24); return d+" day"+(d!==1?"s":"")+" ago"; }
+// { last, due, problems, open } for one zone.
+function zoneStatus(z){
+  var last = zoneChecks(z.id)[0] || null, hrs = (ZONE_EVERY[z.every]||ZONE_EVERY.daily).h;
+  var due = hrs > 0 && (!last ? true : (Date.now() - checkAt(last)) > hrs*3600000);
+  var open = zoneIssues(z.id, true).length;
+  // A problem found in the last check stops showing once it is marked fixed.
+  return { last:last, due:due, never:!last, bad: !!(last && last.ok===false && open), open: open };
+}
+function zoneAttention(){
+  var out = []; if(!cafeZones().length) return out;
+  var due = cafeZones().filter(function(z){ var s = zoneStatus(z); return s.due && (!s.never || zonesInUse()); });
+  if(due.length && zonesInUse()) out.push({ t:"🗺️ "+due.length+" zone"+(due.length!==1?"s":"")+" due for a check ("+due.slice(0,3).map(function(z){ return z.name; }).join(", ")+(due.length>3?"…":"")+")", go:"zones" });
+  var iss = zoneIssues(null, true); if(iss.length) out.push({ t:"🚧 "+iss.length+" problem"+(iss.length!==1?"s":"")+" open in zones ("+iss.slice(0,2).map(function(x){ return x.zoneName+": "+x.text; }).join("; ")+(iss.length>2?"…":"")+")", go:"zones" });
+  return out;
+}
+function renderZonesView(){
+  var el = document.getElementById("zonesView"); if(!el) return;
+  var zs = cafeZones(), html = '';
+  html += '<div class="backupnote">Every area of '+esc(OUTLET.name||"the cafe")+' with who looks after it. Tap a zone to mark it checked, report a problem or see its things.</div>';
+  if(!zs.length){
+    html += '<div class="empty">No zones yet.'+(canEditZones()?' Tap <b>Add zones</b> to pick from Kitchen, Store Room, Washroom, Parking, Seating… or add your own.':' The owner or manager can add them.')+'</div>';
+  } else {
+    html += '<div class="zgrid">'+zs.map(function(z){ var s = zoneStatus(z), inch = z.inCharge ? (staff.find(function(x){ return x.id===z.inCharge; })||{}).name : "";
+      var st = s.open ? '<span class="zst bad">🚧 '+s.open+' problem'+(s.open!==1?'s':'')+'</span>' : s.bad ? '<span class="zst bad">⚠️ last check found a problem</span>' :
+        s.never ? '<span class="zst">Not checked yet</span>' : s.due ? '<span class="zst warn">⏰ Check due · '+esc(agoText(checkAt(s.last)))+'</span>' : '<span class="zst ok">✔ '+esc(agoText(checkAt(s.last)))+(s.last.byName?' · '+esc(s.last.byName):'')+'</span>';
+      return '<button class="ztile'+(s.open||s.bad?' bad':s.due&&!s.never?' due':'')+'" data-zone="'+esc(z.id)+'"><span class="zi">'+esc(z.icon||"📍")+'</span><b class="notr">'+esc(z.name)+'</b>'+(z.hi?'<small class="notr">'+esc(z.hi)+'</small>':'')+st+
+        (inch?'<small class="zin">👤 '+esc(inch)+'</small>':'')+'</button>'; }).join("")+'</div>';
+  }
+  if(canEditZones()) html += '<div class="zbtns"><button class="btn-save" id="zn_suggest">＋ Add zones</button><button class="btn-additem" id="zn_add">＋ Your own zone</button></div>';
+  el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll("[data-zone]"), function(b){ b.addEventListener("click", function(){ openZoneSheet(b.getAttribute("data-zone")); }); });
+  var sg = el.querySelector("#zn_suggest"); if(sg) sg.addEventListener("click", openZoneSuggest);
+  var ad = el.querySelector("#zn_add"); if(ad) ad.addEventListener("click", function(){ openZoneForm(null); });
+  if(recSub==="zones") updateRecordsTotal();
+}
+function saveZones(list){ settings.zones = list; saveSettings(); renderAll(); }
+function openZoneSuggest(){
+  var sheet = document.getElementById("sheet"), have = cafeZones().map(function(z){ return z.key || ""; }), pick = {};
+  var html = '<h2 class="serif">Add zones · जगहें जोड़ें</h2><div class="backupnote">Tick the areas '+esc(OUTLET.name||"this outlet")+' has. Each comes with sensible check points you can change later.</div><div class="zsug">';
+  html += ZONE_SUGGEST.map(function(s){ var got = have.indexOf(s.k)>=0;
+    return '<button class="zsugb'+(got?' got':'')+'" data-zs="'+s.k+'"'+(got?' disabled':'')+'><span>'+s.i+'</span><b>'+esc(s.n)+'</b><small>'+esc(s.hi)+(got?' · added':'')+'</small></button>'; }).join("")+'</div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="zs_c">Cancel</button><button class="btn-save" id="zs_s">Add</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-zs]"), function(b){ b.addEventListener("click", function(){ var k = b.getAttribute("data-zs"); pick[k] = !pick[k]; b.classList.toggle("on", !!pick[k]); }); });
+  document.getElementById("zs_c").addEventListener("click", closeForm);
+  document.getElementById("zs_s").addEventListener("click", function(){
+    var add = ZONE_SUGGEST.filter(function(s){ return pick[s.k]; }).map(function(s){ return { id:uid(), key:s.k, name:s.n, hi:s.hi, icon:s.i, every:s.every, points:s.points.slice(), inCharge:"" }; });
+    closeForm(); if(add.length) saveZones(cafeZones().concat(add));
+  });
+}
+function openZoneForm(zid){
+  var z = zid ? JSON.parse(JSON.stringify(zoneById(zid))) : { id:uid(), name:"", hi:"", icon:"📍", every:"daily", points:[], inCharge:"" };
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+(zid?"Edit zone":"New zone")+'</h2>';
+  html += '<div class="field two"><div><label>Name</label><input type="text" id="zf_name" value="'+esc(z.name)+'" placeholder="e.g. Rooftop"></div><div><label>Name in Hindi</label><input type="text" id="zf_hi" value="'+esc(z.hi||"")+'" placeholder="'+esc(z.name?autoHindi(z.name):"e.g. छत")+'"></div></div>';
+  html += '<div class="field"><label>Picture</label><div class="zicons">'+ZONE_ICONS.concat(ZONE_ICONS.indexOf(z.icon)<0?[z.icon]:[]).map(function(i){ return '<button data-zi="'+i+'" class="'+(i===z.icon?'on':'')+'">'+i+'</button>'; }).join("")+'</div></div>';
+  html += '<div class="field two"><div><label>Check it</label><select id="zf_every">'+Object.keys(ZONE_EVERY).map(function(k){ return '<option value="'+k+'"'+(z.every===k?' selected':'')+'>'+ZONE_EVERY[k].t+' · '+ZONE_EVERY[k].hi+'</option>'; }).join("")+'</select></div>'+
+    '<div><label>Person in charge</label><select id="zf_in"><option value="">— nobody —</option>'+activeStaff().map(function(s){ return '<option value="'+esc(s.id)+'"'+(z.inCharge===s.id?' selected':'')+'>'+esc(s.name)+'</option>'; }).join("")+'</select></div></div>';
+  html += '<div class="field"><label>Points to check (one per line)</label><textarea id="zf_points" rows="4" placeholder="Floor clean&#10;Lights working">'+esc((z.points||[]).join("\n"))+'</textarea></div>';
+  html += '<div class="field"><label>Notes</label><input type="text" id="zf_notes" value="'+esc(z.notes||"")+'" placeholder="e.g. key with manager, cleaner comes at 7"></div>';
+  html += '<div class="err" id="zf_err"></div><div class="sheetbtns"><button class="btn-cancel" id="zf_c">Cancel</button>'+(zid?'<button class="btn-del" id="zf_del">Remove</button>':'')+'<button class="btn-save" id="zf_s">Save</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-zi]"), function(b){ b.addEventListener("click", function(){ z.icon = b.getAttribute("data-zi"); Array.prototype.forEach.call(sheet.querySelectorAll("[data-zi]"), function(x){ x.classList.toggle("on", x===b); }); }); });
+  document.getElementById("zf_c").addEventListener("click", function(){ if(zid) openZoneSheet(zid); else closeForm(); });
+  var del = document.getElementById("zf_del");
+  if(del) del.addEventListener("click", function(){ askConfirm("Remove the zone "+z.name+"? Its past checks stay in the records.", function(){
+    assets.forEach(function(a){ if(a.zoneId===zid) a.zoneId = ""; }); saveAssets && saveAssets(); closeForm(); saveZones(cafeZones().filter(function(x){ return x.id!==zid; })); }); });
+  document.getElementById("zf_s").addEventListener("click", function(){
+    var name = document.getElementById("zf_name").value.trim(), e = document.getElementById("zf_err");
+    if(!name){ e.textContent = "Give the zone a name."; e.style.display = "block"; return; }
+    if(cafeZones().some(function(x){ return x.id!==z.id && x.name.toLowerCase()===name.toLowerCase(); })){ e.textContent = "There is already a zone with that name."; e.style.display = "block"; return; }
+    z.name = name; z.hi = document.getElementById("zf_hi").value.trim() || autoHindi(name); z.every = document.getElementById("zf_every").value; z.inCharge = document.getElementById("zf_in").value;
+    z.points = document.getElementById("zf_points").value.split("\n").map(function(x){ return x.trim(); }).filter(Boolean).slice(0, 20); z.notes = document.getElementById("zf_notes").value.trim();
+    var list = cafeZones(), i = list.findIndex(function(x){ return x.id===z.id; }); if(i>=0) list[i] = z; else list.push(z);
+    closeForm(); saveZones(list); if(zid) openZoneSheet(zid);
+  });
+}
+function openZoneSheet(zid){
+  var z = zoneById(zid); if(!z) return;
+  var s = zoneStatus(z), sheet = document.getElementById("sheet"), inch = z.inCharge ? (staff.find(function(x){ return x.id===z.inCharge; })||{}).name : "";
+  var html = '<h2 class="serif"><span style="font-size:30px;">'+esc(z.icon||"📍")+'</span> <span class="notr">'+esc(z.name)+'</span>'+(z.hi?' <small class="muted notr" style="font-size:15px;">'+esc(z.hi)+'</small>':'')+'</h2>';
+  html += '<div class="backupnote">'+esc((ZONE_EVERY[z.every]||ZONE_EVERY.daily).t)+(inch?' · 👤 '+esc(inch)+' in charge':'')+(z.notes?' · '+esc(z.notes):'')+'<br>'+
+    (s.last ? 'Last checked '+esc(agoText(checkAt(s.last)))+(s.last.byName?' by '+esc(s.last.byName):'')+(s.last.ok===false?' — <b class="bad">found a problem</b>':'') : 'Not checked yet.')+'</div>';
+  if(canWriteKey(CHECKS_KEY)) html += '<div class="zbtns"><button class="btn-save" id="zs_check">✔ Check now · जाँच करें</button><button class="btn-del" id="zs_issue">🚧 Report problem</button></div>';
+  var open = zoneIssues(zid, true);
+  if(open.length) html += '<div class="card" style="margin-bottom:10px;"><h3>🚧 Open problems</h3>'+open.map(function(x){
+    return '<div class="psrow"><span>'+esc(x.text)+'<br><small class="muted">'+esc(fmtD(x.date))+' '+esc(x.time||"")+(x.byName?' · '+esc(x.byName):'')+'</small></span>'+(canEditZones()?'<button class="btn-additem" data-zfix="'+esc(x.id)+'" style="width:auto;padding:6px 12px;margin:0;">✔ Fixed</button>':'')+'</div>'; }).join("")+'</div>';
+  var za = assets.filter(function(a){ return a.zoneId===zid; });
+  if(canReadKey(ASSETS_KEY)) html += '<div class="card" style="margin-bottom:10px;"><h3>🪑 Things in this zone</h3>'+(za.length ? za.map(function(a){ var lc = lastAssetCheck(a.id);
+    return '<div class="psrow"><span>'+esc(a.name)+'</span><b class="'+(lc&&lc.status==="broken"?'bad':lc&&lc.status==="repair"?'warnamt':'')+'">'+(lc ? esc({ok:"Working",repair:"Needs repair",broken:"Broken"}[lc.status]||lc.status) : '—')+'</b></div>'; }).join("") :
+    '<div class="backupnote" style="margin:0;">None yet. In Records → Assets, open a thing and pick this zone.</div>')+'</div>';
+  var hist = zoneChecks(zid).slice(0, 8);
+  if(hist.length) html += '<div class="card" style="margin-bottom:10px;"><h3>Recent checks</h3>'+hist.map(function(c){
+    var bad = (c.points||[]).filter(function(p){ return p.ok===false; });
+    return '<div class="psrow"><span>'+(c.ok===false?'⚠️ ':'✔ ')+esc(fmtD(c.date))+' '+esc(c.time||"")+(c.byName?' · '+esc(c.byName):'')+(bad.length?'<br><small class="bad">'+esc(bad.map(function(p){ return p.t; }).join(", "))+'</small>':'')+(c.note?'<br><small class="muted">'+esc(c.note)+'</small>':'')+'</span></div>'; }).join("")+'</div>';
+  var fixed = zoneIssues(zid, false).filter(function(x){ return x.fixedAt; }).slice(0, 5);
+  if(fixed.length) html += '<div class="backupnote">Fixed lately: '+fixed.map(function(x){ return esc(x.text)+' ('+esc(fmtD(x.fixedDate||x.date))+')'; }).join(" · ")+'</div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="zs_close">Close</button>'+(canEditZones()?'<button class="btn-additem" id="zs_edit" style="margin:0;">Edit zone</button>':'')+'</div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("zs_close").addEventListener("click", closeForm);
+  var ed = document.getElementById("zs_edit"); if(ed) ed.addEventListener("click", function(){ openZoneForm(zid); });
+  var ck = document.getElementById("zs_check"); if(ck) ck.addEventListener("click", function(){ openZoneCheck(zid); });
+  var is = document.getElementById("zs_issue"); if(is) is.addEventListener("click", function(){ openZoneIssue(zid); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-zfix]"), function(b){ b.addEventListener("click", function(){
+    var x = checks.find(function(c){ return c.id===b.getAttribute("data-zfix"); }); if(!x) return;
+    x.fixedAt = Date.now(); x.fixedDate = fmtDate(new Date()); x.fixedBy = myName(); saveChecks(); renderAll(); openZoneSheet(zid); }); });
+}
+function openZoneCheck(zid){
+  var z = zoneById(zid); if(!z) return;
+  var pts = (z.points && z.points.length ? z.points : ["Clean and in order"]).map(function(t){ return { t:t, ok:null }; });
+  var sheet = document.getElementById("sheet");
+  function draw(){
+    var html = '<h2 class="serif">✔ '+esc(z.icon||"")+' <span class="notr">'+esc(z.name)+'</span> check</h2><div class="backupnote">Tap ✔ if it is fine, ✖ if not.</div>';
+    html += pts.map(function(p, i){ return '<div class="zpt"><span>'+esc(p.t)+'</span><div><button class="zok'+(p.ok===true?' on':'')+'" data-zp="'+i+'" data-v="1">✔</button><button class="zno'+(p.ok===false?' on':'')+'" data-zp="'+i+'" data-v="0">✖</button></div></div>'; }).join("");
+    html += '<button class="btn-additem" id="zc_all" style="margin:8px 0;">✔ All fine · सब ठीक</button>';
+    html += '<div class="field"><label>Note (optional) — what is wrong?</label><input type="text" id="zc_note" placeholder="e.g. tap leaking, soap finished"></div>';
+    html += '<div class="err" id="zc_err"></div><div class="sheetbtns"><button class="btn-cancel" id="zc_c">Back</button><button class="btn-save" id="zc_s">Save check</button></div>';
+    sheet.innerHTML = html;
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-zp]"), function(b){ b.addEventListener("click", function(){ var note = document.getElementById("zc_note").value; pts[+b.getAttribute("data-zp")].ok = b.getAttribute("data-v")==="1"; draw(); document.getElementById("zc_note").value = note; }); });
+    document.getElementById("zc_all").addEventListener("click", function(){ var note = document.getElementById("zc_note").value; pts.forEach(function(p){ p.ok = true; }); draw(); document.getElementById("zc_note").value = note; });
+    document.getElementById("zc_c").addEventListener("click", function(){ openZoneSheet(zid); });
+    document.getElementById("zc_s").addEventListener("click", function(){
+      if(pts.some(function(p){ return p.ok===null; })){ var e = document.getElementById("zc_err"); e.textContent = "Tap ✔ or ✖ for every point (or “All fine”)."; e.style.display = "block"; return; }
+      var bad = pts.filter(function(p){ return !p.ok; }), note = document.getElementById("zc_note").value.trim(), now = new Date();
+      checks.push({ id:uid(), kind:"zone", zoneId:z.id, zoneName:z.name, ok:!bad.length, points:pts, note:note, date:fmtDate(now), time:nowHM(), at:now.getTime(), byName:myName() });
+      // Anything marked ✖ also opens a problem to fix, so it is not forgotten.
+      if(bad.length) checks.push({ id:uid(), kind:"zoneissue", zoneId:z.id, zoneName:z.name, text:bad.map(function(p){ return p.t; }).join(", ")+(note?" — "+note:""), date:fmtDate(now), time:nowHM(), at:now.getTime(), byName:myName(), fixedAt:null });
+      saveChecks(); renderAll(); openZoneSheet(zid);
+    });
+  }
+  draw();
+}
+function openZoneIssue(zid){
+  var z = zoneById(zid); if(!z) return;
+  var sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<h2 class="serif">🚧 Problem in <span class="notr">'+esc(z.name)+'</span></h2><div class="field"><label>What is wrong? · क्या ख़राबी है?</label><input type="text" id="zi_text" placeholder="e.g. washroom tap leaking, light not working"></div>'+
+    '<div class="err" id="zi_err"></div><div class="sheetbtns"><button class="btn-cancel" id="zi_c">Back</button><button class="btn-save" id="zi_s">Report</button></div>';
+  document.getElementById("zi_c").addEventListener("click", function(){ openZoneSheet(zid); });
+  document.getElementById("zi_s").addEventListener("click", function(){
+    var t = document.getElementById("zi_text").value.trim(); if(!t){ var e = document.getElementById("zi_err"); e.textContent = "Say what is wrong."; e.style.display = "block"; return; }
+    var now = new Date(); checks.push({ id:uid(), kind:"zoneissue", zoneId:z.id, zoneName:z.name, text:t.slice(0, 200), date:fmtDate(now), time:nowHM(), at:now.getTime(), byName:myName(), fixedAt:null });
+    saveChecks(); renderAll(); openZoneSheet(zid);
+  });
+}
 function attentionItems(){
   var out = [];
   if(canReadKey(ING_KEY) && canReadKey(PURCH_KEY)){
@@ -7099,6 +7289,7 @@ function attentionItems(){
   if(checksInUse()) checklistStatus().forEach(function(x){ if(x.missed) out.push({ t:"⚠️ "+x.l.name+" check "+x.label, go:"assets" }); else if(x.bad) out.push({ t:"⚠️ "+x.l.name+" check found "+x.bad+" problem"+(x.bad!==1?"s":""), go:"assets" }); });
   if(canReadKey(POS_KEY)) out = out.concat(poAttention());
   if(canSummary()) out = out.concat(patternAlerts());
+  if(canReadKey(CHECKS_KEY)) out = out.concat(zoneAttention());
   if(canReadKey(ASSETS_KEY)) assetAlerts().forEach(function(x){ out.push({ t:(x.st==="broken"?"⛔ ":"🛠️ ")+x.a.name+": "+x.why.join(", "), go:"assets" }); });
   return out;
 }
@@ -7979,7 +8170,7 @@ var HI = {
   "Sales":"बिक्री","Purch.":"ख़रीद","Purchases":"ख़रीदारी","Orders":"ऑर्डर","Invest":"निवेश","Expense":"ख़र्च","Expenses":"ख़र्चे","Bills":"बिल","Customers":"ग्राहक","Assets":"सामान","Vendors":"विक्रेता",
   "Menu":"मेन्यू","Stock":"स्टॉक","Cash":"कैश","Handover":"हैंडओवर","Bank":"बैंक","Cash review":"कैश जाँच","Loans":"उधार/लोन","Partners":"पार्टनर",
   "Team":"टीम","Roster":"ड्यूटी","Attend.":"हाज़िरी","Attendance":"हाज़िरी","Tasks":"काम","Salary":"वेतन","Meals":"स्टाफ़ खाना",
-  "Today":"आज","Yesterday":"कल","7 days":"7 दिन","This month":"इस महीने","Last month":"पिछला महीना","days":"दिन","15 days":"15 दिन","30 days":"30 दिन","90 days":"90 दिन","Custom…":"तारीख़ चुनें…","Day":"दिन","Month":"महीना","Year":"साल",
+  "Today":"आज","Yesterday":"कल","7 days":"7 दिन","Zones":"जगहें","Zones · areas":"जगहें","This month":"इस महीने","Last month":"पिछला महीना","days":"दिन","15 days":"15 दिन","30 days":"30 दिन","90 days":"90 दिन","Custom…":"तारीख़ चुनें…","Day":"दिन","Month":"महीना","Year":"साल",
   "Refresh":"रीफ़्रेश","Backup & restore":"बैकअप","Save":"सेव करें","Cancel":"रद्द करें","Close":"बंद करें","Delete":"हटाएँ","Edit":"बदलें","Back":"वापस","Done":"हो गया","Next":"आगे","Add":"जोड़ें","Remove":"हटाएँ","Yes":"हाँ","No":"नहीं","OK":"ठीक है",
   "Today’s bills":"आज के बिल","Live orders":"चालू ऑर्डर","Checks":"जाँच","Settings":"सेटिंग","Big & simple":"बड़ा और आसान","Big & simple: ON":"बड़ा और आसान: चालू",
   "Most sold":"सबसे ज़्यादा बिके","All":"सब","Dine-in":"यहीं खाना","Takeaway":"पैक","Delivery":"डिलीवरी","Tap a picture to add it":"फोटो दबाकर जोड़ें",
@@ -8852,6 +9043,7 @@ function renderAssetForm(isEdit){
   var html = '<h2 class="serif">'+(isEdit?"Edit asset":"Add asset")+'</h2>';
   html += '<div class="field two"><div><label>Name</label><input type="text" id="a_name" placeholder="e.g. Godrej fridge 250L" value="'+esc(d.name)+'"></div>';
   html += '<div><label>Category</label><select id="a_cat">'+ASSET_CATS.map(function(c){ return '<option '+(d.category===c?"selected":"")+'>'+c+'</option>'; }).join("")+'</select></div></div>';
+  if(cafeZones().length) html += '<div class="field"><label>Zone (where it is)</label><select id="a_zone"><option value="">— not set —</option>'+cafeZones().map(function(z){ return '<option value="'+esc(z.id)+'"'+(d.zoneId===z.id?' selected':'')+'>'+esc((z.icon||"")+" "+z.name)+'</option>'; }).join("")+'</select></div>';
 
   html += '<div class="field"><label>Photo</label>';
   if(d.photo){
@@ -8898,6 +9090,7 @@ function renderAssetForm(isEdit){
     d.nextService = document.getElementById("a_service").value;
     d.notes = document.getElementById("a_notes").value;
     d.checkEvery = document.getElementById("a_every").value;
+    var azs = document.getElementById("a_zone"); if(azs) d.zoneId = azs.value;
   }
   ["a_cost","a_date","a_dep","a_manual"].forEach(function(id){
     document.getElementById(id).addEventListener("change", function(){ sync(); renderAssetForm(isEdit); });
@@ -8926,7 +9119,7 @@ function renderAssetForm(isEdit){
                 depRate: d.depRate===""?15:parseFloat(d.depRate),
                 manualValue: d.manualValue===""?null:parseFloat(d.manualValue),
                 vendor:(d.vendor||"").trim(), warranty:d.warranty||"", nextService:d.nextService||"",
-                notes:(d.notes||"").trim(), maintenance:d.maintenance||[], checkEvery: parseFloat(d.checkEvery)>0 ? parseFloat(d.checkEvery) : null };
+                notes:(d.notes||"").trim(), maintenance:d.maintenance||[], checkEvery: parseFloat(d.checkEvery)>0 ? parseFloat(d.checkEvery) : null, zoneId:d.zoneId||"" };
     var idx = assets.findIndex(function(x){ return x.id===rec.id; });
     if(idx>=0) assets[idx]=rec; else assets.push(rec);
     var ok = saveAssets();

@@ -366,6 +366,23 @@ items to use first, missed or failed checks, broken / needs-repair equipment, ch
 to go there. Chef and billing logins can file checks but can't change or delete anyone else's; they only see the
 last two days of checks.
 
+### Zones (areas of each outlet)
+**Records → 🗺️ Zones** lists every area of the outlet as a big picture tile (each outlet has its own list, kept in
+`settings.zones`):
+- **＋ Add zones** — tick from Kitchen, Store Room, General Store Shop, Washroom, Indoor / Hall / Outdoor Seating,
+  Reception, Billing Counter, Parking, Dish Wash Area, Entrance, Terrace, Office (Hindi names included); each comes
+  with check points (e.g. Washroom: floor clean & dry, soap & tissue, dustbin emptied, water & flush). **＋ Your own
+  zone** for anything else. Per zone: picture, Hindi name, **how often to check** (twice a day / every day / every
+  week / no fixed check), **person in charge**, points to check, notes.
+- Tap a zone: **✔ Check now** (✔ / ✖ per point, "All fine", a note) — any ✖ also opens a problem; **🚧 Report
+  problem**; open problems with **✔ Fixed** (owner / manager); **things in this zone** (Records → Assets → an asset →
+  Zone) with their last condition; recent checks with who and when.
+- Tiles show ✔ checked (how long ago, by whom), ⏰ check due, 🚧 open problems, ⚠️ last check found a problem.
+- **Needs attention** on the Dashboard: zones due for a check (once zone checks are in use) and open zone problems.
+- Who: owner / manager add and edit zones and mark problems fixed; chef and billing staff see zones, check them and
+  report problems. Checks and problems are kept in the checks list (`checks_v1`, kinds `zone` / `zoneissue`) so the
+  server records who did each. A **Zones (areas)** switch is in Logins → What each role can use.
+
 ### Purchase orders with approvals (Step 4)
 Records → **Orders**. The order of hands: **staff request → manager approves (up to a limit) or sends it to the
 owner → owner / partner approves → sent to the vendor → goods received and checked**.

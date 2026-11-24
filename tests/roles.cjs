@@ -112,7 +112,7 @@ const today = new Date(Date.now()+330*60000).toISOString().slice(0,10);
   await C.reload(); await C.waitForTimeout(2500);
   const nav = await C.evaluate(() => Array.from(document.querySelectorAll('nav.tabs button')).filter(x=>x.style.display!=='none').map(x=>x.getAttribute('data-v')).join());
   const rec = await C.evaluate(() => Array.from(document.querySelectorAll('#recCtl button')).filter(x=>x.style.display!=='none').map(x=>x.getAttribute('data-r')).join());
-  assert(nav==='kitchen,notes,staff,records' && rec.split(',').sort().join()==='assets,menu,orders,purchases,stock,vendors', 'chef sees only kitchen screens: '+nav+' | '+rec);
+  assert(nav==='kitchen,notes,staff,records' && rec.split(',').sort().join()==='assets,menu,orders,purchases,stock,vendors,zones', 'chef sees only kitchen screens: '+nav+' | '+rec);
   assert(/Chef/.test(await C.textContent('#roleTag')), 'role shown in the header');
   const Mrec = await M.evaluate(() => Array.from(document.querySelectorAll('#recCtl button')).filter(x=>x.style.display!=='none').map(x=>x.getAttribute('data-r')).join());
   assert(!/investments|loans|bank|partners|review/.test(Mrec) && /sales/.test(Mrec), 'manager has no partner / loans / bank screens: '+Mrec);
