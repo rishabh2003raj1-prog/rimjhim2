@@ -172,7 +172,7 @@ const STAFF_PUBLIC = ["id", "name", "role", "roles", "defaultShift", "status", "
 const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
 // Readable by the manager but only the owner / partners can change them.
 const SETTINGS_OWNER = ["poManagerLimit"];
-const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays", "tables", "tableZones", "zones", "waiterService", "customPosts", "platforms", "deliveryCharge"];
+const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays", "tables", "tableZones", "zones", "waiterService", "customPosts", "parkingOn", "storeOn", "parkingRates", "storeMinMargin", "platforms", "deliveryCharge"];
 const STAFF_PAY_CATS = ["Staff Salary", "Staff House Rent", "Staff Food Allowance", "Staff Travel Allowance", "Staff Bonus"];
 const CASH_MGR_TYPES = ["counter", "atm", "atmheld", "taken", "pass", "bank"];
 const CASH_BILL_TYPES = ["counter", "atm", "taken"];
@@ -209,6 +209,10 @@ const POLICY = {
   checks_v1:         { manager: "rw", chef: "append2", billing: "append2" },
   pos_v1:            { manager: "po", chef: "po", billing: "po" },
   liveorders_v1:     { manager: "rw", chef: "rw", billing: "rw" },
+  parking_v1:        { manager: "rw", billing: "rw" },
+  storeitems_v1:     { manager: "rw", billing: "r" },
+  storesales_v1:     { manager: "rw", billing: "append2" },
+  storebuys_v1:      { manager: "rw" },
   partners_v1:       { manager: "r", chef: "r", billing: "r" }
   // investments, loans, payroll and anything new: owner / partner / full only.
 };
@@ -227,6 +231,8 @@ const FEATURES = {
   vendors:   { from: "manager", keys: ["vendors_v1"] },
   assets:    { from: "manager", keys: ["assets_v1", "checks_v1"] },
   zones:     { from: "manager", keys: ["checks_v1"] },
+  parking:   { from: "billing", keys: ["parking_v1"] },
+  store:     { from: "billing", keys: ["storeitems_v1", "storesales_v1", "storebuys_v1"] },
   expenses:  { from: "manager", keys: ["expenses_v1"] },
   customers: { from: "manager", keys: ["customers_v1", "custpayments_v1", "creditpayments_v1", "offers_v1"] },
   cash:      { from: "manager", keys: ["cashdays_v1", "cashmoves_v1"] },
@@ -242,9 +248,9 @@ const FEATURES = {
 const FEATURE_ROLES = ["partner", "manager", "chef", "billing"];
 const FEATURE_DEFAULTS = {
   partner: Object.keys(FEATURES),
-  manager: ["billing", "kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "zones", "expenses", "customers", "cash", "staff", "meals", "dashboard", "calendar", "notes"],
+  manager: ["billing", "kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "zones", "parking", "store", "expenses", "customers", "cash", "staff", "meals", "dashboard", "calendar", "notes"],
   chef:    ["kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "zones", "staff", "meals", "notes"],
-  billing: ["billing", "kitchen", "orders", "customers", "cash", "zones", "staff", "notes"]
+  billing: ["billing", "kitchen", "orders", "customers", "cash", "zones", "parking", "store", "staff", "notes"]
 };
 const KEY_FEATURES = {};
 Object.keys(FEATURES).forEach((f) => FEATURES[f].keys.forEach((k) => { (KEY_FEATURES[k] = KEY_FEATURES[k] || []).push(f); }));

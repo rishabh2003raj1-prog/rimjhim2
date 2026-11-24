@@ -542,6 +542,27 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### 🅿️ Parking and 🛍️ General store (optional, per outlet)
+Both are **off by default**; Counter → ⚙️ Settings → **Extra businesses** switches each on for that outlet
+(`settings.parkingOn` / `storeOn`). When on, Records gets a Parking / Store tab, the Counter a 🅿️ / 🛍️ button, and
+the Dashboard an **Other businesses** card. Neither is mixed into cafe sales or food cost; parking charges and the
+store's profit (sales − stock bought) count in profit as other income, their cash in the counter's expected cash and
+their UPI in the bank check. A **Parking** and a **General store** switch are in Logins → What each role can use.
+
+**Parking** (`parking_v1`): **Vehicle in** — type (🚌 Bus, 🚚 Truck, 🚛 Large container truck, 🛻 Tempo, 🚗 Car, 🏍️ Bike, each
+with its **rate per day**, editable), vehicle number, driver and phone, diesel level, what is **left with us** (🔑 key,
+🛞 stepney, 🔋 battery, ⛺ tirpal, papers, tools, anything else) and an optional advance. Charged per 24 hours (or part)
+from check-in; **🍽️ Driver ate here today** makes that day free. Parked vehicles show day count, free days, amount,
+paid and due. **Check out** shows the bill, needs every belonging ticked as given back, and takes the payment
+(cash / UPI). Recently left vehicles keep their history.
+
+**General store** (`storeitems_v1`, `storesales_v1`, `storebuys_v1`): **🧾 Bill** (tap items, Cash / UPI, separate bill
+numbers), **📦 Stock** (items with buying and selling price, margin %, stock, reorder level, supplier; "stock now"
+records a physical count), **📝 Order list** (items at reorder level, quantity to order, grouped by supplier, share on
+WhatsApp), **🛒 Buy stock** (supplier bill; updates stock and the latest buying price) and **📊 Margins** (month sales,
+profit, margin, profit by item, **low-margin items** under a set % — default 10%). Store items to reorder appear under
+Needs attention. Billing logins can bill and see stock but not buy stock.
+
 ### House rent per month
 House rent allowance can differ month to month. In the staff form choose **House rent is given: Every month** (switch it
 off for any month) or **Only in months I switch on**. Each salary card (Staff → Salary) shows **🏠 House rent · month:

@@ -304,6 +304,16 @@
   .rpchip{display:inline-flex;align-items:center;gap:4px;} .rpost{border:1px solid var(--line);background:#fff;border-radius:999px;padding:2px 8px;font:inherit;font-size:12px;}
   .postcover{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;font-size:12px;color:var(--ink-soft);} .postcover span{background:#F2EEE5;border-radius:8px;padding:3px 7px;}
   .rpi{display:block;font-style:normal;font-size:11px;line-height:1;}
+  .pkcard{display:flex;gap:12px;padding:12px;border:1.5px solid var(--line);background:var(--panel);border-radius:16px;margin-bottom:10px;cursor:pointer;} .pki{font-size:40px;line-height:1;} .pkb{flex:1;min-width:0;}
+  .pkbel{font-size:12px;color:var(--ink-soft);margin-top:3px;} .pkbtns{display:flex;gap:6px;margin-top:8px;} .pkbtns button{flex:1;border:1.5px solid var(--line);background:#fff;border-radius:10px;padding:8px 4px;font:inherit;font-weight:700;font-size:12.5px;color:var(--ink);} .pkbtns button.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;}
+  .vtypes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;} .vtypes button{display:flex;flex-direction:column;align-items:center;gap:1px;border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:8px 2px;font:inherit;font-size:11.5px;font-weight:700;color:var(--ink);}
+  .vtypes button span{font-size:28px;} .vtypes button small{font-weight:500;color:var(--ink-soft);} .vtypes button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .vtypes button.on small{color:#ddd;}
+  .belchips{display:flex;flex-wrap:wrap;gap:6px;} .belchips button{border:1.5px solid var(--line);background:var(--panel);border-radius:999px;padding:7px 11px;font:inherit;font-size:13px;color:var(--ink);} .belchips button small{color:var(--ink-soft);} .belchips button.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .belchips button.on small{color:#e6f2ea;}
+  .belret{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:14.5px;} .belret input{width:22px;height:22px;}
+  .stgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px;} .sttile{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 4px;border:1.5px solid var(--line);background:var(--panel);border-radius:12px;font:inherit;color:var(--ink);text-align:center;}
+  .sttile b{font-size:12.5px;} .sttile span{font-weight:700;} .sttile small{font-size:10.5px;color:var(--ink-soft);} .sttile.has{border-color:#2E7D4F;background:#EEF6EC;} .sttile.out{opacity:.55;}
+  .sttile i{position:absolute;top:-6px;right:-6px;min-width:22px;height:22px;border-radius:11px;background:#2E7D4F;color:#fff;font-style:normal;font-weight:700;font-size:12px;line-height:22px;}
+  .stcart{margin-bottom:10px;border-color:#2E7D4F;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -677,6 +687,7 @@
       <div id="attnBox"></div>
       <div id="mgmtBox"></div>
       <div id="survivalBox"></div>
+      <div id="extraBizBox"></div>
       <button class="btn-save" id="reportsBtn" style="width:100%;margin-bottom:14px;"><span class="rbi" aria-hidden="true">📄</span><span class="rbt">Reports — create &amp; share PDF</span></button>
 
       <div class="kpis">
@@ -781,6 +792,8 @@
         <button data-r="customers">Customers</button>
         <button data-r="assets">Assets</button>
         <button data-r="zones">Zones</button>
+        <button data-r="parking">Parking</button>
+        <button data-r="store">Store</button>
         <button data-r="vendors">Vendors</button>
         <button data-r="menu">Menu</button>
         <button data-r="stock">Stock</button>
@@ -800,6 +813,8 @@
       <div id="customersView" class="reclist" style="display:none;"></div>
       <div id="assetsView" class="reclist" style="display:none;"></div>
       <div id="zonesView" class="reclist" style="display:none;"></div>
+      <div id="parkingView" class="reclist" style="display:none;"></div>
+      <div id="storeView" class="reclist" style="display:none;"></div>
       <div id="vendorsView" class="reclist" style="display:none;"></div>
       <div id="menuView" class="reclist" style="display:none;"></div>
       <div id="stockView" class="reclist" style="display:none;"></div>
@@ -1157,9 +1172,12 @@ function seedData(){
 // data. A copy is also kept on the phone so the app opens and keeps taking
 // entries without internet; changes upload as soon as the connection is back.
 var API_Q = "?outlet=" + encodeURIComponent(OUTLET.id);
+// ---------- PARKING (optional per outlet: Counter → Settings) ----------
+var PARK_KEY = "parking_v1", STORE_ITEMS_KEY = "storeitems_v1", STORE_SALES_KEY = "storesales_v1", STORE_BUYS_KEY = "storebuys_v1";
+var parking = [], storeItems = [], storeSales = [], storeBuys = [];
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
-  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY, LIVE_KEY];
+  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY, LIVE_KEY, PARK_KEY, STORE_ITEMS_KEY, STORE_SALES_KEY, STORE_BUYS_KEY];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
@@ -1397,6 +1415,8 @@ function setKeyValue(key, v){
     case EXPENSE_KEY: expenses = arr; break;        case BILLS_KEY: bills = arr; break;
     case CASH_KEY: cashDays = arr; break;           case CAFEUSE_KEY: cafeUse = arr; break;
     case RETAIL_KEY: retailItems = arr; break;      case RSALE_KEY: retailSales = arr; break;
+    case PARK_KEY: parking = arr; break;            case STORE_ITEMS_KEY: storeItems = arr; break;
+    case STORE_SALES_KEY: storeSales = arr; break;  case STORE_BUYS_KEY: storeBuys = arr; break;
     case WASTE_KEY: wastage = arr; break;           case PREP_KEY: prepBatches = arr; break;
     case AUDIT_KEY: stockAudits = arr; break;       case CUST_KEY: customers = arr; break;
     case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;  case POS_KEY: pos = arr; break;  case LIVE_KEY: liveOrders = arr; break;
@@ -1611,9 +1631,9 @@ function canSwitchStores(){ return isOwner() || (cloud.who && cloud.who.outlet==
 var ACCESS_LABEL = { owner:"Owner", partner:"Partner", full:"Full access", manager:"Manager", chef:"Chef / kitchen", billing:"Billing / counter" };
 // Each role's screens. Anything not listed is hidden.
 var ROLE_SCREENS = {
-  manager: { nav:["dashboard","counter","kitchen","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","zones","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
+  manager: { nav:["dashboard","counter","kitchen","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","zones","parking","store","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
   chef:    { nav:["kitchen","notes","staff","records"], rec:["purchases","orders","menu","stock","assets","zones","vendors"], staff:["roster","attendance","tasks","meals"] },
-  billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash","zones"], staff:["roster","attendance","tasks"] }
+  billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash","zones","parking","store"], staff:["roster","attendance","tasks"] }
 };
 // Owner's feature switches (Logins → What each role can use). The server sends this login's
 // { feature: on/off } as who.features and withholds the lists of features that are off.
@@ -1627,6 +1647,8 @@ var FEATURE_UI = [
   { id:"vendors",   i:"🏪", t:"Vendors", hi:"वेंडर", d:"Suppliers and what is owed to them", rec:["vendors"] },
   { id:"assets",    i:"🪑", t:"Assets & checklists", hi:"सामान और चेकलिस्ट", d:"Equipment, daily checks", rec:["assets"] },
   { id:"zones",     i:"🗺️", t:"Zones (areas)", hi:"जगहें", d:"Kitchen, store, washroom, seating… checks and problems", rec:["zones"] },
+  { id:"parking",   i:"🅿️", t:"Parking", hi:"पार्किंग", d:"Vehicles in / out, charges, belongings", rec:["parking"] },
+  { id:"store",     i:"🛍️", t:"General store", hi:"जनरल स्टोर", d:"Store billing, stock, order list, margins", rec:["store"] },
   { id:"expenses",  i:"💸", t:"Expenses & bills", hi:"खर्च", d:"Expenses, rent, electricity, fixed bills", rec:["expenses","fixed"] },
   { id:"customers", i:"👥", t:"Customers & udhaar", hi:"ग्राहक और उधार", d:"Customer list, udhaar, customer app codes", rec:["customers"] },
   { id:"cash",      i:"💵", t:"Cash count & handover", hi:"कैश", d:"Day's cash count, cash with each person", rec:["cash","handover"] },
@@ -1641,9 +1663,9 @@ var FEATURE_UI = [
 ];
 var FEATURE_DEFAULTS_UI = {
   partner: FEATURE_UI.map(function(f){ return f.id; }),
-  manager: ["billing","kitchen","menu","stock","purchases","orders","vendors","assets","zones","expenses","customers","cash","staff","meals","dashboard","calendar","notes"],
+  manager: ["billing","kitchen","menu","stock","purchases","orders","vendors","assets","zones","parking","store","expenses","customers","cash","staff","meals","dashboard","calendar","notes"],
   chef:    ["kitchen","menu","stock","purchases","orders","vendors","assets","zones","staff","meals","notes"],
-  billing: ["billing","kitchen","orders","customers","cash","zones","staff","notes"]
+  billing: ["billing","kitchen","orders","customers","cash","zones","parking","store","staff","notes"]
 };
 function myFeatures(){ return (cloud.who && cloud.who.features) || null; }
 function featOn(id){ var f = myFeatures(); return !f || f[id]!==false; }
@@ -1676,6 +1698,9 @@ function applyRoleUI(){
   }
   toggle("nav.tabs button", "data-v", rs && rs.nav);
   toggle("#recCtl button", "data-r", rs && rs.rec);
+  [["parking", parkingOn()],["store", storeOn()]].forEach(function(x){ var b = document.querySelector('#recCtl button[data-r="'+x[0]+'"]'); if(b && !x[1]) b.style.display = "none"; });
+  if(rs){ rs = { nav:rs.nav, staff:rs.staff, rec: rs.rec.filter(function(k){ return (k!=="parking" || parkingOn()) && (k!=="store" || storeOn()); }) }; }
+  else if((recSub==="parking" && !parkingOn()) || (recSub==="store" && !storeOn())) switchRecordsSub("sales");
   toggle("#staffCtl button", "data-s", rs && rs.staff);
   var fullish = isFullAccess();
   ["backupBtn","reportsBtn"].forEach(function(id){ var e = document.getElementById(id); if(e) e.style.display = (((fullish || (id==="reportsBtn" && myAccess()==="manager")) && featOn(id==="backupBtn" ? "backup" : "dashboard"))) ? "" : "none"; });
@@ -2315,6 +2340,7 @@ function readLists(){
   wastage = Array.isArray(wa) ? wa : [];
   prepBatches = Array.isArray(pb) ? pb : [];
   stockAudits = Array.isArray(au) ? au : [];
+  [[PARK_KEY,"parking"],[STORE_ITEMS_KEY,"storeItems"],[STORE_SALES_KEY,"storeSales"],[STORE_BUYS_KEY,"storeBuys"]].forEach(function(x){ var v = lsGet(x[0]); setKeyValue(x[0], Array.isArray(v) ? v : []); });
   var rt = lsGet(RETAIL_KEY), rs = lsGet(RSALE_KEY);
   retailItems = Array.isArray(rt) ? rt : [];
   retailSales = Array.isArray(rs) ? rs : [];
@@ -2486,6 +2512,8 @@ function renderAll(){
   renderCustomersView();
   renderAssetsView();
   try{ renderZonesView(); }catch(e){}
+  try{ renderParkingView(); }catch(e){}
+  try{ renderStoreView(); }catch(e){}
   renderVendorsView();
   renderMenuView();
   renderStockView();
@@ -2499,7 +2527,8 @@ function renderAll(){
   renderNotes();
   renderCounter();
   renderKitchen();
-  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } var svb = document.getElementById("survivalBox"); if(svb){ svb.innerHTML = survivalCard(); var svo = svb.querySelector("#surv_open"); if(svo) svo.addEventListener("click", function(){ openSurvivalSheet(); }); } var sb = document.getElementById("setupBox"); if(sb){ sb.innerHTML = setupCard(); wireSetup(sb); } updateNavBadge(); }catch(e){}
+  try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } var xbb = document.getElementById("extraBizBox"); if(xbb){ xbb.innerHTML = extraBizCard(); var xbp = xbb.querySelector("[data-xb]"); Array.prototype.forEach.call(xbb.querySelectorAll("[data-xb]"), function(b){ b.addEventListener("click", function(){ showView("records"); switchRecordsSub(b.getAttribute("data-xb")); }); }); }
+    var svb = document.getElementById("survivalBox"); if(svb){ svb.innerHTML = survivalCard(); var svo = svb.querySelector("#surv_open"); if(svo) svo.addEventListener("click", function(){ openSurvivalSheet(); }); } var sb = document.getElementById("setupBox"); if(sb){ sb.innerHTML = setupCard(); wireSetup(sb); } updateNavBadge(); }catch(e){}
   try{ waiterCheck(); }catch(e){}
 }
 
@@ -3783,7 +3812,7 @@ function wireEntryClicks(root){
 
 // ---------- RECORDS (Sales / Purchases / Investments / Expenses) ----------
 // Records tabs: a scrolling strip, or (▦ Big icons, remembered per phone) a grid of large icon tiles.
-var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"🤝", expenses:"💸", fixed:"💡", customers:"👥", assets:"🪑", zones:"🗺️", vendors:"🏪",
+var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"🤝", expenses:"💸", fixed:"💡", customers:"👥", assets:"🪑", zones:"🗺️", parking:"🅿️", store:"🛍️", vendors:"🏪",
   menu:"📖", stock:"📦", cash:"💵", handover:"🔁", bank:"🏦", review:"🔍", loans:"💰", partners:"👔" };
 var REC_FULL = { purchases:"Purchases", expenses:"Expenses" }, REC_GRID_KEY = "rec_grid_v1";
 function recGridOn(){ try{ return localStorage.getItem(REC_GRID_KEY)==="1"; }catch(e){ return false; } }
@@ -3817,9 +3846,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", orders:"ordersView", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", zones:"zonesView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", orders:"ordersView", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", zones:"zonesView", parking:"parkingView", store:"storeView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", orders:"Purchase orders", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", zones:"Zones · areas", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", orders:"Purchase orders", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", zones:"Zones · areas", parking:"Parking", store:"General store", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -3832,6 +3861,8 @@ function updateRecordsTotal(){
   else if(recSub==="investments"){ var li = recInvestIn(); lbl.textContent = rl+" · net "+rupeeSigned(li.reduce(function(a,v){return a+investAmt(v);},0)); }
   else if(recSub==="expenses"){ var le = recExpIn(); lbl.textContent = rl+" · "+rupee(le.reduce(function(a,x){return a+expAmt(x);},0)); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
+  else if(recSub==="parking"){ var pin = parking.filter(function(p){ return p.status==="in"; }).length; lbl.textContent = pin+" parked now"; }
+  else if(recSub==="store"){ var tdy = fmtDate(new Date()), sst = storeSummary(function(d){ return d===tdy; }); lbl.textContent = "Today "+rupee(sst.sales)+" · profit "+rupee(sst.profit); }
   else if(recSub==="zones"){ var zz = cafeZones(), zd = zz.filter(function(z){ var st = zoneStatus(z); return st.due && !st.never; }).length, zo = zoneIssues(null, true).length; lbl.textContent = zz.length+" zone"+(zz.length!==1?"s":"")+(zd?" · "+zd+" due":"")+(zo?" · "+zo+" problem"+(zo!==1?"s":""):""); }
   else if(recSub==="orders"){ var op = pos.filter(function(p){ return ["received","rejected","cancelled"].indexOf(p.status)<0; }); lbl.textContent = op.length+" open · "+rupee(op.reduce(function(a,p){ return a+poTotalOf(p); },0)); }
   else if(recSub==="handover"){ var hh = handoverLedger(hoMonth); lbl.textContent = rupee(hh.reduce(function(a,r){ return a+Math.max(0,r.closing); },0))+" still with people"; }
@@ -4610,7 +4641,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos, liveOrders:liveOrders };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, parking:parking, storeItems:storeItems, storeSales:storeSales, storeBuys:storeBuys, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos, liveOrders:liveOrders };
 }
 
 function exportBackup(){
@@ -4785,6 +4816,7 @@ function applyBackupData(data, errEl, partial){
     assets = take("assets", assets); customers = take("customers", customers);
     creditPayments = take("creditPayments", creditPayments); wastage = take("wastage", wastage);
     prepBatches = take("prepBatches", prepBatches); stockAudits = take("stockAudits", stockAudits);
+    parking = take("parking", parking); storeItems = take("storeItems", storeItems); storeSales = take("storeSales", storeSales); storeBuys = take("storeBuys", storeBuys);
     retailItems = take("retailItems", retailItems); retailSales = take("retailSales", retailSales);
     cafeUse = take("cafeUse", cafeUse); custPayments = take("custPayments", custPayments);
     payroll = take("payroll", payroll);
@@ -7297,6 +7329,297 @@ function openZoneIssue(zid){
     saveChecks(); renderAll(); openZoneSheet(zid);
   });
 }
+// ---------- PARKING (optional per outlet: Counter → Settings) ----------
+// Each vehicle stay: type, number, driver, belongings left with it, check-in / out, payments.
+// Charged per 24 hours from check-in; days the driver stays and eats here are waived.
+function saveParking(){ return lsSet(PARK_KEY, parking); }
+function saveStoreItems(){ return lsSet(STORE_ITEMS_KEY, storeItems); }
+function saveStoreSales(){ return lsSet(STORE_SALES_KEY, storeSales); }
+function saveStoreBuys(){ return lsSet(STORE_BUYS_KEY, storeBuys); }
+function parkingOn(){ return settings.parkingOn === true; }
+function storeOn(){ return settings.storeOn === true; }
+var VEHICLES = [
+  { k:"bus", i:"🚌", t:"Bus", hi:"बस", rate:200 }, { k:"truck", i:"🚚", t:"Truck", hi:"ट्रक", rate:150 },
+  { k:"container", i:"🚛", t:"Large container truck", hi:"कंटेनर ट्रक", rate:300 }, { k:"tempo", i:"🛻", t:"Tempo / pickup", hi:"टेम्पो", rate:100 },
+  { k:"car", i:"🚗", t:"Car / jeep", hi:"कार", rate:50 }, { k:"bike", i:"🏍️", t:"Bike", hi:"बाइक", rate:20 }
+];
+function vehicleOf(k){ return VEHICLES.find(function(v){ return v.k===k; }) || VEHICLES[1]; }
+function parkRate(k){ var r = settings.parkingRates && settings.parkingRates[k]; return (r===0 || +r>0) ? +r : vehicleOf(k).rate; }
+var DIESEL = ["Empty","¼","½","¾","Full"];
+var BELONGINGS = [["key","🔑 Truck key","चाबी"],["stepney","🛞 Stepney","स्टेपनी"],["battery","🔋 Battery","बैटरी"],["tirpal","⛺ Tirpal","तिरपाल"],["papers","📄 Papers / RC","कागज़"],["tools","🧰 Tools / jack","औज़ार"]];
+// Days charged so far (or at check-out), waived days, amount, paid and due.
+function parkBill(p, atMs){
+  var end = p.outAt || atMs || Date.now(), hrs = Math.max(0, (end - p.inAt) / 3600000);
+  var days = Math.max(1, Math.ceil(hrs / 24 - 0.0001)), waived = Math.min(days, (p.waiveDays||[]).length);
+  var amount = r2((days - waived) * (+p.rate||0)), paid = r2((p.payments||[]).reduce(function(a,x){ return a+(+x.amount||0); },0));
+  return { days:days, waived:waived, charged:days-waived, amount:amount, paid:paid, due:r2(amount - paid), hrs:hrs };
+}
+function parkPaymentsIn(test, mode){ var t = 0; parking.forEach(function(p){ (p.payments||[]).forEach(function(x){ if(test(x.date) && (!mode || (mode==="Cash" ? (x.mode||"Cash")==="Cash" : (x.mode||"Cash")!=="Cash"))) t += +x.amount||0; }); }); return r2(t); }
+function renderParkingView(){
+  var el = document.getElementById("parkingView"); if(!el) return;
+  if(!parkingOn()){ el.innerHTML = '<div class="empty">Parking is switched off for this outlet (Counter → ⚙️ Settings).</div>'; return; }
+  var today = fmtDate(new Date()), inside = parking.filter(function(p){ return p.status==="in"; }).sort(function(a,b){ return a.inAt-b.inAt; });
+  var dueNow = inside.reduce(function(a,p){ return a + Math.max(0, parkBill(p).due); },0), todayIn = parkPaymentsIn(function(d){ return d===today; });
+  var mk = today.slice(0,7), monthIn = parkPaymentsIn(function(d){ return d && d.slice(0,7)===mk; });
+  var html = recKpis([["Parked now", String(inside.length), "", inside.length ? inside.map(function(p){ return vehicleOf(p.vtype).i; }).join("") : "&nbsp;"], ["To collect", rupee(dueNow), dueNow>0?"neg":"", "from parked vehicles"], ["Collected", rupee(todayIn), "pos", "today · "+rupee(monthIn)+" this month"]]);
+  if(canWriteKey(PARK_KEY)) html += '<div class="zbtns"><button class="btn-save" id="pk_in">🅿️ Vehicle in · गाड़ी आई</button><button class="btn-additem" id="pk_rates">Rates per day</button></div>';
+  html += inside.length ? inside.map(function(p){ var b = parkBill(p), v = vehicleOf(p.vtype), ateToday = (p.waiveDays||[]).indexOf(today)>=0;
+    return '<div class="pkcard" data-pk="'+esc(p.id)+'"><div class="pki">'+v.i+'</div><div class="pkb"><b class="notr">'+esc(p.vno||"—")+'</b> <span class="muted">'+esc(v.t)+'</span>'+
+      '<div class="muted" style="font-size:12.5px;">'+esc(p.driver||"")+(p.phone?' · '+esc(p.phone):'')+' · in '+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</div>'+
+      '<div style="font-size:13px;">Day '+b.days+(b.waived?' · '+b.waived+' free (ate here)':'')+' · <b>'+rupee(b.amount)+'</b>'+(b.paid?' · paid '+rupee(b.paid):'')+(b.due>0?' · <b class="bad">due '+rupee(b.due)+'</b>':'')+'</div>'+
+      '<div class="pkbel">'+parkBelongingsText(p)+'</div>'+
+      (canWriteKey(PARK_KEY) ? '<div class="pkbtns"><button class="'+(ateToday?'on':'')+'" data-pkate="'+esc(p.id)+'">'+(ateToday?'✔ Ate here today':'🍽️ Driver ate here today')+'</button><button data-pkout="'+esc(p.id)+'">Check out ›</button></div>' : '')+'</div></div>'; }).join("")
+    : '<div class="empty">No vehicle parked right now.</div>';
+  var out = parking.filter(function(p){ return p.status==="out"; }).sort(function(a,b){ return (b.outAt||0)-(a.outAt||0); }).slice(0, 10);
+  if(out.length) html += '<div class="card" style="margin-top:12px;"><h3>Recently left</h3>'+out.map(function(p){ var b = parkBill(p);
+    return '<div class="psrow" data-pk="'+esc(p.id)+'" style="cursor:pointer;"><span>'+vehicleOf(p.vtype).i+' <span class="notr">'+esc(p.vno)+'</span><br><small class="muted">'+esc(fmtD(p.inDate))+' → '+esc(fmtD(p.outDate))+' · '+b.days+' day'+(b.days!==1?'s':'')+(b.waived?', '+b.waived+' free':'')+'</small></span><b class="'+(b.due>0?'bad':'')+'">'+rupee(b.paid)+(b.due>0?' (due '+rupee(b.due)+')':'')+'</b></div>'; }).join("")+'</div>';
+  el.innerHTML = html;
+  var pi = el.querySelector("#pk_in"); if(pi) pi.addEventListener("click", function(){ openParkIn(null); });
+  var pr = el.querySelector("#pk_rates"); if(pr) pr.addEventListener("click", openParkRates);
+  Array.prototype.forEach.call(el.querySelectorAll("[data-pkate]"), function(b){ b.addEventListener("click", function(ev){ ev.stopPropagation(); var p = parking.find(function(x){ return x.id===b.getAttribute("data-pkate"); }); if(!p) return;
+    p.waiveDays = p.waiveDays || []; var k = p.waiveDays.indexOf(today); if(k>=0) p.waiveDays.splice(k,1); else p.waiveDays.push(today); saveParking(); renderAll(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-pkout]"), function(b){ b.addEventListener("click", function(ev){ ev.stopPropagation(); openParkOut(b.getAttribute("data-pkout")); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-pk]"), function(b){ b.addEventListener("click", function(){ openParkIn(b.getAttribute("data-pk")); }); });
+  if(recSub==="parking") updateRecordsTotal();
+}
+function parkBelongingsText(p){
+  var b = p.bel || {}, parts = BELONGINGS.filter(function(x){ return b[x[0]]; }).map(function(x){ return x[1]; });
+  if(p.diesel) parts.unshift("⛽ Diesel "+p.diesel);
+  if(b.other) parts.push(esc(b.other));
+  return parts.length ? 'Left with us: '+parts.join(" · ") : '';
+}
+function openParkRates(){
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">Parking rates · किराया</h2><div class="backupnote">Charge for every 24 hours (or part) from check-in.</div>'+
+    VEHICLES.map(function(v){ return '<div class="field"><label>'+v.i+' '+esc(v.t)+' · '+esc(v.hi)+' (₹ per day)</label><input type="number" inputmode="numeric" data-rate="'+v.k+'" value="'+esc(parkRate(v.k))+'"></div>'; }).join("")+
+    '<div class="sheetbtns"><button class="btn-cancel" id="pr_c">Cancel</button><button class="btn-save" id="pr_s">Save</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("pr_c").addEventListener("click", closeForm);
+  document.getElementById("pr_s").addEventListener("click", function(){ var r = {}; Array.prototype.forEach.call(sheet.querySelectorAll("[data-rate]"), function(i){ var v = parseFloat(i.value); r[i.getAttribute("data-rate")] = v>=0 ? v : 0; });
+    settings.parkingRates = r; saveSettings(); closeForm(); renderAll(); });
+}
+function openParkIn(id){
+  var p = id ? JSON.parse(JSON.stringify(parking.find(function(x){ return x.id===id; }))) : { id:uid(), vtype:"truck", vno:"", driver:"", phone:"", bel:{}, diesel:"", payments:[], waiveDays:[] };
+  var sheet = document.getElementById("sheet"), isNew = !id, ro = !canWriteKey(PARK_KEY) || p.status==="out";
+  var html = '<h2 class="serif">'+(isNew ? '🅿️ Vehicle in · गाड़ी आई' : vehicleOf(p.vtype).i+' <span class="notr">'+esc(p.vno)+'</span>')+'</h2>';
+  html += '<div class="vtypes">'+VEHICLES.map(function(v){ return '<button data-vt="'+v.k+'" class="'+(p.vtype===v.k?'on':'')+'"'+(ro?' disabled':'')+'><span>'+v.i+'</span>'+esc(v.t)+'<small>'+rupee(parkRate(v.k))+'/day</small></button>'; }).join("")+'</div>';
+  html += '<div class="field two"><div><label>Vehicle number</label><input id="pk_no" value="'+esc(p.vno)+'" placeholder="MP 09 HG 1234" style="text-transform:uppercase;"'+(ro?' disabled':'')+'></div><div><label>Driver name</label><input id="pk_dr" value="'+esc(p.driver)+'"'+(ro?' disabled':'')+'></div></div>';
+  html += '<div class="field two"><div><label>Driver phone</label><input id="pk_ph" inputmode="tel" value="'+esc(p.phone)+'"'+(ro?' disabled':'')+'></div><div><label>Diesel level</label><select id="pk_ds"'+(ro?' disabled':'')+'><option value="">—</option>'+DIESEL.map(function(d){ return '<option'+(p.diesel===d?' selected':'')+'>'+d+'</option>'; }).join("")+'</select></div></div>';
+  html += '<div class="field"><label>Left with us · हमारे पास रखा</label><div class="belchips">'+BELONGINGS.map(function(b){ return '<button type="button" data-bel="'+b[0]+'" class="'+((p.bel||{})[b[0]]?'on':'')+'"'+(ro?' disabled':'')+'>'+esc(b[1])+' <small>'+esc(b[2])+'</small></button>'; }).join("")+'</div>'+
+    '<input id="pk_other" style="margin-top:6px;" placeholder="Anything else (e.g. key no. 14, 2 bags)" value="'+esc((p.bel||{}).other||"")+'"'+(ro?' disabled':'')+'></div>';
+  if(isNew) html += '<div class="field two"><div><label>Advance paid (₹, optional)</label><input id="pk_adv" type="number" inputmode="numeric"></div><div><label>Paid by</label><select id="pk_advm"><option>Cash</option><option>UPI</option></select></div></div>';
+  if(!isNew){ var b = parkBill(p);
+    html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>In</span><b>'+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</b></div>'+(p.outAt?'<div class="psrow"><span>Out</span><b>'+esc(fmtD(p.outDate))+' '+esc(p.outTime||"")+'</b></div>':'')+
+      '<div class="psrow"><span>'+b.days+' day'+(b.days!==1?'s':'')+' × '+rupee(p.rate)+(b.waived?' − '+b.waived+' free (driver ate here: '+(p.waiveDays||[]).map(fmtD).join(", ")+')':'')+'</span><b>'+rupee(b.amount)+'</b></div>'+
+      (p.payments||[]).map(function(x){ return '<div class="psrow"><span class="muted">Paid '+esc(fmtD(x.date))+' · '+esc(x.mode||"Cash")+'</span><b>'+rupee(x.amount)+'</b></div>'; }).join("")+
+      '<div class="psrow"><span><b>'+(b.due>=0?'Due':'Extra paid')+'</b></span><b class="'+(b.due>0?'bad':'')+'">'+rupee(Math.abs(b.due))+'</b></div></div>';
+  }
+  html += '<div class="err" id="pk_err"></div><div class="sheetbtns"><button class="btn-cancel" id="pk_c">'+(ro?'Close':'Cancel')+'</button>'+(!isNew && !ro ? '<button class="btn-del" id="pk_del">Delete</button>' : '')+(ro?'':'<button class="btn-save" id="pk_s">'+(isNew?'Park it':'Save')+'</button>')+'</div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-vt]"), function(b){ b.addEventListener("click", function(){ p.vtype = b.getAttribute("data-vt"); Array.prototype.forEach.call(sheet.querySelectorAll("[data-vt]"), function(x){ x.classList.toggle("on", x===b); }); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-bel]"), function(b){ b.addEventListener("click", function(){ b.classList.toggle("on"); }); });
+  document.getElementById("pk_c").addEventListener("click", closeForm);
+  var del = document.getElementById("pk_del"); if(del) del.addEventListener("click", function(){ askConfirm("Delete this parking entry?", function(){ parking = parking.filter(function(x){ return x.id!==p.id; }); saveParking(); closeForm(); renderAll(); }); });
+  var sv = document.getElementById("pk_s");
+  if(sv) sv.addEventListener("click", function(){
+    var no = document.getElementById("pk_no").value.trim().toUpperCase(), e = document.getElementById("pk_err");
+    if(!no){ e.textContent = "Enter the vehicle number."; e.style.display = "block"; return; }
+    if(isNew && parking.some(function(x){ return x.status==="in" && (x.vno||"").replace(/\s/g,"")===no.replace(/\s/g,""); })){ e.textContent = "This vehicle is already parked."; e.style.display = "block"; return; }
+    p.vno = no; p.driver = document.getElementById("pk_dr").value.trim(); p.phone = document.getElementById("pk_ph").value.trim(); p.diesel = document.getElementById("pk_ds").value;
+    p.bel = { other: document.getElementById("pk_other").value.trim() }; Array.prototype.forEach.call(sheet.querySelectorAll("[data-bel].on"), function(b){ p.bel[b.getAttribute("data-bel")] = true; });
+    if(isNew){ var now = new Date(); p.inAt = now.getTime(); p.inDate = fmtDate(now); p.inTime = nowHM(); p.status = "in"; p.rate = parkRate(p.vtype); p.inBy = myName();
+      var adv = parseFloat(document.getElementById("pk_adv").value); if(adv>0) p.payments.push({ date:p.inDate, amount:adv, mode:document.getElementById("pk_advm").value, by:myName() });
+      parking.push(p); }
+    else { var i = parking.findIndex(function(x){ return x.id===p.id; }); if(!parking[i].payments || p.vtype!==parking[i].vtype) p.rate = parkRate(p.vtype); parking[i] = p; }
+    saveParking(); closeForm(); renderAll();
+  });
+}
+function openParkOut(id){
+  var p = parking.find(function(x){ return x.id===id; }); if(!p) return;
+  var b = parkBill(p), sheet = document.getElementById("sheet"), v = vehicleOf(p.vtype), bel = BELONGINGS.filter(function(x){ return (p.bel||{})[x[0]]; });
+  var html = '<h2 class="serif">Check out · '+v.i+' <span class="notr">'+esc(p.vno)+'</span></h2>';
+  html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>Parked</span><b>'+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+' → now</b></div>'+
+    '<div class="psrow"><span>'+b.days+' day'+(b.days!==1?'s':'')+' × '+rupee(p.rate)+'</span><b>'+rupee(b.days*p.rate)+'</b></div>'+
+    (b.waived ? '<div class="psrow"><span>🍽️ Driver ate here ('+b.waived+' day'+(b.waived!==1?'s':'')+' free)</span><b class="ok">− '+rupee(b.waived*p.rate)+'</b></div>' : '')+
+    (b.paid ? '<div class="psrow"><span>Already paid</span><b>− '+rupee(b.paid)+'</b></div>' : '')+
+    '<div class="psrow tot"><span><b>To collect · लेना है</b></span><b>'+rupee(Math.max(0,b.due))+'</b></div></div>';
+  if(bel.length || p.diesel || (p.bel||{}).other) html += '<div class="field"><label>Give back and tick · वापस दें</label>'+bel.map(function(x){ return '<label class="belret"><input type="checkbox" data-ret="'+x[0]+'"> '+esc(x[1])+'</label>'; }).join("")+
+    ((p.bel||{}).other ? '<label class="belret"><input type="checkbox" data-ret="other"> '+esc(p.bel.other)+'</label>' : '')+(p.diesel ? '<div class="muted" style="font-size:12.5px;">Diesel when parked: '+esc(p.diesel)+'</div>' : '')+'</div>';
+  html += '<div class="field two"><div><label>Collect now (₹)</label><input id="po_amt" type="number" inputmode="numeric" value="'+Math.max(0, Math.round(b.due))+'"></div><div><label>Paid by</label><select id="po_m"><option>Cash</option><option>UPI</option></select></div></div>';
+  html += '<div class="err" id="po_err"></div><div class="sheetbtns"><button class="btn-cancel" id="po_c">Back</button><button class="btn-save" id="po_s">✔ Check out</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  document.getElementById("po_c").addEventListener("click", closeForm);
+  document.getElementById("po_s").addEventListener("click", function(){
+    var boxes = sheet.querySelectorAll("[data-ret]"), notBack = Array.prototype.filter.call(boxes, function(c){ return !c.checked; });
+    if(notBack.length){ var e = document.getElementById("po_err"); e.textContent = "Tick everything given back to the driver first."; e.style.display = "block"; return; }
+    var amt = parseFloat(document.getElementById("po_amt").value) || 0, now = new Date();
+    if(amt>0){ p.payments = p.payments || []; p.payments.push({ date:fmtDate(now), amount:amt, mode:document.getElementById("po_m").value, by:myName() }); }
+    p.outAt = now.getTime(); p.outDate = fmtDate(now); p.outTime = nowHM(); p.status = "out"; p.outBy = myName(); p.returned = true;
+    saveParking(); closeForm(); renderAll();
+  });
+}
+// ---------- GENERAL STORE (optional per outlet) ----------
+// Its own items (buy price, selling price), stock buying, billing, order list and margin report.
+// Kept apart from the cafe's sales and food cost; its profit (sales − stock bought) is counted
+// as other income, its cash / UPI in the cash count and bank check.
+var STORE_CATS = ["Biscuits & snacks","Cold drinks & water","Tobacco & paan","Toiletries","Grocery","Dairy & bread","Medicine & first aid","Auto & truck supplies","Other"];
+var storeSub = "bill", storeCart = {};
+function storeItem(id){ return storeItems.find(function(x){ return x.id===id; }) || null; }
+function storeStock(it){
+  var from = it.openAt || (it.openDate ? new Date(it.openDate+"T00:00").getTime() : 0);
+  function at(r){ return r.at || new Date((r.date||"1970-01-01")+"T"+(r.time||"00:00")).getTime(); }
+  var bought = storeBuys.reduce(function(a,b){ return (!from || at(b) >= from) ? a + (b.lines||[]).filter(function(l){ return l.itemId===it.id; }).reduce(function(s,l){ return s+(+l.qty||0); },0) : a; },0);
+  var sold = storeSales.reduce(function(a,s){ return (!from || at(s) >= from) ? a + (s.lines||[]).filter(function(l){ return l.itemId===it.id; }).reduce(function(q,l){ return q+(+l.qty||0); },0) : a; },0);
+  return r2((+it.open||0) + bought - sold);
+}
+function storeMargin(it){ var s = +it.sell||0, c = +it.cost||0; return s>0 ? (s-c)/s : null; }
+function storeLowMargin(it){ var m = storeMargin(it); return m!==null && m < ((+settings.storeMinMargin||10)/100); }
+function storeSalesIn(test){ return storeSales.filter(function(s){ return test(s.date); }); }
+function storeSummary(test){
+  var sales = 0, cogs = 0, by = {};
+  storeSalesIn(test).forEach(function(s){ (s.lines||[]).forEach(function(l){ var r = (+l.qty||0)*(+l.price||0), c = (+l.qty||0)*(+l.cost||0); sales += r; cogs += c;
+    var b = by[l.name] = by[l.name] || { qty:0, sales:0, profit:0 }; b.qty += +l.qty||0; b.sales += r; b.profit += r - c; }); });
+  var buys = storeBuys.filter(function(b){ return test(b.date); }).reduce(function(a,b){ return a+(+b.total||0); },0);
+  return { sales:r2(sales), cogs:r2(cogs), profit:r2(sales-cogs), margin: sales>0 ? (sales-cogs)/sales : 0, buys:r2(buys), by:by, bills:storeSalesIn(test).length };
+}
+function storeMoneyIn(test, cash){ return r2(storeSalesIn(test).filter(function(s){ return cash ? (s.mode||"Cash")==="Cash" : (s.mode||"Cash")!=="Cash"; }).reduce(function(a,s){ return a+(+s.total||0); },0)); }
+function storeBuysOut(test, cash){ return r2(storeBuys.filter(function(b){ return test(b.date) && (cash ? (b.mode||"Cash")==="Cash" : (b.mode||"Cash")!=="Cash" && b.mode!=="Credit"); }).reduce(function(a,b){ return a+(+b.total||0); },0)); }
+function renderStoreView(){
+  var el = document.getElementById("storeView"); if(!el) return;
+  if(!storeOn()){ el.innerHTML = '<div class="empty">The general store is switched off for this outlet (Counter → ⚙️ Settings).</div>'; return; }
+  var subs = [["bill","🧾 Bill"],["stock","📦 Stock"],["order","📝 Order list"],["buy","🛒 Buy stock"],["report","📊 Margins"]].filter(function(s){ return s[0]!=="buy" || canWriteKey(STORE_BUYS_KEY); });
+  if(!subs.some(function(s){ return s[0]===storeSub; })) storeSub = "bill";
+  var html = '<div class="segctl recctl5" id="storeCtl" style="margin-bottom:10px;">'+subs.map(function(s){ return '<button data-ss="'+s[0]+'" class="'+(storeSub===s[0]?'on':'')+'">'+s[1]+'</button>'; }).join("")+'</div>';
+  var today = fmtDate(new Date());
+  if(storeSub==="bill"){
+    var cart = Object.keys(storeCart).filter(function(k){ return storeCart[k]>0 && storeItem(k); }), tot = cart.reduce(function(a,k){ return a + storeCart[k]*(+storeItem(k).sell||0); },0);
+    var ts = storeSummary(function(d){ return d===today; });
+    html += '<div class="backupnote">Today: '+ts.bills+' bill'+(ts.bills!==1?'s':'')+' · '+rupee(ts.sales)+' · profit '+rupee(ts.profit)+'</div>';
+    if(cart.length) html += '<div class="card stcart"><h3>Bill</h3>'+cart.map(function(k){ var it = storeItem(k); return '<div class="psrow"><span class="notr">'+storeCart[k]+'× '+esc(it.name)+'</span><span><b>'+rupee(storeCart[k]*(+it.sell||0))+'</b> <button class="ndel" data-sminus="'+esc(k)+'">−</button></span></div>'; }).join("")+
+      '<div class="psrow tot"><span><b>Total</b></span><b>'+rupee(tot)+'</b></div><div class="zbtns"><button class="btn-save" data-spay="Cash">💵 Cash</button><button class="btn-save" data-spay="UPI">📱 UPI</button></div><button class="btn-additem" id="st_clear">Clear</button></div>';
+    html += '<input id="st_q" placeholder="🔍 Search item" style="width:100%;margin-bottom:8px;">';
+    html += storeItems.length ? '<div class="stgrid">'+storeItems.slice().sort(function(a,b){ return (a.name||"").localeCompare(b.name||""); }).map(function(it){ var q = storeCart[it.id]||0, s = storeStock(it);
+      return '<button class="sttile'+(q?' has':'')+(s<=0?' out':'')+'" data-sadd="'+esc(it.id)+'" data-name="'+esc((it.name||"").toLowerCase())+'"><b class="notr">'+esc(it.name)+'</b><span>'+rupee(it.sell)+'</span><small>'+(s<=0?'out of stock':s+' left')+'</small>'+(q?'<i>'+q+'</i>':'')+'</button>'; }).join("")+'</div>'
+      : '<div class="empty">No store items yet. Add them in 📦 Stock.</div>';
+  } else if(storeSub==="stock"){
+    var val = storeItems.reduce(function(a,it){ return a + Math.max(0, storeStock(it))*(+it.cost||0); },0);
+    html += '<div class="backupnote">'+storeItems.length+' items · stock worth '+rupee(val)+' at buying price.</div>';
+    if(canWriteKey(STORE_ITEMS_KEY)) html += '<button class="btn-big" id="st_add" style="margin-bottom:10px;">+ Add store item</button>';
+    html += storeItems.map(function(it){ var s = storeStock(it), m = storeMargin(it), low = s <= (+it.min||0);
+      return '<div class="entry" data-sedit="'+esc(it.id)+'"><div style="flex:1;min-width:0;"><div class="who notr">'+esc(it.name)+'</div><div class="meta">'+esc(it.cat||"")+' · buy '+rupeeP(it.cost||0)+' · sell '+rupeeP(it.sell||0)+
+        (m!==null?' · <b class="'+(m<0?'bad':storeLowMargin(it)?'warnamt':'ok')+'">'+Math.round(m*100)+'% margin</b>':'')+'</div></div><div class="amt '+(low?'purch':'sale')+'">'+s+'<span style="font-size:9px;display:block;color:var(--ink-soft)">'+esc(it.unit||"pcs")+'</span></div></div>'; }).join("");
+  } else if(storeSub==="order"){
+    var low2 = storeItems.filter(function(it){ return storeStock(it) <= (+it.min||0); });
+    var byV = {}; low2.forEach(function(it){ var v = it.vendor || "Any shop"; (byV[v] = byV[v] || []).push(it); });
+    html += low2.length ? Object.keys(byV).map(function(v){ return '<div class="card" style="margin-bottom:10px;"><h3>'+esc(v)+'</h3>'+byV[v].map(function(it){ var s = storeStock(it), want = Math.max(1, Math.ceil((+it.min||0)*2 - s));
+      return '<div class="psrow"><span class="notr">'+esc(it.name)+' <small class="muted">· '+s+' left</small></span><b>'+want+' '+esc(it.unit||"pcs")+'</b></div>'; }).join("")+'</div>'; }).join("")+
+      '<button class="btn-save" id="st_share" style="width:100%;">📲 Share order list on WhatsApp</button>'
+      : '<div class="empty">Nothing to order — every item is above its reorder level.</div>';
+  } else if(storeSub==="buy"){
+    html += '<button class="btn-big" id="st_buy" style="margin-bottom:10px;">+ Stock bought (bill)</button>';
+    html += storeBuys.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 20).map(function(b){
+      return '<div class="psrow"><span>'+esc(fmtD(b.date))+' · '+esc(b.vendor||"")+'<br><small class="muted">'+(b.lines||[]).map(function(l){ var it = storeItem(l.itemId); return (it?it.name:"?")+' × '+l.qty; }).join(", ")+' · '+esc(b.mode||"Cash")+'</small></span><b>'+rupee(b.total)+'</b></div>'; }).join("") || '<div class="empty">No stock bought yet.</div>';
+  } else {
+    var mk = today.slice(0,7), ms = storeSummary(function(d){ return d && d.slice(0,7)===mk; }), td = storeSummary(function(d){ return d===today; });
+    html += recKpis([["Sales", rupee(ms.sales), "pos", "this month · today "+rupee(td.sales)], ["Profit", rupee(ms.profit), ms.profit>=0?"pos":"neg", Math.round(ms.margin*100)+"% margin"], ["Stock bought", rupee(ms.buys), "", "this month"]]);
+    var lm = storeItems.filter(storeLowMargin);
+    if(lm.length) html += '<div class="card owedcard" style="margin-bottom:10px;"><h3>⚠️ Low margin (under '+(+settings.storeMinMargin||10)+'%)</h3>'+lm.map(function(it){ var m = storeMargin(it);
+      return '<div class="psrow"><span class="notr">'+esc(it.name)+' <small class="muted">· buy '+rupeeP(it.cost)+' · sell '+rupeeP(it.sell)+'</small></span><b class="'+(m<0?'bad':'warnamt')+'">'+Math.round(m*100)+'%</b></div>'; }).join("")+
+      '<div class="backupnote" style="margin:6px 0 0;">Raise the price, buy cheaper, or stop stocking these.</div></div>';
+    var top = Object.keys(ms.by).sort(function(a,b){ return ms.by[b].profit - ms.by[a].profit; });
+    if(top.length) html += '<div class="card"><h3>This month by item</h3>'+top.map(function(n){ var x = ms.by[n];
+      return '<div class="psrow"><span class="notr">'+esc(n)+' <small class="muted">· '+x.qty+' sold · '+rupee(x.sales)+'</small></span><b class="'+(x.profit<0?'bad':'')+'">'+rupee(x.profit)+'</b></div>'; }).join("")+'</div>';
+    if(canWriteKey(SETTINGS_KEY)) html += '<div class="field" style="margin-top:10px;"><label>Warn when margin is below (%)</label><input id="st_minm" type="number" inputmode="numeric" value="'+esc(+settings.storeMinMargin||10)+'"></div>';
+  }
+  el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ss]"), function(b){ b.addEventListener("click", function(){ storeSub = b.getAttribute("data-ss"); renderStoreView(); }); });
+  var q = el.querySelector("#st_q"); if(q) q.addEventListener("input", function(){ var v = q.value.toLowerCase(); Array.prototype.forEach.call(el.querySelectorAll("[data-sadd]"), function(b){ b.style.display = b.getAttribute("data-name").indexOf(v)>=0 ? "" : "none"; }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-sadd]"), function(b){ b.addEventListener("click", function(){ var k = b.getAttribute("data-sadd"); storeCart[k] = (storeCart[k]||0) + 1; renderStoreView(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-sminus]"), function(b){ b.addEventListener("click", function(){ var k = b.getAttribute("data-sminus"); storeCart[k] = Math.max(0, (storeCart[k]||0) - 1); renderStoreView(); }); });
+  var cl = el.querySelector("#st_clear"); if(cl) cl.addEventListener("click", function(){ storeCart = {}; renderStoreView(); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-spay]"), function(b){ b.addEventListener("click", function(){
+    var lines = Object.keys(storeCart).filter(function(k){ return storeCart[k]>0 && storeItem(k); }).map(function(k){ var it = storeItem(k); return { itemId:k, name:it.name, qty:storeCart[k], price:+it.sell||0, cost:+it.cost||0 }; });
+    if(!lines.length) return;
+    var now = new Date(), tot = r2(lines.reduce(function(a,l){ return a+l.qty*l.price; },0));
+    var no = 1 + storeSales.filter(function(s){ return s.date===fmtDate(now); }).length;
+    storeSales.push({ id:uid(), date:fmtDate(now), time:nowHM(), at:now.getTime(), no:no, lines:lines, total:tot, mode:b.getAttribute("data-spay"), byName:myName() });
+    storeCart = {}; saveStoreSales(); renderAll(); appAlert("Store bill "+no+" saved · "+rupee(tot)+" ("+b.getAttribute("data-spay")+")"); }); });
+  var ad = el.querySelector("#st_add"); if(ad) ad.addEventListener("click", function(){ openStoreItemForm(null); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-sedit]"), function(b){ b.addEventListener("click", function(){ if(canWriteKey(STORE_ITEMS_KEY)) openStoreItemForm(b.getAttribute("data-sedit")); }); });
+  var by = el.querySelector("#st_buy"); if(by) by.addEventListener("click", openStoreBuy);
+  var sh = el.querySelector("#st_share"); if(sh) sh.addEventListener("click", function(){
+    var low = storeItems.filter(function(it){ return storeStock(it) <= (+it.min||0); });
+    var t = OUTLET.name+" – store order\n\n"+low.map(function(it){ return "• "+it.name+": "+Math.max(1, Math.ceil((+it.min||0)*2 - storeStock(it)))+" "+(it.unit||"pcs")+(it.vendor?" ("+it.vendor+")":""); }).join("\n");
+    try{ window.open("https://wa.me/?text="+encodeURIComponent(t), "_blank"); }catch(e){} });
+  var mm = el.querySelector("#st_minm"); if(mm) mm.addEventListener("change", function(){ var v = parseFloat(mm.value); settings.storeMinMargin = v>=0 ? v : 10; saveSettings(); renderStoreView(); });
+  if(recSub==="store") updateRecordsTotal();
+}
+function openStoreItemForm(id){
+  var it = id ? JSON.parse(JSON.stringify(storeItem(id))) : { id:uid(), name:"", cat:STORE_CATS[0], unit:"pcs", sell:"", cost:"", open:0, openDate:fmtDate(new Date()), min:5, vendor:"" };
+  var sheet = document.getElementById("sheet");
+  var html = '<h2 class="serif">'+(id?"Edit store item":"New store item")+'</h2>';
+  html += '<div class="field two"><div><label>Name</label><input id="si_name" value="'+esc(it.name)+'" placeholder="e.g. Parle-G 100g"></div><div><label>Category</label><select id="si_cat">'+STORE_CATS.map(function(c){ return '<option'+(it.cat===c?' selected':'')+'>'+c+'</option>'; }).join("")+'</select></div></div>';
+  html += '<div class="field two"><div><label>Buying price (₹ per unit)</label><input id="si_cost" type="number" inputmode="decimal" value="'+esc(it.cost)+'"></div><div><label>Selling price (₹)</label><input id="si_sell" type="number" inputmode="decimal" value="'+esc(it.sell)+'"></div></div>';
+  html += '<div class="backupnote" id="si_m"></div>';
+  html += '<div class="field two"><div><label>Unit</label><input id="si_unit" value="'+esc(it.unit||"pcs")+'"></div><div><label>Reorder when stock is at</label><input id="si_min" type="number" inputmode="numeric" value="'+esc(it.min)+'"></div></div>';
+  html += '<div class="field two"><div><label>Stock now</label><input id="si_open" type="number" inputmode="decimal" value="'+esc(id ? storeStock(it) : it.open)+'"></div><div><label>Usual supplier</label><input id="si_vendor" value="'+esc(it.vendor||"")+'"></div></div>';
+  html += '<div class="err" id="si_err"></div><div class="sheetbtns"><button class="btn-cancel" id="si_c">Cancel</button>'+(id?'<button class="btn-del" id="si_del">Delete</button>':'')+'<button class="btn-save" id="si_s">Save</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  function mshow(){ var c = parseFloat(document.getElementById("si_cost").value)||0, s = parseFloat(document.getElementById("si_sell").value)||0, m = s>0 ? Math.round((s-c)/s*100) : null;
+    document.getElementById("si_m").innerHTML = m===null ? '' : 'Profit per unit '+rupeeP(s-c)+' · <b class="'+(m<0?'bad':m<(+settings.storeMinMargin||10)?'warnamt':'ok')+'">'+m+'% margin</b>'; }
+  ["si_cost","si_sell"].forEach(function(k){ document.getElementById(k).addEventListener("input", mshow); }); mshow();
+  document.getElementById("si_c").addEventListener("click", closeForm);
+  var del = document.getElementById("si_del"); if(del) del.addEventListener("click", function(){ askConfirm("Delete "+it.name+"?", function(){ storeItems = storeItems.filter(function(x){ return x.id!==id; }); saveStoreItems(); closeForm(); renderAll(); }); });
+  document.getElementById("si_s").addEventListener("click", function(){
+    var n = document.getElementById("si_name").value.trim(), e = document.getElementById("si_err"), sell = parseFloat(document.getElementById("si_sell").value);
+    if(!n || !(sell>0)){ e.textContent = "Enter the name and selling price."; e.style.display = "block"; return; }
+    var stockNow = parseFloat(document.getElementById("si_open").value) || 0;
+    it.name = n; it.cat = document.getElementById("si_cat").value; it.cost = parseFloat(document.getElementById("si_cost").value)||0; it.sell = sell;
+    it.unit = document.getElementById("si_unit").value.trim() || "pcs"; it.min = parseFloat(document.getElementById("si_min").value)||0; it.vendor = document.getElementById("si_vendor").value.trim();
+    // "Stock now" restarts the count from today when it changed (a physical count).
+    if(!id || stockNow !== storeStock(storeItem(id))){ it.open = stockNow; it.openDate = fmtDate(new Date()); var t = new Date(); it.openAt = t.getTime(); }
+    var i = storeItems.findIndex(function(x){ return x.id===it.id; }); if(i>=0) storeItems[i] = it; else storeItems.push(it);
+    saveStoreItems(); closeForm(); renderAll();
+  });
+}
+function openStoreBuy(){
+  var sheet = document.getElementById("sheet"), rows = [{ itemId:"", qty:"", cost:"" }];
+  function draw(){
+    var html = '<h2 class="serif">Stock bought · माल आया</h2>';
+    html += '<div class="field two"><div><label>Date</label><input type="date" id="sb_date" value="'+fmtDate(new Date())+'"></div><div><label>Supplier</label><input id="sb_vendor" placeholder="e.g. Agrawal Traders"></div></div>';
+    html += rows.map(function(r, i){ return '<div class="field two sbrow"><div><label>Item</label><select data-sbi="'+i+'"><option value="">— pick —</option>'+storeItems.map(function(it){ return '<option value="'+esc(it.id)+'"'+(r.itemId===it.id?' selected':'')+'>'+esc(it.name)+'</option>'; }).join("")+'</select></div>'+
+      '<div style="display:flex;gap:6px;"><div style="flex:1;"><label>Qty</label><input type="number" inputmode="decimal" data-sbq="'+i+'" value="'+esc(r.qty)+'"></div><div style="flex:1;"><label>₹ per unit</label><input type="number" inputmode="decimal" data-sbc="'+i+'" value="'+esc(r.cost)+'"></div></div></div>'; }).join("");
+    html += '<button class="btn-additem" id="sb_more">+ Another item</button>';
+    html += '<div class="field"><label>Paid by</label><select id="sb_mode"><option>Cash</option><option>UPI</option><option value="Credit">Udhaar (pay later)</option></select></div>';
+    html += '<div class="err" id="sb_err"></div><div class="sheetbtns"><button class="btn-cancel" id="sb_c">Cancel</button><button class="btn-save" id="sb_s">Save</button></div>';
+    sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+    function sync(){ rows.forEach(function(r, i){ r.itemId = sheet.querySelector('[data-sbi="'+i+'"]').value; r.qty = sheet.querySelector('[data-sbq="'+i+'"]').value; r.cost = sheet.querySelector('[data-sbc="'+i+'"]').value; }); }
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-sbi]"), function(s){ s.addEventListener("change", function(){ var i = +s.getAttribute("data-sbi"), it = storeItem(s.value), c = sheet.querySelector('[data-sbc="'+i+'"]'); if(it && !c.value) c.value = it.cost||""; }); });
+    document.getElementById("sb_more").addEventListener("click", function(){ sync(); rows.push({ itemId:"", qty:"", cost:"" }); draw(); });
+    document.getElementById("sb_c").addEventListener("click", closeForm);
+    document.getElementById("sb_s").addEventListener("click", function(){
+      sync(); var lines = rows.filter(function(r){ return r.itemId && +r.qty>0; }).map(function(r){ return { itemId:r.itemId, qty:+r.qty, cost:+r.cost||0 }; });
+      if(!lines.length){ var e = document.getElementById("sb_err"); e.textContent = "Pick at least one item with a quantity."; e.style.display = "block"; return; }
+      var tot = r2(lines.reduce(function(a,l){ return a+l.qty*l.cost; },0));
+      var bd = document.getElementById("sb_date").value || fmtDate(new Date());
+      storeBuys.push({ id:uid(), date:bd, at: bd===fmtDate(new Date()) ? Date.now() : new Date(bd+"T12:00").getTime(), vendor:document.getElementById("sb_vendor").value.trim(), lines:lines, total:tot, mode:document.getElementById("sb_mode").value, byName:myName() });
+      // The latest buying price becomes the item's cost (for margins).
+      lines.forEach(function(l){ var it = storeItem(l.itemId); if(it && l.cost>0) it.cost = l.cost; });
+      saveStoreBuys(); saveStoreItems(); closeForm(); renderAll();
+    });
+  }
+  draw();
+}
+// Dashboard: parking and the general store this month (only where they are switched on).
+function extraBizCard(){
+  if(!(parkingOn() || storeOn()) || !(isFullAccess() || myAccess()==="manager")) return "";
+  var mk = fmtDate(new Date()).slice(0,7), inM = function(d){ return !!d && d.slice(0,7)===mk; }, html = '<div class="card" style="margin-bottom:14px;"><h3>Other businesses · '+esc(monthLabel(mk))+'</h3>';
+  if(parkingOn()){ var pin = parking.filter(function(p){ return p.status==="in"; }), due = pin.reduce(function(a,p){ return a+Math.max(0, parkBill(p).due); },0);
+    html += '<div class="psrow" data-xb="parking" style="cursor:pointer;"><span>🅿️ Parking · '+pin.length+' parked now'+(due>0?' · '+rupee(due)+' to collect':'')+'</span><b>'+rupee(parkPaymentsIn(inM))+'</b></div>'; }
+  if(storeOn()){ var ss = storeSummary(inM), lm = storeItems.filter(storeLowMargin).length, low = storeItems.filter(function(it){ return storeStock(it) <= (+it.min||0); }).length;
+    html += '<div class="psrow" data-xb="store" style="cursor:pointer;"><span>🛍️ Store · sales '+rupee(ss.sales)+' · '+Math.round(ss.margin*100)+'% margin'+(lm?' · ⚠️ '+lm+' low-margin':'')+(low?' · '+low+' to reorder':'')+'</span><b>'+rupee(ss.profit)+'</b></div>'; }
+  return html+'<div class="backupnote" style="margin:4px 0 0;">Kept apart from cafe sales; counted in profit as other income.</div></div>';
+}
 function attentionItems(){
   var out = [];
   if(canReadKey(ING_KEY) && canReadKey(PURCH_KEY)){
@@ -7307,6 +7630,7 @@ function attentionItems(){
   if(canReadKey(POS_KEY)) out = out.concat(poAttention());
   if(canSummary()) out = out.concat(patternAlerts());
   if(canReadKey(CHECKS_KEY)) out = out.concat(zoneAttention());
+  if(storeOn() && canReadKey(STORE_ITEMS_KEY)){ var srl = storeItems.filter(function(it){ return storeStock(it) <= (+it.min||0); }); if(srl.length) out.push({ t:"🛍️ "+srl.length+" store item"+(srl.length!==1?"s":"")+" to reorder ("+srl.slice(0,3).map(function(it){ return it.name; }).join(", ")+(srl.length>3?"…":"")+")", go:"store" }); }
   if(canReadKey(ASSETS_KEY)) assetAlerts().forEach(function(x){ out.push({ t:(x.st==="broken"?"⛔ ":"🛠️ ")+x.a.name+": "+x.why.join(", "), go:"assets" }); });
   return out;
 }
@@ -10880,6 +11204,8 @@ function renderCounter(){
   html += '<div class="ctools">'+
     '<button id="ct_live" class="'+(activeTickets().some(function(t){ return (t.status==="new"||t.status==="cooking") && ticketMins(t)>ticketTarget(t); })?"warn":"")+'">📋 Live orders ('+activeTickets().length+')</button>'+
     '<button id="ct_bills">🧾 Today’s bills</button>'+
+    (parkingOn() && canReadKey(PARK_KEY) ? '<button id="ct_park">🅿️ Parking ('+parking.filter(function(p){ return p.status==="in"; }).length+')</button>' : '')+
+    (storeOn() && canReadKey(STORE_ITEMS_KEY) ? '<button id="ct_store">🛍️ Store bill</button>' : '')+
     (canWriteKey(LIVE_KEY) && waiterOn() ? (function(){ var wm = waiterMode(), wn = wm ? waiterTasks(wm!=="all"?wm:"").length : waiterTasks("").length; return '<button id="ct_waiter" class="'+(wm?"on":"")+(wn?" warn":"")+'">🛎️ Waiter'+(wn?' ('+wn+')':'')+(wm?' · 🔔':'')+'</button>'; })() : '')+
     (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checksInUse() && checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
@@ -10920,6 +11246,8 @@ function renderCounter(){
 function wireCounterTools(el){
   var b = document.getElementById("ct_bills"); if(b) b.addEventListener("click", function(){ openCounterBills(fmtDate(new Date())); });
   var lv = document.getElementById("ct_live"); if(lv) lv.addEventListener("click", function(){ openLiveOrders(false); });
+  var cpk = document.getElementById("ct_park"); if(cpk) cpk.addEventListener("click", function(){ showView("records"); switchRecordsSub("parking"); });
+  var cst = document.getElementById("ct_store"); if(cst) cst.addEventListener("click", function(){ storeSub = "bill"; showView("records"); switchRecordsSub("store"); });
   var wb = document.getElementById("ct_waiter"); if(wb) wb.addEventListener("click", function(){ waiterUnlockSound(); openWaiterSheet(); });
   var s = document.getElementById("ct_simple"); if(s) s.addEventListener("click", function(){ setSimpleMode(!simpleMode()); });
   var v = document.getElementById("ct_voice"); if(v) v.addEventListener("click", function(){ setVoice(!voiceOn()); renderCounter(); });
@@ -10944,13 +11272,17 @@ function openUpiSettings(){
       html += '<div class="field two" style="margin-top:8px;"><div><input id="of_name" placeholder="Offer name"></div><div class="two" style="display:flex;gap:6px;"><input type="number" inputmode="decimal" id="of_val" placeholder="Value" style="flex:1;min-width:0;"><select id="of_kind" style="flex:1;min-width:0;"><option value="pct">%</option><option value="amt">₹</option></select></div></div>'+
         '<button class="btn-additem" id="of_add">+ Add offer</button>';
     }
+    html += '<div class="dgroup">Extra businesses at '+esc(OUTLET.name||"this outlet")+'</div>'+
+      '<div class="field two"><div><label>🅿️ Parking</label><select id="up_park"><option value="off"'+(!parkingOn()?' selected':'')+'>Off</option><option value="on"'+(parkingOn()?' selected':'')+'>On — vehicle parking</option></select></div>'+
+      '<div><label>🛍️ General store</label><select id="up_store"><option value="off"'+(!storeOn()?' selected':'')+'>Off</option><option value="on"'+(storeOn()?' selected':'')+'>On — separate store</option></select></div></div>'+
+      '<div class="backupnote" style="margin:-4px 0 8px;">Most outlets keep these off. When on, Records gets a Parking / Store tab and the Counter a button for it.</div>';
     html += '<div class="dgroup">Order types</div>'+
       '<div class="field"><label>Dine-in service at '+esc(OUTLET.name||"this outlet")+'</label><select id="up_waiter"><option value="on"'+(waiterOn()?' selected':'')+'>🛎️ Waiters serve at the tables (waiter alerts on)</option><option value="off"'+(!waiterOn()?' selected':'')+'>🙋 Self service — customers collect at the counter</option></select>'+
       '<div class="backupnote" style="margin:4px 0 0;">Self service hides the 🛎️ Waiter button and its alerts on every phone of this outlet; the kitchen guide says “call the customer to collect” instead.</div></div>'+
       '<div class="psrow"><span>Tables: '+esc(cafeTables().join(", "))+'</span><button class="btn-additem" id="up_tables" style="width:auto;padding:6px 12px;">✏️ Edit tables</button></div>'+
       '<div class="field"><label>Own delivery charge (₹)</label><input id="up_dcharge" type="number" inputmode="numeric" value="'+esc(deliveryCharge())+'"></div>';
     html += '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
-    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge","up_waiter"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
+    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge","up_waiter","up_park","up_store"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     Object.keys(keep).forEach(function(k){ var e = document.getElementById(k); if(e) e.value = keep[k]; });
     function err(m){ var e = document.getElementById("up_err"); e.textContent = m; e.style.display = "block"; }
@@ -10972,6 +11304,7 @@ function openUpiSettings(){
       settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx;
       var dc = parseFloat(document.getElementById("up_dcharge").value); settings.deliveryCharge = dc>=0 ? dc : 0;
       settings.waiterService = document.getElementById("up_waiter").value !== "off";
+      settings.parkingOn = document.getElementById("up_park").value === "on"; settings.storeOn = document.getElementById("up_store").value === "on";
       saveSettings();
       if(canOffers){ offers = offs; saveOffers(); }
       closeForm(); renderCounter();
@@ -11376,6 +11709,12 @@ function bankRows(){
   var byDay = {};
   sales.forEach(function(x){ if(x.date && (x.mode==="UPI" || x.mode==="Card")) byDay[x.date] = (byDay[x.date]||0) + saleTotal(x); });
   Object.keys(byDay).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:byDay[d], text:"UPI / card sales", ref:d }); });
+  // Parking and general store money by UPI, and store stock paid by UPI.
+  var xd = {}; parking.forEach(function(p){ (p.payments||[]).forEach(function(x){ if(x.date && (x.mode||"Cash")!=="Cash") xd[x.date] = (xd[x.date]||0) + (+x.amount||0); }); });
+  Object.keys(xd).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:xd[d], text:"Parking (UPI)", ref:"park"+d }); });
+  var sd = {}; storeSales.forEach(function(x){ if(x.date && (x.mode||"Cash")!=="Cash") sd[x.date] = (sd[x.date]||0) + (+x.total||0); });
+  Object.keys(sd).forEach(function(d){ rows.push({ date:d, kind:"sales", amt:sd[d], text:"General store (UPI)", ref:"store"+d }); });
+  storeBuys.forEach(function(b){ if(b.date && b.mode && b.mode!=="Cash" && b.mode!=="Credit") rows.push({ date:b.date, kind:"purchases", amt:-(+b.total||0), text:"Store stock · "+(b.vendor||""), ref:b.id }); });
   (settings.platformPayouts||[]).forEach(function(x){ if(x && x.date) rows.push({ date:x.date, kind:"sales", amt:+x.amount||0, text:(CHANNELS[x.platform]?CHANNELS[x.platform].t:"Online")+" payout", ref:x.id }); });
   creditPayments.forEach(function(x){
     if(x.date && x.mode && x.mode!=="Cash"){ var c = custById ? custById(x.customerId) : null;
@@ -11707,7 +12046,9 @@ function renderHandoverView(){
 
 // Other income: bank interest, counted in profit on the day it was credited.
 function otherIncomeIn(test){
-  return r2(cashMoves.filter(function(m){ return m.type==="interest" && test(m.date); }).reduce(function(a,m){ return a+(+m.amount||0); },0));
+  // Interest, parking charges collected, and the general store's sales less the stock it bought.
+  var extra = parkPaymentsIn(test) + r2(storeSalesIn(test).reduce(function(a,s){ return a+(+s.total||0); },0)) - r2(storeBuys.filter(function(b){ return test(b.date); }).reduce(function(a,b){ return a+(+b.total||0); },0));
+  return r2(extra + cashMoves.filter(function(m){ return m.type==="interest" && test(m.date); }).reduce(function(a,m){ return a+(+m.amount||0); },0));
 }
 // ---------- LOANS ----------
 // Every loan in one place: working capital loans from partners (kept with partner
@@ -12736,6 +13077,9 @@ function cashMovement(dateStr){
   var inCredit = creditPayments.filter(function(p){ return p.date===dateStr && (p.mode||"Cash")==="Cash"; })
                     .reduce(function(a,p){ return a+(+p.amount||0); },0);
   inflow += inCredit;
+  // Parking charges and store bills paid in cash go into the counter; store stock paid in cash comes out of it.
+  var oneDay = function(d){ return d===dateStr; }, inPark = parkPaymentsIn(oneDay, "Cash"), inStore = storeMoneyIn(oneDay, true), outStore = storeBuysOut(oneDay, true);
+  inflow += inPark + inStore;
   var outPurch = purchases.filter(function(p){ return p.date===dateStr && paidFromTill(p); })
                     .reduce(function(a,p){ return a+purchTotal(p); },0);
   var outExp = expenses.filter(function(x){ return x.date===dateStr && x.mode==="Cash" && !payerIsPersonal(x.paidBy) && !payerHeldBy(x.paidBy); })
@@ -12758,7 +13102,8 @@ function cashMovement(dateStr){
     if(loanIsIn(l)) loanIn += (+l.amount||0); else loanOut += (+l.amount||0);
   });
   inflow += loanIn;
-  return { inflow: inflow, inCredit: inCredit, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, loanIn: loanIn, loanOut: loanOut, outflow: outPurch + outExp + takenOut + repaid + invOut + loanOut, outPurch: outPurch, outExp: outExp };
+  outPurch += outStore;
+  return { inflow: inflow, inCredit: inCredit, inPark: inPark, inStore: inStore, backIn: backIn, takenOut: takenOut, repaid: repaid, invIn: invIn, invOut: invOut, loanIn: loanIn, loanOut: loanOut, outflow: outPurch + outExp + takenOut + repaid + invOut + loanOut, outPurch: outPurch, outExp: outExp };
 }
 
 function openingCashFor(dateStr){
