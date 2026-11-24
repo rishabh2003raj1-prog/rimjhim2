@@ -20,10 +20,34 @@ const dis = (p) => p.click('#dlgBtns button', { timeout:1500 }).catch(()=>{});
   await O.click('#ct_park'); await O.waitForTimeout(150);
   await O.click('#pk_in'); await O.click('[data-vt="truck"]'); await O.fill('#pk_no', 'mp09 ab 1234'); await O.fill('#pk_dr', 'Balwinder'); await O.fill('#pk_ph', '9876543210');
   await O.selectOption('#pk_ds', '½'); await O.click('[data-bel="key"]'); await O.click('[data-bel="tirpal"]'); await O.fill('#pk_other', 'key no. 14');
-  await O.fill('#pk_adv', '100'); await O.screenshot({ path: process.env.S+'/parking_in.png' });
+  // photos: vehicle + a document (RC)
+  const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHUlEQVR4nGP8z8Dwn4GBgYGJgYGBgYGBgYEBAA0IAQH7c9e7AAAAAElFTkSuQmCC', 'base64');
+  let [fc] = await Promise.all([O.waitForEvent('filechooser'), O.click('#pk_vadd')]); await fc.setFiles({ name:'truck.png', mimeType:'image/png', buffer:png });
+  await O.waitForSelector('#pk_vpics img');
+  await O.selectOption('#pk_dkind', 'RC (registration)');
+  [fc] = await Promise.all([O.waitForEvent('filechooser'), O.click('#pk_dadd')]); await fc.setFiles({ name:'rc.png', mimeType:'image/png', buffer:png });
+  await O.waitForSelector('#pk_dpics img');
+  assert(/RC \(registration\)/.test(await O.textContent('#pk_dpics')), 'vehicle photo and RC document added');
+  await O.click('#pk_vpics img'); assert(await O.$('.photoview img'), 'tap a photo to see it large'); await O.click('.photoview');
+  // Truck needs driver ID: blocked without it (the RC photo is not an ID)
+  await O.fill('#pk_adv', '100'); await O.click('#pk_s');
+  assert(/licence or Aadhaar/.test(await O.textContent('#pk_err')), 'truck without driver ID is refused');
+  await O.selectOption('#pk_idt', 'Aadhaar'); await O.fill('#pk_idn', '1234 5678'); await O.click('#pk_s');
+  assert(/12 digits/.test(await O.textContent('#pk_err')), 'short Aadhaar refused');
+  await O.fill('#pk_idn', '1234 5678 9012');
+  await O.screenshot({ path: process.env.S+'/parking_in.png' });
   await O.click('#pk_s'); await O.waitForTimeout(150);
   let pk = await E(O, `JSON.stringify(parking.map(function(p){ return [p.vno, p.vtype, p.rate, p.diesel, p.bel.key, p.bel.tirpal, p.bel.other, p.payments.length]; }))`);
   assert(pk==='[["MP09 AB 1234","truck",150,"½",true,true,"key no. 14",1]]', 'truck parked with belongings and advance: '+pk);
+  assert(/📷 1 · 📄 1/.test(await O.textContent('#parkingView')), 'parked card shows photo and document count');
+  assert(/Aadhaar ••••9012/.test(await O.textContent('#parkingView')) && !/1234 5678/.test(await O.textContent('#parkingView')), 'card shows only the last 4 Aadhaar digits');
+  // A car does not need an ID
+  await O.click('#pk_in'); await O.click('[data-vt="car"]'); await O.fill('#pk_no', 'MP04 CC 1111'); await O.click('#pk_s'); await O.waitForTimeout(150);
+  assert(await E(O, `parking.some(function(p){ return p.vno==="MP04 CC 1111"; })`), 'car parks without driver ID');
+  await E(O, `parking = parking.filter(function(p){ return p.vno!=="MP04 CC 1111"; }); saveParking(); renderAll();`);
+  await O.waitForTimeout(3500);
+  const srvp = (await call(O, 'GET', '/api/data?outlet=rimjhim')).json.items.parking_v1.value[0].pics || [];
+  assert(srvp.length===2 && srvp.every(x => /^\/api\/photos\//.test(x.src)) && srvp.some(x => x.kind==='doc' && x.label==='RC (registration)'), 'photos uploaded to photo storage (not kept inside the list)');
   // 3.5 days later, driver ate here two days
   await E(O, `var p = parking[0]; p.inAt = Date.now() - 3.5*86400000; p.inDate = fmtDate(new Date(p.inAt)); p.waiveDays = [addDays(fmtDate(new Date()), -1)]; saveParking(); renderAll(); switchRecordsSub('parking');`);
   await O.click('[data-pkate]'); await O.waitForTimeout(100);

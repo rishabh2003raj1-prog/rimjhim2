@@ -556,8 +556,12 @@ the Dashboard an **Other businesses** card. Neither is mixed into cafe sales or 
   bank, paid from the store bank), a **closing count** (staff can count; shows ✔ or the difference) and recent counts. A **Parking** and a **General store** switch are in Logins → What each role can use.
 
 **Parking** (`parking_v1`): **Vehicle in** — type (🚌 Bus, 🚚 Truck, 🚛 Large container truck, 🛻 Tempo, 🚗 Car, 🏍️ Bike, each
-with its **rate per day**, editable), vehicle number, driver and phone, diesel level, what is **left with us** (🔑 key,
-🛞 stepney, 🔋 battery, ⛺ tirpal, papers, tools, anything else) and an optional advance. Charged per 24 hours (or part)
+with its **rate per day**, editable), vehicle number, driver and phone, **driver ID** (driving licence or Aadhaar number — **required for bus, truck and
+container**, together with the driver's name and 10-digit phone, unless a licence / Aadhaar photo is added; Aadhaar must
+be 12 digits and lists show only its last 4), diesel level, what is **left with us** (🔑 key,
+🛞 stepney, 🔋 battery, ⛺ tirpal, papers, tools, anything else) and an optional advance; **📷 vehicle photos** (front, number plate, damage) and **📄 document photos** (RC,
+driving licence, Aadhaar / ID, insurance, permit, other) — taken with the camera, shown as thumbnails (tap for full
+screen), kept in photo storage like bill photos (`pics` on the parking entry). Charged per 24 hours (or part)
 from check-in; **🍽️ Driver ate here today** makes that day free. Parked vehicles show day count, free days, amount,
 paid and due. **Check out** shows the bill, needs every belonging ticked as given back, and takes the payment
 (cash / UPI). Recently left vehicles keep their history.

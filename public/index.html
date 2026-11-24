@@ -314,6 +314,11 @@
   .sttile b{font-size:12.5px;} .sttile span{font-weight:700;} .sttile small{font-size:10.5px;color:var(--ink-soft);} .sttile.has{border-color:#2E7D4F;background:#EEF6EC;} .sttile.out{opacity:.55;}
   .sttile i{position:absolute;top:-6px;right:-6px;min-width:22px;height:22px;border-radius:11px;background:#2E7D4F;color:#fff;font-style:normal;font-weight:700;font-size:12px;line-height:22px;}
   .stcart{margin-bottom:10px;border-color:#2E7D4F;}
+  .pkpics{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;} .pkpic{position:relative;width:86px;} .pkpic img{width:86px;height:70px;object-fit:cover;border-radius:10px;border:1.5px solid var(--line);display:block;cursor:zoom-in;}
+  .pkpic small{display:block;font-size:10.5px;color:var(--ink-soft);text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;} .pkpic button{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:12px;border:none;background:#A6402D;color:#fff;font-weight:700;line-height:24px;padding:0;}
+  .photoview{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:16px;} .photoview img{max-width:100%;max-height:82vh;border-radius:8px;}
+  .photoview div{color:#fff;font-size:14px;} .photoview button{position:absolute;top:14px;right:14px;width:40px;height:40px;border-radius:20px;border:none;background:#fff;font-size:18px;}
+  .reqheavy{color:#A6402D;font-weight:700;font-size:11.5px;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -1178,7 +1183,7 @@ var parking = [], storeItems = [], storeSales = [], storeBuys = [];
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
   VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY, LIVE_KEY, PARK_KEY, STORE_ITEMS_KEY, STORE_SALES_KEY, STORE_BUYS_KEY];
-var PHOTO_FIELDS = {}; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo";
+var PHOTO_FIELDS = {}; PHOTO_FIELDS["parking_v1"] = "photo"; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
 function photoSlots(key, list){
@@ -1188,6 +1193,7 @@ function photoSlots(key, list){
     if(!x) return;
     out.push([x, field]);
     if(key===MENU_KEY && Array.isArray(x.sop)) x.sop.forEach(function(st){ if(st) out.push([st, "photo"]); });
+    if(key===PARK_KEY && Array.isArray(x.pics)) x.pics.forEach(function(pc){ if(pc) out.push([pc, "src"]); });
   });
   return out;
 }
@@ -7346,6 +7352,16 @@ var VEHICLES = [
 function vehicleOf(k){ return VEHICLES.find(function(v){ return v.k===k; }) || VEHICLES[1]; }
 function parkRate(k){ var r = settings.parkingRates && settings.parkingRates[k]; return (r===0 || +r>0) ? +r : vehicleOf(k).rate; }
 var DIESEL = ["Empty","¼","½","¾","Full"];
+// Bus and truck parking needs the driver's details and ID (licence or Aadhaar: number or photo).
+var HEAVY_VEHICLES = ["bus","truck","container"];
+function idMasked(p){ var n = String(p.idNo||"").replace(/\s/g,""); if(!n) return ""; return (p.idType==="Aadhaar" ? "Aadhaar ••••"+n.slice(-4) : "DL "+n); }
+var PARK_DOCS = ["RC (registration)","Driving licence","Aadhaar / ID","Insurance","Permit / fitness","Other"];
+// Full-screen look at a photo (tap anywhere to close).
+function viewPhoto(src, caption){
+  var v = document.createElement("div"); v.className = "photoview";
+  v.innerHTML = '<img src="'+esc(src)+'" alt="">'+(caption?'<div>'+esc(caption)+'</div>':'')+'<button aria-label="Close">✕</button>';
+  v.addEventListener("click", function(){ v.remove(); }); document.body.appendChild(v);
+}
 var BELONGINGS = [["key","🔑 Truck key","चाबी"],["stepney","🛞 Stepney","स्टेपनी"],["battery","🔋 Battery","बैटरी"],["tirpal","⛺ Tirpal","तिरपाल"],["papers","📄 Papers / RC","कागज़"],["tools","🧰 Tools / jack","औज़ार"]];
 // Days charged so far (or at check-out), waived days, amount, paid and due.
 function parkBill(p, atMs){
@@ -7365,9 +7381,9 @@ function renderParkingView(){
   if(canWriteKey(PARK_KEY)) html += '<div class="zbtns"><button class="btn-save" id="pk_in">🅿️ Vehicle in · गाड़ी आई</button><button class="btn-additem" id="pk_rates">Rates per day</button></div>';
   html += inside.length ? inside.map(function(p){ var b = parkBill(p), v = vehicleOf(p.vtype), ateToday = (p.waiveDays||[]).indexOf(today)>=0;
     return '<div class="pkcard" data-pk="'+esc(p.id)+'"><div class="pki">'+v.i+'</div><div class="pkb"><b class="notr">'+esc(p.vno||"—")+'</b> <span class="muted">'+esc(v.t)+'</span>'+
-      '<div class="muted" style="font-size:12.5px;">'+esc(p.driver||"")+(p.phone?' · '+esc(p.phone):'')+' · in '+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</div>'+
+      '<div class="muted" style="font-size:12.5px;">'+esc(p.driver||"")+(p.phone?' · '+esc(p.phone):'')+(p.idNo?' · 🪪 '+esc(idMasked(p)):'')+' · in '+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</div>'+
       '<div style="font-size:13px;">Day '+b.days+(b.waived?' · '+b.waived+' free (ate here)':'')+' · <b>'+rupee(b.amount)+'</b>'+(b.paid?' · paid '+rupee(b.paid):'')+(b.due>0?' · <b class="bad">due '+rupee(b.due)+'</b>':'')+'</div>'+
-      '<div class="pkbel">'+parkBelongingsText(p)+'</div>'+
+      '<div class="pkbel">'+parkBelongingsText(p)+((p.pics||[]).length ? ' · 📷 '+(p.pics||[]).filter(function(x){ return x.kind==="vehicle"; }).length+' · 📄 '+(p.pics||[]).filter(function(x){ return x.kind==="doc"; }).length : '')+'</div>'+
       (canWriteKey(PARK_KEY) ? '<div class="pkbtns"><button class="'+(ateToday?'on':'')+'" data-pkate="'+esc(p.id)+'">'+(ateToday?'✔ Ate here today':'🍽️ Driver ate here today')+'</button><button data-pkout="'+esc(p.id)+'">Check out ›</button></div>' : '')+'</div></div>'; }).join("")
     : '<div class="empty">No vehicle parked right now.</div>';
   var out = parking.filter(function(p){ return p.status==="out"; }).sort(function(a,b){ return (b.outAt||0)-(a.outAt||0); }).slice(0, 10);
@@ -7404,9 +7420,14 @@ function openParkIn(id){
   var html = '<h2 class="serif">'+(isNew ? '🅿️ Vehicle in · गाड़ी आई' : vehicleOf(p.vtype).i+' <span class="notr">'+esc(p.vno)+'</span>')+'</h2>';
   html += '<div class="vtypes">'+VEHICLES.map(function(v){ return '<button data-vt="'+v.k+'" class="'+(p.vtype===v.k?'on':'')+'"'+(ro?' disabled':'')+'><span>'+v.i+'</span>'+esc(v.t)+'<small>'+rupee(parkRate(v.k))+'/day</small></button>'; }).join("")+'</div>';
   html += '<div class="field two"><div><label>Vehicle number</label><input id="pk_no" value="'+esc(p.vno)+'" placeholder="MP 09 HG 1234" style="text-transform:uppercase;"'+(ro?' disabled':'')+'></div><div><label>Driver name</label><input id="pk_dr" value="'+esc(p.driver)+'"'+(ro?' disabled':'')+'></div></div>';
+  html += '<div class="field two"><div><label>Driver ID <span class="reqheavy">'+(HEAVY_VEHICLES.indexOf(p.vtype)>=0?'(needed for bus / truck)':'')+'</span></label><select id="pk_idt"'+(ro?' disabled':'')+'><option'+(p.idType!=="Aadhaar"?' selected':'')+'>Driving licence</option><option'+(p.idType==="Aadhaar"?' selected':'')+'>Aadhaar</option></select></div>'+
+    '<div><label>ID number</label><input id="pk_idn" value="'+esc(p.idNo||"")+'" placeholder="DL / Aadhaar no." autocomplete="off"'+(ro?' disabled':'')+'></div></div>';
   html += '<div class="field two"><div><label>Driver phone</label><input id="pk_ph" inputmode="tel" value="'+esc(p.phone)+'"'+(ro?' disabled':'')+'></div><div><label>Diesel level</label><select id="pk_ds"'+(ro?' disabled':'')+'><option value="">—</option>'+DIESEL.map(function(d){ return '<option'+(p.diesel===d?' selected':'')+'>'+d+'</option>'; }).join("")+'</select></div></div>';
   html += '<div class="field"><label>Left with us · हमारे पास रखा</label><div class="belchips">'+BELONGINGS.map(function(b){ return '<button type="button" data-bel="'+b[0]+'" class="'+((p.bel||{})[b[0]]?'on':'')+'"'+(ro?' disabled':'')+'>'+esc(b[1])+' <small>'+esc(b[2])+'</small></button>'; }).join("")+'</div>'+
     '<input id="pk_other" style="margin-top:6px;" placeholder="Anything else (e.g. key no. 14, 2 bags)" value="'+esc((p.bel||{}).other||"")+'"'+(ro?' disabled':'')+'></div>';
+  p.pics = p.pics || [];
+  html += '<div class="field"><label>📷 Vehicle photos · गाड़ी की फ़ोटो</label><div class="pkpics" id="pk_vpics"></div>'+(ro?'':'<button type="button" class="btn-additem" id="pk_vadd">📷 Add vehicle photo (front, number plate, any damage)</button>')+'</div>';
+  html += '<div class="field"><label>📄 Documents · कागज़</label><div class="pkpics" id="pk_dpics"></div>'+(ro?'':'<div style="display:flex;gap:6px;"><select id="pk_dkind" style="flex:1;">'+PARK_DOCS.map(function(d){ return '<option>'+d+'</option>'; }).join("")+'</select><button type="button" class="btn-additem" id="pk_dadd" style="flex:none;width:auto;margin:0;padding:0 14px;">📄 Add photo</button></div>')+'</div>';
   if(isNew) html += '<div class="field two"><div><label>Advance paid (₹, optional)</label><input id="pk_adv" type="number" inputmode="numeric"></div><div><label>Paid by</label><select id="pk_advm"><option>Cash</option><option>UPI</option></select></div></div>';
   if(!isNew){ var b = parkBill(p);
     html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>In</span><b>'+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</b></div>'+(p.outAt?'<div class="psrow"><span>Out</span><b>'+esc(fmtD(p.outDate))+' '+esc(p.outTime||"")+'</b></div>':'')+
@@ -7416,8 +7437,18 @@ function openParkIn(id){
   }
   html += '<div class="err" id="pk_err"></div><div class="sheetbtns"><button class="btn-cancel" id="pk_c">'+(ro?'Close':'Cancel')+'</button>'+(!isNew && !ro ? '<button class="btn-del" id="pk_del">Delete</button>' : '')+(ro?'':'<button class="btn-save" id="pk_s">'+(isNew?'Park it':'Save')+'</button>')+'</div>';
   sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
-  Array.prototype.forEach.call(sheet.querySelectorAll("[data-vt]"), function(b){ b.addEventListener("click", function(){ p.vtype = b.getAttribute("data-vt"); Array.prototype.forEach.call(sheet.querySelectorAll("[data-vt]"), function(x){ x.classList.toggle("on", x===b); }); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-vt]"), function(b){ b.addEventListener("click", function(){ p.vtype = b.getAttribute("data-vt"); Array.prototype.forEach.call(sheet.querySelectorAll("[data-vt]"), function(x){ x.classList.toggle("on", x===b); });
+    var rh = sheet.querySelector(".reqheavy"); if(rh) rh.textContent = HEAVY_VEHICLES.indexOf(p.vtype)>=0 ? "(needed for bus / truck)" : ""; }); });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-bel]"), function(b){ b.addEventListener("click", function(){ b.classList.toggle("on"); }); });
+  function drawPics(){
+    [["vehicle","pk_vpics"],["doc","pk_dpics"]].forEach(function(x){ var box = document.getElementById(x[1]), list = p.pics.filter(function(pc){ return pc.kind===x[0]; });
+      box.innerHTML = list.length ? list.map(function(pc){ return '<div class="pkpic"><img src="'+esc(pc.src)+'" alt="" data-pview="'+esc(pc.id)+'"><small>'+esc(pc.label||"")+'</small>'+(ro?'':'<button type="button" data-pdel="'+esc(pc.id)+'" aria-label="Remove">×</button>')+'</div>'; }).join("") : '<div class="muted" style="font-size:12.5px;">None yet</div>'; });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-pview]"), function(im){ im.addEventListener("click", function(){ var pc = p.pics.find(function(x){ return x.id===im.getAttribute("data-pview"); }); if(pc) viewPhoto(pc.src, (p.vno||"")+" · "+(pc.label||"")); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-pdel]"), function(b){ b.addEventListener("click", function(){ p.pics = p.pics.filter(function(x){ return x.id!==b.getAttribute("data-pdel"); }); drawPics(); }); });
+  }
+  drawPics();
+  var va = document.getElementById("pk_vadd"); if(va) va.addEventListener("click", function(){ pickPhoto(function(d){ p.pics.push({ id:uid(), kind:"vehicle", label:"Vehicle", src:d, at:Date.now() }); drawPics(); }); });
+  var da = document.getElementById("pk_dadd"); if(da) da.addEventListener("click", function(){ var lbl = document.getElementById("pk_dkind").value; pickPhoto(function(d){ p.pics.push({ id:uid(), kind:"doc", label:lbl, src:d, at:Date.now() }); drawPics(); }); });
   document.getElementById("pk_c").addEventListener("click", closeForm);
   var del = document.getElementById("pk_del"); if(del) del.addEventListener("click", function(){ askConfirm("Delete this parking entry?", function(){ parking = parking.filter(function(x){ return x.id!==p.id; }); saveParking(); closeForm(); renderAll(); }); });
   var sv = document.getElementById("pk_s");
@@ -7425,6 +7456,15 @@ function openParkIn(id){
     var no = document.getElementById("pk_no").value.trim().toUpperCase(), e = document.getElementById("pk_err");
     if(!no){ e.textContent = "Enter the vehicle number."; e.style.display = "block"; return; }
     if(isNew && parking.some(function(x){ return x.status==="in" && (x.vno||"").replace(/\s/g,"")===no.replace(/\s/g,""); })){ e.textContent = "This vehicle is already parked."; e.style.display = "block"; return; }
+    var idType = document.getElementById("pk_idt").value==="Aadhaar" ? "Aadhaar" : "DL", idNo = document.getElementById("pk_idn").value.trim().toUpperCase();
+    if(HEAVY_VEHICLES.indexOf(p.vtype)>=0){
+      var drv = document.getElementById("pk_dr").value.trim(), ph = document.getElementById("pk_ph").value.replace(/\D/g,"");
+      var idPhoto = p.pics.some(function(pc){ return pc.kind==="doc" && /licence|Aadhaar/i.test(pc.label||""); });
+      if(!drv || ph.length < 10){ e.textContent = "For a bus / truck, enter the driver’s name and 10-digit phone."; e.style.display = "block"; return; }
+      if(!idNo && !idPhoto){ e.textContent = "For a bus / truck, enter the driver’s licence or Aadhaar number, or add a photo of it (Documents)."; e.style.display = "block"; return; }
+      if(idNo && idType==="Aadhaar" && !/^\d{12}$/.test(idNo.replace(/\s/g,""))){ e.textContent = "An Aadhaar number has 12 digits."; e.style.display = "block"; return; }
+    }
+    p.idType = idType; p.idNo = idNo;
     p.vno = no; p.driver = document.getElementById("pk_dr").value.trim(); p.phone = document.getElementById("pk_ph").value.trim(); p.diesel = document.getElementById("pk_ds").value;
     p.bel = { other: document.getElementById("pk_other").value.trim() }; Array.prototype.forEach.call(sheet.querySelectorAll("[data-bel].on"), function(b){ p.bel[b.getAttribute("data-bel")] = true; });
     if(isNew){ var now = new Date(); p.inAt = now.getTime(); p.inDate = fmtDate(now); p.inTime = nowHM(); p.status = "in"; p.rate = parkRate(p.vtype); p.inBy = myName();
