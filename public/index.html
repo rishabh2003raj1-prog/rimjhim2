@@ -289,6 +289,14 @@
   .zicons{display:flex;flex-wrap:wrap;gap:6px;} .zicons button{width:44px;height:44px;font-size:24px;border:1.5px solid var(--line);background:var(--panel);border-radius:10px;padding:0;} .zicons button.on{border-color:var(--ink);background:#EFE8DA;}
   .zpt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line);font-size:14.5px;} .zpt div{display:flex;gap:6px;flex:none;}
   .zpt button{width:46px;height:40px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font-size:18px;font-weight:700;} .zpt .zok.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;} .zpt .zno.on{background:#A6402D;border-color:#A6402D;color:#fff;}
+  .waiterbar{position:fixed;left:10px;right:10px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:25;border:none;border-radius:14px;padding:12px 14px;background:#2E7D4F;color:#fff;font:inherit;font-size:14.5px;font-weight:600;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.25);}
+  .waiterbar.late{background:#A6402D;animation:wpulse 1.2s infinite;} .waiterbar .wsep{opacity:.6;margin:0 8px;} .waiterbar .wgo{float:right;font-size:18px;line-height:1;}
+  @keyframes wpulse{0%,100%{transform:scale(1);}50%{transform:scale(1.02);}}
+  .wmodes{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:6px 0 12px;} .wmodes button{border:1.5px solid var(--line);background:var(--panel);border-radius:10px;padding:9px 2px;font:inherit;font-weight:700;font-size:12.5px;color:var(--ink);} .wmodes button.on{background:var(--ink);border-color:var(--ink);color:#fff;}
+  .wcard{display:flex;gap:12px;padding:12px;border-radius:16px;border:2px solid #2E7D4F;background:#EEF6EC;margin-bottom:10px;} .wcard.clear{border-color:#8A5A2B;background:#FBF3E8;} .wcard.late{border-color:#A6402D;background:#FBEDEA;}
+  .wtbl{display:flex;flex-direction:column;align-items:center;gap:2px;flex:none;width:70px;} .wtbl small{font-size:11px;text-align:center;}
+  .wbody{flex:1;min-width:0;} .wbody .btn-save{width:100%;margin-top:8px;}
+  body:has(.sheetbg.on) .waiterbar{display:none;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -1410,7 +1418,8 @@ function applyRemote(items){
     var it = items[key];
     if((cloud.rev[key]||0) >= it.rev) return;
     if(cloud.dirty[key]) return; // our upload will merge with it
-    if(sheetOpen){ cloud.deferred[key] = it; return; }
+    // The waiter screen is a live view: new orders must reach it even while it is open.
+    if(sheetOpen && !(key===LIVE_KEY && document.getElementById("wt_sheet"))){ cloud.deferred[key] = it; return; }
     setKeyValue(key, it.value);
     cloud.rev[key] = it.rev;
     cloud.base[key] = JSON.stringify(it.value);
@@ -2484,6 +2493,7 @@ function renderAll(){
   renderCounter();
   renderKitchen();
   try{ var ab = document.getElementById("attnBox"); if(ab){ ab.innerHTML = attentionCard(); wireAttention(ab); } var mb = document.getElementById("mgmtBox"); if(mb){ mb.innerHTML = mgmtCard(); wireMgmt(mb); } var svb = document.getElementById("survivalBox"); if(svb){ svb.innerHTML = survivalCard(); var svo = svb.querySelector("#surv_open"); if(svo) svo.addEventListener("click", function(){ openSurvivalSheet(); }); } var sb = document.getElementById("setupBox"); if(sb){ sb.innerHTML = setupCard(); wireSetup(sb); } updateNavBadge(); }catch(e){}
+  try{ waiterCheck(); }catch(e){}
 }
 
 // ---------- DASHBOARD ----------
@@ -10456,7 +10466,8 @@ function ticketStep(t){
   if(plat && t.status==="new") return { hi:"पहले "+c.t+" ऐप पर ऑर्डर Accept करें", en:"Open the "+c.t+" partner app and ACCEPT order #"+t.pid+" now. Set preparation time to "+platformCfg(t.type).prep+" min.", btn:"✔ Accepted on "+c.t, next:"cooking" };
   if(t.status==="new" || t.status==="cooking") return { hi:"रसोई: ये बनाएँ", en:"Kitchen: make these items"+(t.type==="dine"?" for "+t.table:"")+". Tap Ready when done."+(plat?" Then press “Food ready” on the "+c.t+" app.":""), btn:"✔ Food ready · तैयार", next:"ready" };
   if(t.status==="ready"){
-    if(t.type==="dine") return { hi:"खाना "+t.table+" पर दें", en:"Serve it to "+t.table+".", btn:"✔ Served · परोस दिया", next:"served" };
+    if(t.type==="dine") return waiterOn() ? { hi:"खाना "+t.table+" पर दें", en:"Serve it to "+t.table+".", btn:"✔ Served · परोस दिया", next:"served" }
+      : { hi:"ग्राहक को बुलाएँ — काउंटर से ले जाएँ", en:"Self service: call order "+t.no+" ("+t.table+") to collect it at the counter.", btn:"✔ Collected · ले गए", next:"served" };
     return { hi:"पैक करें — हर चीज़ पर ✔", en:"Pack it. Tick every line on the packing list.", btn:"📦 Pack · पैक करें", pack: plat ? "platform" : t.type, next:"packed" };
   }
   if(t.status==="served") return t.paid ? { hi:"पूरा हुआ", en:"Paid. Clear the table when the guests leave.", btn:"✔ Table cleared", next:"done" }
@@ -10624,7 +10635,7 @@ function openLiveOrders(kitchenOnly){
 function ticketAdvance(id, kitchenOnly){
   var t = liveOrders.find(function(x){ return x.id===id; }); if(!t) return;
   var st = ticketStep(t);
-  function go(){ t.status = st.next; tLog(t, st.next); saveLive(); renderAll(); if(st.next==="ready") sayHindi("खाना तैयार"); openLiveOrders(kitchenOnly); }
+  function go(){ t.status = st.next; tLog(t, st.next); if(st.next==="ready") t.readyAt = Date.now(); if(st.next==="served"){ t.servedAt = Date.now(); t.servedBy = myName(); } if(st.next==="done" && t.type==="dine") t.clearedBy = myName(); saveLive(); renderAll(); if(st.next==="ready") sayHindi("खाना तैयार"); openLiveOrders(kitchenOnly); }
   if(st.pack){ openPackList(t, PACK_LISTS[st.pack], function(){ go(); }); return; }
   if(st.bill || st.collect){
     // Load the ticket into the Counter and take payment there.
@@ -10697,6 +10708,101 @@ function setSimpleMode(on){ try{ localStorage.setItem(SIMPLE_KEY, on?"1":"0"); }
 function applySimpleMode(){ document.body.classList.toggle("simple", simpleMode()); }
 function voiceOn(){ try{ return localStorage.getItem(VOICE_KEY)!=="0"; }catch(e){ return true; } }
 function setVoice(on){ try{ localStorage.setItem(VOICE_KEY, on?"1":"0"); }catch(e){} }
+// ---------- WAITER ALERTS ----------
+// Dine-in only. When the kitchen marks an order Ready, the waiter is told to pick it up and serve
+// it; once the bill is paid, to clear the table. A phone turns this on in 🛎️ Waiter (per phone,
+// for all tables or only indoor / outdoor ones): sound, vibration, a Hindi voice line and a
+// banner on every screen. Live orders reach other phones within a few seconds.
+var WAITER_KEY = "waiter_mode_v1";
+// Per outlet (Counter → Settings): waiters serve at tables, or self service (customers collect at the counter).
+function waiterOn(){ return settings.waiterService !== false; }
+function waiterMode(){ try{ return localStorage.getItem(WAITER_KEY) || ""; }catch(e){ return ""; } }
+function setWaiterMode(m){ try{ if(m) localStorage.setItem(WAITER_KEY, m); else localStorage.removeItem(WAITER_KEY); }catch(e){} waiterUnlockSound(); renderWaiterBar(); }
+function tReadyAt(t){
+  if(t.readyAt) return t.readyAt;
+  var hm = t.steps && t.steps.ready; if(!hm) return t.at || Date.now();
+  return new Date((t.date || fmtDate(new Date()))+"T"+hm).getTime();
+}
+// What waiters have to do now: [{ kind:"serve"|"clear", t, since }]
+function waiterTasks(zoneFilter){
+  var out = [];
+  liveOrders.forEach(function(t){
+    if(!t || t.type!=="dine" || t.status==="done" || t.status==="cancelled") return;
+    if(zoneFilter==="in" || zoneFilter==="out"){ if(tableZone(t.table)!==zoneFilter) return; }
+    if(t.status==="ready") out.push({ kind:"serve", t:t, since:tReadyAt(t), key:t.id+":serve:"+tReadyAt(t) });
+    else if(t.status==="served" && t.paid) out.push({ kind:"clear", t:t, since:t.paidAt || t.servedAt || Date.now(), key:t.id+":clear" });
+  });
+  return out.sort(function(a,b){ return (a.kind===b.kind ? 0 : a.kind==="serve" ? -1 : 1) || a.since - b.since; });
+}
+var waiterSeen = null, waiterNagAt = 0, waiterAudio = null;
+function waiterUnlockSound(){ try{ if(!waiterAudio && (window.AudioContext || window.webkitAudioContext)) waiterAudio = new (window.AudioContext || window.webkitAudioContext)(); if(waiterAudio && waiterAudio.state==="suspended") waiterAudio.resume(); }catch(e){} }
+function waiterBeep(times){
+  try{
+    waiterUnlockSound(); if(!waiterAudio) return;
+    for(var i=0;i<(times||2);i++){ var o = waiterAudio.createOscillator(), g = waiterAudio.createGain(), s = waiterAudio.currentTime + i*0.35;
+      o.type = "sine"; o.frequency.value = 880; g.gain.setValueAtTime(0.0001, s); g.gain.exponentialRampToValueAtTime(0.4, s+0.02); g.gain.exponentialRampToValueAtTime(0.0001, s+0.28);
+      o.connect(g); g.connect(waiterAudio.destination); o.start(s); o.stop(s+0.3); }
+  }catch(e){}
+}
+function waiterSay(text){ try{ if(!window.speechSynthesis || typeof SpeechSynthesisUtterance==="undefined") return; var u = new SpeechSynthesisUtterance(text); u.lang = "hi-IN"; u.rate = 0.9; speechSynthesis.speak(u); }catch(e){} }
+function waiterLine(x){ var n = tableNo(x.t.table); return x.kind==="serve" ? "टेबल "+n+" का खाना तैयार है, ले जाएँ" : "टेबल "+n+" साफ़ करें"; }
+window.__waiterAlerts = [];
+// Called after every redraw: alert for tasks this phone has not seen yet, and nag about food waiting.
+function waiterCheck(){
+  if(!waiterOn()){ var wb0 = document.getElementById("waiterBar"); if(wb0) wb0.remove(); return; }
+  var mode = waiterMode(), tasks = waiterTasks(mode && mode!=="all" ? mode : "");
+  if(waiterSeen===null){ waiterSeen = {}; tasks.forEach(function(x){ waiterSeen[x.key] = 1; }); renderWaiterBar(); return; }
+  var fresh = tasks.filter(function(x){ return !waiterSeen[x.key]; });
+  fresh.forEach(function(x){ waiterSeen[x.key] = 1; });
+  if(mode && fresh.length){
+    waiterBeep(fresh[0].kind==="serve" ? 3 : 2);
+    try{ if(navigator.vibrate) navigator.vibrate([300,120,300,120,300]); }catch(e){}
+    fresh.forEach(function(x){ window.__waiterAlerts.push(x.key); waiterSay(waiterLine(x)); });
+    waiterNagAt = Date.now();
+  } else if(mode){
+    // Food waiting more than 3 minutes: remind every 2 minutes.
+    var late = tasks.filter(function(x){ return x.kind==="serve" && Date.now()-x.since > 3*60000; });
+    if(late.length && Date.now()-waiterNagAt > 2*60000){ waiterNagAt = Date.now(); waiterBeep(2); waiterSay(waiterLine(late[0])+", जल्दी करें"); }
+  }
+  renderWaiterBar();
+  if(document.getElementById("wt_sheet") && document.getElementById("sheetBg").classList.contains("on")) openWaiterSheet();
+}
+function renderWaiterBar(){
+  var bar = document.getElementById("waiterBar");
+  var mode = waiterOn() ? waiterMode() : "", tasks = mode ? waiterTasks(mode!=="all" ? mode : "") : [];
+  if(!mode || !tasks.length){ if(bar) bar.remove(); return; }
+  if(!bar){ bar = document.createElement("button"); bar.id = "waiterBar"; bar.addEventListener("click", function(){ openWaiterSheet(); }); document.body.appendChild(bar); }
+  var sv = tasks.filter(function(x){ return x.kind==="serve"; }), cl = tasks.filter(function(x){ return x.kind==="clear"; });
+  var late = sv.some(function(x){ return Date.now()-x.since > 3*60000; });
+  bar.className = "waiterbar notr"+(late?" late":"");
+  bar.innerHTML = (sv.length ? '🍽️ <b>'+sv.map(function(x){ return esc(x.t.table); }).slice(0,3).join(", ")+(sv.length>3?"…":"")+'</b> ready — serve · परोसें' : '')+
+    (sv.length && cl.length ? '<span class="wsep">|</span>' : '')+(cl.length ? '🧹 Clear <b>'+cl.map(function(x){ return esc(x.t.table); }).slice(0,3).join(", ")+'</b>' : '')+' <span class="wgo">›</span>';
+}
+function openWaiterSheet(){
+  var sheet = document.getElementById("sheet"), mode = waiterMode(), tasks = waiterTasks(mode && mode!=="all" ? mode : "");
+  var html = '<h2 class="serif" id="wt_sheet">🛎️ Waiter · वेटर</h2>';
+  html += '<div class="backupnote">Alerts on <b>this phone</b> when dine-in food is ready to serve and when a table needs clearing:</div>';
+  html += '<div class="wmodes">'+[["","🔕 Off"],["all","All tables"],["in","🏠 Indoor"],["out","⛱️ Outdoor"]].map(function(m){ return '<button data-wm="'+m[0]+'" class="'+(mode===m[0]?"on":"")+'">'+m[1]+'</button>'; }).join("")+'</div>';
+  var sv = tasks.filter(function(x){ return x.kind==="serve"; }), cl = tasks.filter(function(x){ return x.kind==="clear"; });
+  function card(x){ var t = x.t, z = tableZone(t.table), mins = Math.max(0, Math.round((Date.now()-x.since)/60000));
+    return '<div class="wcard '+x.kind+(x.kind==="serve" && mins>=3?" late":"")+'"><div class="wtbl tbl '+z+'"><span class="tpic">'+TABLE_SVG[z]+'<b>'+esc(tableNo(t.table))+'</b></span><small class="notr">'+esc(t.table)+'</small></div>'+
+      '<div class="wbody"><b>'+(x.kind==="serve" ? '🍽️ Pick up & serve · ले जाकर परोसें' : '🧹 Clear the table · टेबल साफ़ करें')+'</b>'+
+      (x.kind==="serve" ? '<div class="ltkitems">'+(t.items||[]).map(function(i){ return '<span class="notr">'+i.qty+'× '+esc(lineName(i))+'</span>'; }).join("")+'</div>' : '<div class="muted">Bill paid'+(t.steps&&t.steps.paid?' at '+esc(t.steps.paid):'')+'. Clear and wipe the table for the next guests.</div>')+
+      '<div class="muted" style="font-size:12px;">'+(x.kind==="serve" ? (mins ? 'Ready '+mins+' min ago' : 'Ready just now') : '')+'</div>'+
+      '<button class="btn-save" data-wdo="'+esc(t.id)+'" data-k="'+x.kind+'">'+(x.kind==="serve" ? '✔ Served · परोस दिया' : '✔ Table cleared · साफ़ हो गई')+'</button></div></div>'; }
+  html += sv.length ? sv.map(card).join("") : '';
+  html += cl.length ? cl.map(card).join("") : '';
+  if(!tasks.length) html += '<div class="empty">Nothing to serve or clear right now 👍</div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="wt_c" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-wm]"), function(b){ b.addEventListener("click", function(){ setWaiterMode(b.getAttribute("data-wm")); openWaiterSheet(); renderCounter(); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-wdo]"), function(b){ b.addEventListener("click", function(){
+    var t = liveOrders.find(function(x){ return x.id===b.getAttribute("data-wdo"); }); if(!t) return;
+    if(b.getAttribute("data-k")==="serve"){ t.status = "served"; t.servedAt = Date.now(); t.servedBy = myName(); tLog(t, "served"); }
+    else { t.status = "done"; t.clearedBy = myName(); tLog(t, "done"); }
+    saveLive(); renderAll(); openWaiterSheet(); }); });
+  document.getElementById("wt_c").addEventListener("click", closeForm);
+}
 function sayHindi(text){
   if(!voiceOn() || !window.speechSynthesis || typeof SpeechSynthesisUtterance==="undefined") return;
   try{ speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(text); u.lang = "hi-IN"; u.rate = 0.9; speechSynthesis.speak(u); }catch(e){}
@@ -10767,6 +10873,7 @@ function renderCounter(){
   html += '<div class="ctools">'+
     '<button id="ct_live" class="'+(activeTickets().some(function(t){ return (t.status==="new"||t.status==="cooking") && ticketMins(t)>ticketTarget(t); })?"warn":"")+'">📋 Live orders ('+activeTickets().length+')</button>'+
     '<button id="ct_bills">🧾 Today’s bills</button>'+
+    (canWriteKey(LIVE_KEY) && waiterOn() ? (function(){ var wm = waiterMode(), wn = wm ? waiterTasks(wm!=="all"?wm:"").length : waiterTasks("").length; return '<button id="ct_waiter" class="'+(wm?"on":"")+(wn?" warn":"")+'">🛎️ Waiter'+(wn?' ('+wn+')':'')+(wm?' · 🔔':'')+'</button>'; })() : '')+
     (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checksInUse() && checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
     '<button id="ct_voice" class="'+(voiceOn()?"on":"")+'">'+(voiceOn()?"🔊":"🔇")+'</button>'+
@@ -10806,6 +10913,7 @@ function renderCounter(){
 function wireCounterTools(el){
   var b = document.getElementById("ct_bills"); if(b) b.addEventListener("click", function(){ openCounterBills(fmtDate(new Date())); });
   var lv = document.getElementById("ct_live"); if(lv) lv.addEventListener("click", function(){ openLiveOrders(false); });
+  var wb = document.getElementById("ct_waiter"); if(wb) wb.addEventListener("click", function(){ waiterUnlockSound(); openWaiterSheet(); });
   var s = document.getElementById("ct_simple"); if(s) s.addEventListener("click", function(){ setSimpleMode(!simpleMode()); });
   var v = document.getElementById("ct_voice"); if(v) v.addEventListener("click", function(){ setVoice(!voiceOn()); renderCounter(); });
   var u = document.getElementById("ct_upi"); if(u) u.addEventListener("click", openUpiSettings);
@@ -10830,10 +10938,12 @@ function openUpiSettings(){
         '<button class="btn-additem" id="of_add">+ Add offer</button>';
     }
     html += '<div class="dgroup">Order types</div>'+
+      '<div class="field"><label>Dine-in service at '+esc(OUTLET.name||"this outlet")+'</label><select id="up_waiter"><option value="on"'+(waiterOn()?' selected':'')+'>🛎️ Waiters serve at the tables (waiter alerts on)</option><option value="off"'+(!waiterOn()?' selected':'')+'>🙋 Self service — customers collect at the counter</option></select>'+
+      '<div class="backupnote" style="margin:4px 0 0;">Self service hides the 🛎️ Waiter button and its alerts on every phone of this outlet; the kitchen guide says “call the customer to collect” instead.</div></div>'+
       '<div class="psrow"><span>Tables: '+esc(cafeTables().join(", "))+'</span><button class="btn-additem" id="up_tables" style="width:auto;padding:6px 12px;">✏️ Edit tables</button></div>'+
       '<div class="field"><label>Own delivery charge (₹)</label><input id="up_dcharge" type="number" inputmode="numeric" value="'+esc(deliveryCharge())+'"></div>';
     html += '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
-    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
+    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge","up_waiter"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     Object.keys(keep).forEach(function(k){ var e = document.getElementById(k); if(e) e.value = keep[k]; });
     function err(m){ var e = document.getElementById("up_err"); e.textContent = m; e.style.display = "block"; }
@@ -10854,6 +10964,7 @@ function openUpiSettings(){
       if(!(mx>=0 && mx<=100)) return err("The limit must be between 0 and 100%.");
       settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx;
       var dc = parseFloat(document.getElementById("up_dcharge").value); settings.deliveryCharge = dc>=0 ? dc : 0;
+      settings.waiterService = document.getElementById("up_waiter").value !== "off";
       saveSettings();
       if(canOffers){ offers = offs; saveOffers(); }
       closeForm(); renderCounter();
@@ -10988,7 +11099,7 @@ function finishCounterBill(mode, customer, given, plat){
   sales.push(rec);
   items.forEach(function(i){ dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:id }); });
   var sentToKitchen = false;
-  if(tk){ tk.paid = true; tk.saleId = id; tk.amount = total; tLog(tk, "paid"); if(tk.status==="out") { tk.status = "done"; tLog(tk, "done"); } saveLive(); }
+  if(tk){ tk.paid = true; tk.paidAt = Date.now(); tk.saleId = id; tk.amount = total; tLog(tk, "paid"); if(tk.status==="out") { tk.status = "done"; tLog(tk, "done"); } saveLive(); }
   else if(counterType!=="dine"){
     createTicket({ type:counterType, paid:true, saleId:id, amount:total, items:items, cname: plat ? plat.cname : (counterMeta.cname||""), phone:counterMeta.phone||"", address:counterMeta.address||"", charge:charge,
                    platform: plat ? plat.platform : null, pid: plat ? plat.pid : null, accepted: plat ? !!plat.accepted : undefined });

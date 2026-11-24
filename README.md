@@ -508,6 +508,23 @@ Swiggy order types were built and then switched off at the owner's request; the 
 - A direct link to the Zomato / Swiggy accounts (orders arriving automatically) needs an approved integration
   (e.g. through a middleware such as UrbanPiper); the app is ready to take such orders as Live orders.
 
+### 🛎️ Waiter alerts (dine-in)
+Counter → **🛎️ Waiter** turns alerts on for **that phone**: all tables, or only 🏠 indoor / ⛱️ outdoor tables (from
+each table's zone). Then:
+- When the kitchen marks a dine-in order **Ready**: beep, vibration, Hindi voice "टेबल 3 का खाना तैयार है, ले जाएँ"
+  and a green banner on every screen ("Table 3 ready — serve"). Food waiting over 3 minutes turns the banner red and
+  repeats the reminder every 2 minutes.
+- When the bill is paid (and the food was served): "टेबल 3 साफ़ करें" and a banner to clear the table.
+- The waiter screen lists each job with the table picture and number, the items to take, how long it has been ready,
+  and big **✔ Served · परोस दिया** / **✔ Table cleared · साफ़ हो गई** buttons (who did it is saved on the order).
+  It keeps updating while open; other phones see the changes within a few seconds.
+The voice plays even when the counter's 🔇 is on, so the waiter phone is always heard. Any login that can see live
+orders can use it (billing logins work well for waiters).
+**Self-service outlets:** Counter → ⚙️ Settings → **Dine-in service** — "🛎️ Waiters serve at the tables" (default)
+or "🙋 Self service — customers collect at the counter" (`settings.waiterService`, per outlet). Self service hides
+the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
+to collect it at the counter" (✔ Collected) instead of serving at the table.
+
 ### House rent per month
 House rent allowance can differ month to month. In the staff form choose **House rent is given: Every month** (switch it
 off for any month) or **Only in months I switch on**. Each salary card (Staff → Salary) shows **🏠 House rent · month:
