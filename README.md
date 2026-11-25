@@ -548,6 +548,20 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### ⚡ Rush hour mode (fast billing with tokens)
+For busy hours or a small cafe with 2–3 staff. Counter → **⚡ Rush hour** turns it on or off **for that phone**
+(`rush_mode_v1`). While it is on, the counter skips the order steps (no order type, tables, kitchen tickets or
+waiter jobs):
+- Tap the items, then **💳 Pay now ➜**: payment is taken at once and the done screen shows a big **Token N** to call
+  out when the food is ready.
+- Or tap **⏸️ Pay later**: the items are saved as an open token (optional name, e.g. "Table 4" or "Blue shirt") for
+  customers who pay after eating. Open tokens show as chips above the menu (Token N · name · ₹ · minutes) on every
+  phone of the outlet. Tap one to add more items (**Save token**) or to bill it when the customer leaves.
+- Token numbers run in one series per day for Pay now and Pay later. The token is saved on the bill
+  (`order.token`, `order.rush`) so sales and reports work as usual.
+- Kitchen screens never show rush tokens. Turn rush hour off to go back to the normal order flow; open tokens stay
+  until they are billed.
+
 ### 🅿️ Parking and 🛍️ General store (optional, per outlet)
 Both are **off by default**; Counter → ⚙️ Settings → **Extra businesses** switches each on for that outlet
 (`settings.parkingOn` / `storeOn`). When on, Records gets a Parking / Store tab, the Counter a 🅿️ / 🛍️ button, and

@@ -327,6 +327,11 @@
   .scd{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font:inherit;color:var(--ink);min-height:58px;}
   .scd b{font-size:15px;} .scd span{font-size:10.5px;font-weight:700;} .scd small{font-size:9.5px;color:var(--ink-soft);} .scd.free{background:#E8F3EA;border-color:#2E7D4F;} .scd.free span{color:#2E7D4F;}
   .ppark{margin:8px 0;padding:10px;border-radius:12px;background:#F2EEE5;} .ppark label{display:block;font-size:13px;font-weight:700;margin-bottom:4px;} .ppark select{width:100%;} .ppark small{display:block;margin-top:4px;font-size:12px;}
+  .rushbar{background:#FFF1DC;border:1.5px solid #C9772B;border-radius:12px;padding:8px 12px;margin:0 0 8px;font-size:13px;} .rushbar span{color:var(--ink-soft);}
+  .tabchips{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:8px;} .tabchips button{flex:none;display:flex;flex-direction:column;align-items:center;min-width:92px;padding:8px 10px;border-radius:14px;border:2px solid #2E7D4F;background:#EEF6EC;font:inherit;color:var(--ink);}
+  .tabchips button b{font-size:15px;} .tabchips button span{font-weight:700;} .tabchips button small{font-size:10.5px;color:var(--ink-soft);} .tabchips button.on{background:#2E7D4F;color:#fff;} .tabchips button.on small{color:#e6f2ea;} .tabchips button.old{border-color:#A6402D;background:#FBEDEA;}
+  .clater{border:none;border-radius:14px;background:#C9772B;color:#fff;font:inherit;font-weight:800;font-size:15px;padding:0 12px;margin-right:6px;}
+  .tokbig{font-size:44px;font-weight:900;color:#2E7D4F;letter-spacing:1px;margin-bottom:4px;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -10989,9 +10994,46 @@ function unitPrice(m, type){
   return p;
 }
 function openTicketFor(table){ return liveOrders.find(function(t){ return t.type==="dine" && t.table===table && !t.paid && t.status!=="cancelled"; }) || null; }
-function activeTickets(){ return liveOrders.filter(function(t){ return t.status!=="done" && t.status!=="cancelled"; }).sort(function(a,b){ return (a.at||0)-(b.at||0); }); }
+// ⚡ Rush hour (per phone): no order types, tables or kitchen steps — tap items, then Pay now (token)
+// or Pay later (an open token billed when the customer finishes). Open tokens are kept with live
+// orders (type "tab") so every phone sees them, but they never show in the kitchen.
+var RUSH_KEY = "rush_mode_v1";
+function rushOn(){ try{ return localStorage.getItem(RUSH_KEY)==="1"; }catch(e){ return false; } }
+function setRush(on){ try{ localStorage.setItem(RUSH_KEY, on ? "1" : "0"); }catch(e){} }
+// One token sequence per day for both Pay now and Pay later.
+function nextRushToken(){
+  var d = fmtDate(new Date()), m = 0;
+  liveOrders.forEach(function(t){ if(t.type==="tab" && t.date===d) m = Math.max(m, +t.no||0); });
+  sales.forEach(function(x){ if(x.date===d && x.order && x.order.token) m = Math.max(m, +x.order.token||0); });
+  return m + 1;
+}
+function openTabs(){ return liveOrders.filter(function(t){ return t.type==="tab" && t.status==="tab" && !t.paid; }).sort(function(a,b){ return (a.at||0)-(b.at||0); }); }
+function tabTotal(t){ return (t.items||[]).reduce(function(a,i){ return a + (+i.qty||0)*(+i.price||0); },0); }
+function rushBarHtml(){
+  var tabs = openTabs(), held = counterTicket ? liveOrders.find(function(x){ return x.id===counterTicket; }) : null;
+  var html = '<div class="rushbar"><b>⚡ Rush hour</b> <span>Tap items → 💳 Pay now, or ⏸️ Pay later for customers who pay after eating.</span></div>';
+  if(tabs.length) html += '<div class="tabchips">'+tabs.map(function(t){ var m = ticketMins(t);
+    return '<button data-tab="'+esc(t.id)+'" class="'+(held && held.id===t.id?'on':'')+(m>=45?' old':'')+'"><b>Token '+t.no+'</b>'+(t.label?'<small class="notr">'+esc(t.label)+'</small>':'')+'<span>'+rupee(tabTotal(t))+'</span><small>'+m+' min</small></button>'; }).join("")+'</div>';
+  return html;
+}
+function saveTabFromCounter(){
+  var lines = orderLines(); if(!lines.length) return;
+  var items = lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:unitPrice(l.m, "take") }; });
+  var held = counterTicket ? liveOrders.find(function(x){ return x.id===counterTicket && x.type==="tab"; }) : null, now = new Date(), t;
+  if(held){ held.items = items; held.amount = tabTotal(held); held.updated = now.getTime(); t = held; }
+  else { t = { id:uid(), type:"tab", status:"tab", no:nextRushToken(), date:fmtDate(now), time:nowHM(), at:now.getTime(), items:items, byName:myName() }; t.amount = tabTotal(t); liveOrders.push(t); }
+  saveLive(); counterOrder = {}; counterDisc = null; counterTicket = null; renderAll();
+  var sheet = document.getElementById("sheet");
+  sheet.innerHTML = '<div class="pdone"><div class="tokbig">Token '+t.no+'</div><b>'+(held ? 'Updated' : 'Saved')+' — pay later</b><div>'+rupee(t.amount)+' · '+items.reduce(function(a,i){ return a+i.qty; },0)+' items</div>'+
+    '<div class="field" style="margin-top:12px;text-align:left;"><label>Name / table (optional)</label><input id="tb_lbl" value="'+esc(t.label||"")+'" placeholder="e.g. Table 4, blue shirt"></div>'+
+    '<button class="btn-save" id="tb_ok" style="width:100%;margin-top:10px;">Next customer</button></div>';
+  document.getElementById("sheetBg").classList.add("on"); sayHindi("टोकन "+t.no);
+  document.getElementById("tb_ok").addEventListener("click", function(){ var v = document.getElementById("tb_lbl").value.trim(); if(v!==(t.label||"")){ t.label = v.slice(0,30); saveLive(); } closeForm(); renderAll(); });
+}
+function activeTickets(){ return liveOrders.filter(function(t){ return t.type!=="tab" && t.status!=="done" && t.status!=="cancelled"; }).sort(function(a,b){ return (a.at||0)-(b.at||0); }); }
 function nextTicketNo(){ var d = fmtDate(new Date()); return 1 + liveOrders.filter(function(t){ return t.date===d; }).reduce(function(a,t){ return Math.max(a, +t.no||0); },0); }
 function ticketLabel(t){
+  if(t.type==="tab") return "🎫 Token "+t.no+(t.label?" · "+t.label:"");
   var c = CHANNELS[t.type] || { t:t.type, i:"" };
   return c.i+" "+(t.type==="dine" ? t.table : isPlatform(t.type) ? c.t+" #"+t.pid : t.type==="delivery" ? "Delivery · "+(t.cname||"") : "Takeaway"+(t.cname?" · "+t.cname:""));
 }
@@ -11066,6 +11108,7 @@ function openTablesEditor(back){
   draw();
 }
 function counterBarLabel(){
+  if(rushOn()) return "💳 Pay now ➜";
   if(counterTicket) return "Bill ➜";
   if(counterType==="dine") return counterTable ? (openTicketFor(counterTable) ? "Add to "+counterTable+" ➜" : "Send to kitchen ➜") : "Pick a table ↑";
   if(counterType==="delivery") return "Details ➜";
@@ -11073,6 +11116,12 @@ function counterBarLabel(){
   return "Bill ➜";
 }
 function counterTypeHtml(){
+  if(rushOn()){
+    if(counterTicket){ var hd = liveOrders.find(function(x){ return x.id===counterTicket; }); if(!hd || hd.paid || hd.status==="done" || hd.status==="cancelled") releaseCounterTicket(); }
+    var rb = rushBarHtml();
+    if(counterTicket){ var tk0 = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk0) rb += '<div class="ctbilling"><span>🧾 '+esc(ticketLabel(tk0))+'<small>Add items, then Pay now — or save the token again.</small></span><button id="ct_unbill">✕ Stop</button></div>'; }
+    return rb;
+  }
   // An order billed, paid or cancelled on another phone must not keep this Counter stuck.
   if(counterTicket){ var held = liveOrders.find(function(x){ return x.id===counterTicket; }); if(!held || held.paid || held.status==="done" || held.status==="cancelled") releaseCounterTicket(); }
   if(isPlatform(counterType) && !platformCfg(counterType).enabled && !counterTicket) setCounterType("take");
@@ -11100,6 +11149,7 @@ function wireCounterType(el){
 }
 // What "Bill / Send" does for the chosen order type.
 function counterGo(){
+  if(rushOn()){ counterType = "take"; openCounterPay(); return; }
   if(counterTicket || counterType==="take"){ openCounterPay(); return; }
   if(counterType==="dine"){
     if(!counterTable){ appAlert("Pick a table first · पहले टेबल चुनें"); return; }
@@ -11420,6 +11470,7 @@ function renderCounter(){
   var html = '<div class="listhead"><h2 class="serif">Counter</h2><div class="monthtot">'+bills.length+' bill'+(bills.length!==1?'s':'')+' today · '+rupee(bills.reduce(function(a,s){ return a+saleTotal(s); },0))+'</div></div>';
   html += '<div class="ctools">'+
     '<button id="ct_live" class="'+(activeTickets().some(function(t){ return (t.status==="new"||t.status==="cooking") && ticketMins(t)>ticketTarget(t); })?"warn":"")+'">📋 Live orders ('+activeTickets().length+')</button>'+
+    '<button id="ct_rush" class="'+(rushOn()?"on":"")+'">⚡ Rush hour'+(rushOn()?': ON':'')+'</button>'+
     '<button id="ct_bills">🧾 Today’s bills</button>'+
     (parkingOn() && canReadKey(PARK_KEY) ? '<button id="ct_park">🅿️ Parking ('+parking.filter(function(p){ return p.status==="in"; }).length+')</button>' : '')+
     (storeOn() && canReadKey(STORE_ITEMS_KEY) ? '<button id="ct_store">🛍️ Store bill</button>' : '')+
@@ -11443,7 +11494,8 @@ function renderCounter(){
   html += '<div class="cgrid">'+show.map(tileHtml).join("")+'</div>';
   var n = orderCount(), t = billNet();
   html += '<div class="cbar'+(n?" on":"")+'">'+(n ?
-    '<button class="cclear" id="ct_clear" aria-label="clear">✕</button><div class="ctot"><b>'+rupee(t)+'</b><span>'+n+' item'+(n!==1?'s':'')+'</span></div><button class="cgo" id="ct_go">'+esc(counterBarLabel())+'</button>' :
+    '<button class="cclear" id="ct_clear" aria-label="clear">✕</button><div class="ctot"><b>'+rupee(t)+'</b><span>'+n+' item'+(n!==1?'s':'')+'</span></div>'+
+      (rushOn() ? '<button class="clater" id="ct_later">⏸️ '+(counterTicket ? 'Save token' : 'Pay later')+'</button>' : '')+'<button class="cgo" id="ct_go">'+esc(counterBarLabel())+'</button>' :
     '<div class="chint">Tap a picture to add it</div>')+'</div>';
   el.innerHTML = html;
   wireCounterTools(el);
@@ -11458,11 +11510,19 @@ function renderCounter(){
   });
   wireCounterType(el);
   var go = document.getElementById("ct_go"); if(go) go.addEventListener("click", function(){ if(!canBill){ appAlert("This login cannot make bills."); return; } counterGo(); });
+  var lt = document.getElementById("ct_later"); if(lt) lt.addEventListener("click", function(){ if(!canBill){ appAlert("This login cannot make bills."); return; } saveTabFromCounter(); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tab]"), function(b){ b.addEventListener("click", function(){
+    var t = liveOrders.find(function(x){ return x.id===b.getAttribute("data-tab"); }); if(!t) return;
+    counterTicket = t.id; counterType = "take"; counterTable = null; counterOrder = {}; counterDisc = null; counterMeta = {};
+    (t.items||[]).forEach(function(i){ counterOrder[i.menuId] = (counterOrder[i.menuId]||0) + i.qty; });
+    renderCounter(); openCounterPay(); }); });
   var cl = document.getElementById("ct_clear"); if(cl) cl.addEventListener("click", function(){ askConfirm("Clear this order?", function(){ counterOrder = {}; counterDisc = null; counterTicket = null; counterMeta = {}; renderCounter(); }); });
 }
 function wireCounterTools(el){
   var b = document.getElementById("ct_bills"); if(b) b.addEventListener("click", function(){ openCounterBills(fmtDate(new Date())); });
   var lv = document.getElementById("ct_live"); if(lv) lv.addEventListener("click", function(){ openLiveOrders(false); });
+  var rsh = document.getElementById("ct_rush"); if(rsh) rsh.addEventListener("click", function(){ setRush(!rushOn()); releaseCounterTicket(); counterTable = null; if(rushOn()) counterType = "take"; renderCounter();
+    if(rushOn()) appAlert("⚡ Rush hour ON on this phone: tap items, then 💳 Pay now (token) or ⏸️ Pay later. No tables or kitchen steps. Tap ⚡ again to switch off."); });
   var cpk = document.getElementById("ct_park"); if(cpk) cpk.addEventListener("click", function(){ showView("records"); switchRecordsSub("parking"); });
   var cst = document.getElementById("ct_store"); if(cst) cst.addEventListener("click", function(){ storeSub = "bill"; showView("records"); switchRecordsSub("store"); });
   var wb = document.getElementById("ct_waiter"); if(wb) wb.addEventListener("click", function(){ waiterUnlockSound(); openWaiterSheet(); });
@@ -11663,7 +11723,8 @@ function finishCounterBill(mode, customer, given, plat){
   sales.push(rec);
   items.forEach(function(i){ dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:id }); });
   var sentToKitchen = false;
-  if(tk){ tk.paid = true; tk.paidAt = Date.now(); tk.saleId = id; tk.amount = total; tLog(tk, "paid"); if(tk.status==="out") { tk.status = "done"; tLog(tk, "done"); } saveLive(); }
+  if(tk){ tk.paid = true; tk.paidAt = Date.now(); tk.saleId = id; tk.amount = total; tLog(tk, "paid"); if(tk.status==="out" || tk.type==="tab") { tk.status = "done"; tLog(tk, "done"); } saveLive(); if(tk.type==="tab") rec.order.token = tk.no; }
+  else if(rushOn()){ rec.order.token = nextRushToken(); rec.order.rush = true; }
   else if(counterType!=="dine"){
     createTicket({ type:counterType, paid:true, saleId:id, amount:total, items:items, cname: plat ? plat.cname : (counterMeta.cname||""), phone:counterMeta.phone||"", address:counterMeta.address||"", charge:charge,
                    platform: plat ? plat.platform : null, pid: plat ? plat.pid : null, accepted: plat ? !!plat.accepted : undefined });
@@ -11673,7 +11734,8 @@ function finishCounterBill(mode, customer, given, plat){
   counterOrder = {}; counterDisc = null; counterTicket = null; counterMeta = {}; counterTable = null;
   closeForm(); renderAll();
   var sheet = document.getElementById("sheet");
-  sheet.innerHTML = '<div class="pdone"><div class="tick">✔</div><b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+(parkMsg ? '<div class="ok" style="margin-top:6px;">'+esc(parkMsg)+'</div>' : '')+(sentToKitchen ? '<div class="muted" style="margin-top:6px;">Sent to the kitchen · Live orders</div>' : '')+
+  var tokNo = rec.order.token;
+  sheet.innerHTML = '<div class="pdone">'+(tokNo ? '<div class="tokbig">Token '+tokNo+'</div>' : '<div class="tick">✔</div>')+'<b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+(parkMsg ? '<div class="ok" style="margin-top:6px;">'+esc(parkMsg)+'</div>' : '')+(sentToKitchen ? '<div class="muted" style="margin-top:6px;">Sent to the kitchen · Live orders</div>' : '')+
     '<button class="btn-save" id="pd_ok" style="width:100%;margin-top:16px;">Next customer</button></div>';
   document.getElementById("sheetBg").classList.add("on");
   sayHindi("धन्यवाद");
