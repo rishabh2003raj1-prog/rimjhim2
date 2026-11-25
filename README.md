@@ -571,6 +571,13 @@ screen), kept in photo storage like bill photos (`pics` on the parking entry). C
 from check-in; **🍽️ Driver ate here today** makes that day free. Parked vehicles show day count, free days, amount,
 paid and due. **Check out** shows the bill, needs every belonging ticked as given back, and takes the payment
 (cash / UPI). Recently left vehicles keep their history.
+The form follows the paper parking slip (नाम, आधार, मो., गाड़ी नं., डीज़ल, बैटरी, स्टेपनी, जैक, तिरपाल, पार्किंग,
+ड्राइवर साइन): **counts** for battery / stepney / jack / tirpal / papers / tools (✗ = none), **🔑 key with us or
+driver kept it**, diesel as a preset (लाल पर, लाल से थोड़ा ऊपर, ¼ … full) or **in words** (e.g. "17 अंगुली"), the
+**agreed rate per day** (filled from the vehicle type, can be changed per vehicle), and the **driver's signature**
+drawn on the screen (required for bus / truck; kept as a photo). Each stay gets a slip number; **🧾 Parking slip
+(PDF)** (on the vehicle and at check-out) prints the same slip in Hindi + English with the signature, Aadhaar masked
+to its last 4 digits, and at check-out the days, free days, total and paid.
 
 **General store** (`storeitems_v1`, `storesales_v1`, `storebuys_v1`): **🧾 Bill** (tap items, Cash / UPI, separate bill
 numbers), **📦 Stock** (items with buying and selling price, margin %, stock, reorder level, supplier; "stock now"
