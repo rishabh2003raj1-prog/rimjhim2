@@ -8427,8 +8427,8 @@ function patternAlerts(){
     }
     // 4. Bills cancelled again and again by one person.
     var vz = {};
-    checks.filter(function(c){ return c.kind==="void" && c.date>=addDays(today,-7); }).forEach(function(c){ var g = vz[c.byName||"?"] || (vz[c.byName||"?"] = { n:0, amt:0 }); g.n++; g.amt += +c.amount||0; });
-    Object.keys(vz).forEach(function(w){ if(vz[w].n>=3) out.push({ t:"❌ "+w+" cancelled "+vz[w].n+" bills this week ("+rupee(vz[w].amt)+")", go:"sales", kind:"void" }); });
+    checks.filter(function(c){ return (c.kind==="void" || c.kind==="tokenvoid") && c.date>=addDays(today,-7); }).forEach(function(c){ var g = vz[c.byName||"?"] || (vz[c.byName||"?"] = { n:0, amt:0 }); g.n++; g.amt += +c.amount||0; });
+    Object.keys(vz).forEach(function(w){ if(vz[w].n>=3) out.push({ t:"❌ "+w+" cancelled "+vz[w].n+" bills/tokens this week ("+rupee(vz[w].amt)+")", go:"sales", kind:"void" }); });
     // 5. Wastage this week far above normal.
     if(canReadKey(WASTE_KEY) && canReadKey(PURCH_KEY)){
       var wk = wasteValueBetween(addDays(today,-6), today), past = [1,2,3,4].map(function(i){ return wasteValueBetween(addDays(today,-6-7*i), addDays(today,-7*i)); });
@@ -11007,6 +11007,29 @@ function nextRushToken(){
   sales.forEach(function(x){ if(x.date===d && x.order && x.order.token) m = Math.max(m, +x.order.token||0); });
   return m + 1;
 }
+// Cancel an open (unpaid) rush token. Who, when and why are kept on the token and listed in Today's bills.
+function heldTab(){ return counterTicket ? liveOrders.find(function(x){ return x.id===counterTicket && x.type==="tab" && !x.paid && x.status==="tab"; }) : null; }
+function cancelTab(t){
+  if(!t) return;
+  function go(why){
+    var cur = liveOrders.find(function(x){ return x.id===t.id; });
+    if(!cur || cur.paid || cur.status!=="tab"){ appAlert("This token was already billed or cancelled."); return; }
+    cur.status = "cancelled"; cur.cancelWhy = why; cur.cancelBy = myName()||"Owner"; cur.cancelAt = Date.now(); cur.amount = tabTotal(cur); tLog(cur, "cancelled");
+    if(canWriteKey(CHECKS_KEY)){ checks.push({ id:uid(), kind:"tokenvoid", tabId:cur.id, date:cur.date, time:nowHM(), token:cur.no, label:cur.label||"", why:why, amount:cur.amount, items:(cur.items||[]).map(function(i){ return i.qty+"× "+i.name; }).join(", "), byName:myName()||"Owner" }); saveChecks(); }
+    saveLive(); if(counterTicket===cur.id) releaseCounterTicket(); closeForm(); renderAll();
+  }
+  __queueDlg(function(){ __showDlg("Cancel Token "+t.no+(t.label?" ("+t.label+")":"")+" · "+rupee(tabTotal(t))+"? It will not be billed. Why?", [
+    { label:"🚶 Customer left", cls:"dlgyes", fn:function(){ go("Customer left"); } },
+    { label:"✏️ Wrong / duplicate token", cls:"dlgyes", fn:function(){ go("Wrong token"); } },
+    { label:"↩️ Keep the token", cls:"dlgno" } ]); });
+}
+function tokenVoids(dateStr){
+  var out = checks.filter(function(c){ return c.kind==="tokenvoid" && c.date===dateStr; }), seen = {};
+  out.forEach(function(c){ seen[c.tabId] = 1; });
+  liveOrders.forEach(function(t){ if(t.type==="tab" && t.status==="cancelled" && t.date===dateStr && !seen[t.id])
+    out.push({ tabId:t.id, token:t.no, label:t.label||"", why:t.cancelWhy||"", time:t.cancelAt ? new Date(t.cancelAt).toTimeString().slice(0,5) : "", byName:t.cancelBy||"", amount:t.amount!=null?t.amount:tabTotal(t), items:(t.items||[]).map(function(i){ return i.qty+"× "+i.name; }).join(", ") }); });
+  return out;
+}
 function openTabs(){ return liveOrders.filter(function(t){ return t.type==="tab" && t.status==="tab" && !t.paid; }).sort(function(a,b){ return (a.at||0)-(b.at||0); }); }
 function tabTotal(t){ return (t.items||[]).reduce(function(a,i){ return a + (+i.qty||0)*(+i.price||0); },0); }
 function rushBarHtml(){
@@ -11119,7 +11142,7 @@ function counterTypeHtml(){
   if(rushOn()){
     if(counterTicket){ var hd = liveOrders.find(function(x){ return x.id===counterTicket; }); if(!hd || hd.paid || hd.status==="done" || hd.status==="cancelled") releaseCounterTicket(); }
     var rb = rushBarHtml();
-    if(counterTicket){ var tk0 = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk0) rb += '<div class="ctbilling"><span>🧾 '+esc(ticketLabel(tk0))+'<small>Add items, then Pay now — or save the token again.</small></span><button id="ct_unbill">✕ Stop</button></div>'; }
+    if(counterTicket){ var tk0 = liveOrders.find(function(x){ return x.id===counterTicket; }); if(tk0) rb += '<div class="ctbilling"><span>🧾 '+esc(ticketLabel(tk0))+'<small>Add items, then Pay now — or save the token again.</small></span><button id="ct_tabcx">❌ Cancel token</button><button id="ct_unbill">✕ Stop</button></div>'; }
     return rb;
   }
   // An order billed, paid or cancelled on another phone must not keep this Counter stuck.
@@ -11145,6 +11168,7 @@ function wireCounterType(el){
   Array.prototype.forEach.call(el.querySelectorAll("[data-ctype]"), function(b){ b.addEventListener("click", function(){ if(counterTicket) releaseCounterTicket(); setCounterType(b.getAttribute("data-ctype")); renderCounter(); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-table]"), function(b){ b.addEventListener("click", function(){ var tb = b.getAttribute("data-table"); counterTable = counterTable===tb ? null : tb; renderCounter(); }); });
   var te = el.querySelector("#ct_tables"); if(te) te.addEventListener("click", function(){ openTablesEditor(null); });
+  var tcx = el.querySelector("#ct_tabcx"); if(tcx) tcx.addEventListener("click", function(ev){ ev.preventDefault(); cancelTab(heldTab()); });
   var ub = el.querySelector("#ct_unbill"); if(ub) ub.addEventListener("click", function(ev){ ev.preventDefault(); releaseCounterTicket(); counterTable = null; renderCounter(); });
 }
 // What "Bill / Send" does for the chosen order type.
@@ -11622,7 +11646,7 @@ function renderCounterPay(speak){
     if(charge) html += '<div class="psub"><span>🛵 Delivery charge</span><b>'+rupee(charge)+'</b></div>';
     html += '<div class="ptotal"><span>Total</span><b>'+rupee(total)+'</b><button class="psay" id="pp_say" aria-label="say the total">🔊</button></div>';
     html += '<div class="ppay"><button class="cash" data-pay="cash"><span>💵</span>Cash</button><button class="upi" data-pay="upi"><span>📱</span>UPI</button><button class="udh" data-pay="udhaar"><span>📒</span>Udhaar</button></div>';
-    html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back" style="flex:1;">← Add more</button></div>';
+    html += '<div class="sheetbtns"><button class="btn-cancel" id="pp_back" style="flex:1;">← Add more</button>'+(heldTab() ? '<button class="btn-cancel" id="pp_tabcx" style="flex:1;color:#A6402D;border-color:#A6402D;">❌ Cancel token</button>' : '')+'</div>';
   } else if(payStep==="discount"){
     html += '<h2 class="serif">🏷️ Discount</h2><div class="backupnote">Bill '+rupee(sub)+'.'+(discLimited() ? ' You can give up to '+maxDiscPct()+'% yourself; saved offers have no limit.' : '')+'</div>';
     var offs = activeOffers();
@@ -11686,6 +11710,7 @@ function renderCounterPay(speak){
     payStep = "order"; renderCounter(); renderCounterPay();
   });
   on("#pp_say", function(){ sayHindi("कुल "+Math.round(total)+" रुपये"); });
+  on("#pp_tabcx", function(){ cancelTab(heldTab()); });
   on("#pp_back", function(){ if(payStep==="order"){ closeForm(); } else { payStep = "order"; renderCounterPay(); } });
   on("#pp_reset", function(){ payGiven = 0; renderCounterPay(); });
   on("#pp_done", function(){ finishCounterBill(payStep==="upi" ? "UPI" : "Cash", null, payStep==="cash" ? payGiven : 0); });
@@ -11750,7 +11775,8 @@ function openCounterBills(dateStr){
   html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>'+list.length+' bill'+(list.length!==1?'s':'')+'</span><b>'+rupee(list.reduce(function(a,s){ return a+saleTotal(s); },0))+'</b></div>'+
     Object.keys(modes).map(function(k){ return '<div class="psrow"><span>'+({Cash:"💵 ",UPI:"📱 ",Udhaar:"📒 "}[k]||"")+esc(k)+'</span><b>'+rupee(modes[k])+'</b></div>'; }).join("")+
     (discTot ? '<div class="psrow"><span>🏷️ Discounts given ('+discN+' bill'+(discN!==1?'s':'')+')</span><b class="warnamt">− '+rupee(discTot)+'</b></div>' : '')+
-    checks.filter(function(c){ return c.kind==="void" && c.date===dateStr; }).map(function(c){ return '<div class="psrow"><span>❌ Bill '+esc(c.billNo)+' cancelled · '+esc(c.time||"")+' · '+esc(c.byName||"")+'<br><span class="muted" style="font-size:11.5px;">'+esc(c.items||"")+'</span></span><b class="bad">'+rupee(c.amount)+'</b></div>'; }).join("")+'</div>';
+    checks.filter(function(c){ return c.kind==="void" && c.date===dateStr; }).map(function(c){ return '<div class="psrow"><span>❌ Bill '+esc(c.billNo)+' cancelled · '+esc(c.time||"")+' · '+esc(c.byName||"")+'<br><span class="muted" style="font-size:11.5px;">'+esc(c.items||"")+'</span></span><b class="bad">'+rupee(c.amount)+'</b></div>'; }).join("")+
+    tokenVoids(dateStr).map(function(v){ return '<div class="psrow tabvoid"><span>❌ Token '+esc(v.token)+(v.label?' · <span class="notr">'+esc(v.label)+'</span>':'')+' cancelled · '+esc(v.time||"")+' · '+esc(v.byName||"")+'<br><span class="muted" style="font-size:11.5px;">'+esc(v.why||"")+' · '+esc(v.items||"")+'</span></span><b class="bad">'+rupee(v.amount)+'</b></div>'; }).join("")+'</div>';
   if(!list.length) html += '<div class="empty">No bills yet.</div>';
   var canCancel = canWriteKey(SALES_KEY);
   html += list.map(function(s){

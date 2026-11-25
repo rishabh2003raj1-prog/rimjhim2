@@ -42,6 +42,25 @@ const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode
   await E(p, 'closeForm()');
   assert(await E(p, `openTabs().length===1 && sales.length===2 && sales[1].order.token===2 && sales[1].mode==="UPI" && sales[1].amount===140`), 'Token 2 billed (UPI ₹140) and closed; Token 3 still open');
   await p.screenshot({ path: process.env.S+'/rush_paid.png' });
+  // Cancel Token 3 (customer left) from the bill sheet
+  await p.click('[data-tab]:first-child'); await p.waitForSelector('#pp_tabcx');
+  await p.screenshot({ path: process.env.S+'/rush_cancelbtn.png' });
+  await p.click('#pp_tabcx'); await p.waitForTimeout(100);
+  const opts = await p.$$eval('#dlgBtns button', a => a.map(x => x.textContent));
+  assert(opts.length===3 && /Customer left/.test(opts[0]) && /Keep/.test(opts[2]), 'cancel asks why (customer left / wrong token / keep)');
+  await p.click('#dlgBtns button:last-child'); await p.waitForTimeout(100);
+  assert(await E(p, 'openTabs().length')===1, 'Keep the token: still open');
+  await p.click('#pp_back'); await p.waitForSelector('#ct_tabcx');
+  await p.click('#ct_tabcx'); await p.waitForTimeout(100); await p.click('#dlgBtns button:first-child'); await p.waitForTimeout(150);
+  assert(await E(p, `openTabs().length===0 && sales.length===2 && counterTicket===null && Object.keys(counterOrder).length===0`), 'token cancelled: no bill made, counter cleared');
+  assert(await E(p, `checks.some(function(c){ return c.kind==="tokenvoid" && c.token===3 && c.why==="Customer left" && c.amount===20; })`), 'cancel kept as a record (who, why, amount)');
+  assert(!(await p.$('[data-tab]')), 'token chip gone');
+  await p.click('#ct_bills'); await p.waitForTimeout(150);
+  assert(/Token 3 cancelled[\s\S]*Owner[\s\S]*Customer left[\s\S]*₹20/.test(await p.textContent('#sheet')), "Today's bills lists the cancelled token");
+  await p.screenshot({ path: process.env.S+'/rush_cancel.png' });
+  await E(p, 'closeForm()');
+  await p.click('.ctile[data-add="chai"]'); await p.click('#ct_later'); await p.waitForTimeout(100);
+  assert(/Token 4/.test(await p.textContent('.pdone')), 'cancelled number is not reused (next is Token 4)'); await p.click('#tb_ok');
   // Off again
   await p.click('#ct_rush');
   assert(!(await E(p, 'rushOn()')) && await p.$('.ctype'), 'Rush hour OFF: order types back');

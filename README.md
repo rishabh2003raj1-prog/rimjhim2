@@ -557,6 +557,9 @@ waiter jobs):
 - Or tap **⏸️ Pay later**: the items are saved as an open token (optional name, e.g. "Table 4" or "Blue shirt") for
   customers who pay after eating. Open tokens show as chips above the menu (Token N · name · ₹ · minutes) on every
   phone of the outlet. Tap one to add more items (**Save token**) or to bill it when the customer leaves.
+- **❌ Cancel token** (customer left / wrong or duplicate token): tap the token, then Cancel token on the bill or
+  in the token bar. No bill is made. Who cancelled, when, why and the items are kept (`checks` kind `tokenvoid`) and
+  listed in **Today's bills**; many cancels by one person in a week show in the owner's alerts. The number is not reused.
 - Token numbers run in one series per day for Pay now and Pay later. The token is saved on the bill
   (`order.token`, `order.rush`) so sales and reports work as usual.
 - Kitchen screens never show rush tokens. Turn rush hour off to go back to the normal order flow; open tokens stay
