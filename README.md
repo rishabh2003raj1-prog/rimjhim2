@@ -548,6 +548,63 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### 🛍️ Takeaway details: Customer / Zomato / Swiggy
+Counter → ⚙️ Settings → **Takeaway details** has a switch for each (per outlet, `settings.takeawaySrc`), all off by
+default. Each one that is on shows as a choice under 🛍️ Takeaway: **🛍️ Counter** (plain), **🧍 Customer** (name and
+phone typed on the counter, saved on the bill and the kitchen ticket, and linked to the customer's account by name),
+**🔴 Zomato** / **🟠 Swiggy** (the platform flow: order ID, commission % and packing set in the same settings, payout
+waiting until recorded). Turning a switch off removes the choice on every phone.
+
+### 🍱 Tiffin service (optional, per outlet)
+Counter → ⚙️ Settings → Extra businesses → **🍱 Tiffin service: On**. Records → **Tiffin** (also the 🍱 Tiffin button
+on the Counter) has four parts:
+- **🏷️ Plans**: name, meals (🌅 breakfast / ☀️ lunch / 🌙 dinner), number of tiffins, price, Sunday off, what is in
+  it. Also the time choices close for each meal (default breakfast 07:00, lunch 10:30, dinner 17:00).
+- **📋 Menu & choices**: for today, tomorrow or the day after and each meal: what is always in the tiffin (e.g. 4 roti ·
+  rice · salad) and **choice groups**, e.g. Dal: Dal fry / Dal makhani · Sabzi: Paneer matar / Shahi paneer
+  (suggestions offered). A day with no menu uses the last menu for that meal.
+- **👥 Subscribers**: name, phone, plan, meals, start date, pickup or 🛵 delivery address, Sunday off, note, and the
+  payment (cash / UPI / udhaar, recorded as a sale). Each subscriber is linked to a customer (made if new). Detail:
+  tiffins left, next meals and their choices, payments, **🔁 Renew** (adds tiffins + payment; a finished plan restarts
+  from the next meal), **⏸️ Pause days**, **⏹️ Stop / ▶️ Restart**, edit.
+- **🍳 Kitchen list** (today / tomorrow): per meal the number of tiffins, how many of each option (e.g. Dal makhani 6 ·
+  Dal fry 4), skipped count, and each subscriber with their choice, pickup / address. Tap a row to set a customer's
+  choice or skip (e.g. when they phone).
+
+**Customer app (/c)**: give the subscriber app access (Records → Customers → Give app access). Their page shows
+**tiffins left** and the next meals (today and tomorrow) still open, with big option buttons for each group and
+**⏭️ Skip this meal**. Each tap saves at once (`POST /api/cust/tiffin`); the server checks the subscriber is theirs, the
+meal is due, the option is on the menu and the cutoff has not passed (IST). No choice = the first option.
+**Tiffins left** = tiffins bought − meals served since the start (skipped meals, paused days, Sundays off and meals
+after a stop are not counted; a meal counts once its choice time has passed).
+Lists: `tiffinplans_v1`, `tiffinsubs_v1`, `tiffinmenu_v1`, `tiffinpicks_v1` (manager / billing write, chef reads; chef
+can also set menus).
+
+### 🎉 Party catering (optional, per outlet)
+Settings → Extra businesses → **🎉 Party catering: On**. Records → **Catering** (Counter: 🎉 Party orders):
+- **📖 Catering menu**: its own items, separate from the cafe menu: rate per plate / kg / piece / litre / tray, group,
+  minimum order.
+- **🎉 Orders**: customer, phone, event, guests, date and time, venue, items (per-plate items take the guest count;
+  "Per plate × guests" updates them), extras (transport, service staff, utensils, packing), discount, notes. Shows
+  the total and per-guest price. An advance can be taken when saving. Status: Enquiry → Confirmed → Food ready →
+  Delivered → Settled (or Cancelled). Orders in the next 2 days are highlighted.
+- **Money**: each payment received (advance, part payment, balance) is a sale on that day (cash / UPI). At settlement
+  the balance is paid now or **put on udhaar** under the customer's name, so sales always add up to the order total.
+- **📄 Quotation / bill PDF** to share on WhatsApp, and a **🍳 Prep list** per day (total of each item for the
+  confirmed orders).
+
+### 🏨 Hotel collab orders (optional, per outlet)
+Settings → Extra businesses → **🏨 Hotel orders: On**. Records → **Hotels** (Counter: 🏨 Hotel order):
+- **🤝 Hotels & rates**: each hotel has its own rates: a discount % on the cafe menu, its own price for any dish, extra
+  dishes only for that hotel, and "only the listed dishes" (a separate hotel menu). Payment: on account (monthly) or
+  with each order.
+- **🏨 Orders**: tap the hotel, room / guest, tap dishes (hotel prices, menu price struck out). **Send to kitchen**
+  makes a bill (on the hotel's account = udhaar under the hotel's name, or cash / UPI), a delivery ticket on Live
+  orders and the dish counts for stock. A same-day order can be cancelled (the bill is removed and kept as a cancel
+  record).
+- **🧾 Statements**: per month, each hotel's orders and total, what is due now, and a **statement PDF** with every
+  order and payment. Hotel payments are recorded as usual udhaar payments.
+
 ### ⚡ Rush hour mode (fast billing with tokens)
 For busy hours or a small cafe with 2–3 staff. Counter → **⚡ Rush hour** turns it on or off **for that phone**
 (`rush_mode_v1`). While it is on, the counter skips the order steps (no order type, tables, kitchen tickets or

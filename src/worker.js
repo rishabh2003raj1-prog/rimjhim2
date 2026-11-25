@@ -172,7 +172,7 @@ const STAFF_PUBLIC = ["id", "name", "role", "roles", "defaultShift", "status", "
 const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
 // Readable by the manager but only the owner / partners can change them.
 const SETTINGS_OWNER = ["poManagerLimit"];
-const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays", "tables", "tableZones", "zones", "waiterService", "customPosts", "parkingOn", "storeOn", "parkingRates", "storeMinMargin", "storeOpening", "parkMealMin", "platforms", "deliveryCharge"];
+const SETTINGS_PUBLIC = ["shifts", "mealTypes", "mealWeek", "mealBasics", "mealDays", "defaultFloat", "openingCash", "openingCashDate", "fixedExtra", "noteAliases", "paidLeaveDays", "upiId", "upiName", "maxDiscountPct", "checklists", "stockCoverDays", "tables", "tableZones", "zones", "waiterService", "customPosts", "parkingOn", "storeOn", "parkingRates", "storeMinMargin", "storeOpening", "parkMealMin", "platforms", "deliveryCharge", "takeawaySrc", "tiffinOn", "cateringOn", "hotelsOn", "tiffinCutoff"];
 const STAFF_PAY_CATS = ["Staff Salary", "Staff House Rent", "Staff Food Allowance", "Staff Travel Allowance", "Staff Bonus"];
 const CASH_MGR_TYPES = ["counter", "atm", "atmheld", "taken", "pass", "bank"];
 const CASH_BILL_TYPES = ["counter", "atm", "taken"];
@@ -213,6 +213,14 @@ const POLICY = {
   storeitems_v1:     { manager: "rw", billing: "r" },
   storesales_v1:     { manager: "rw", billing: "append2" },
   storebuys_v1:      { manager: "rw" },
+  tiffinplans_v1:    { manager: "rw", chef: "r", billing: "r" },
+  tiffinsubs_v1:     { manager: "rw", chef: "r", billing: "rw" },
+  tiffinmenu_v1:     { manager: "rw", chef: "rw", billing: "r" },
+  tiffinpicks_v1:    { manager: "rw", chef: "r", billing: "rw" },
+  catermenu_v1:      { manager: "rw", chef: "r", billing: "r" },
+  caterorders_v1:    { manager: "rw", chef: "r", billing: "rw" },
+  hotels_v1:         { manager: "rw", chef: "r", billing: "r" },
+  hotelorders_v1:    { manager: "rw", chef: "r", billing: "rw" },
   partners_v1:       { manager: "r", chef: "r", billing: "r" }
   // investments, loans, payroll and anything new: owner / partner / full only.
 };
@@ -233,6 +241,9 @@ const FEATURES = {
   zones:     { from: "manager", keys: ["checks_v1"] },
   parking:   { from: "billing", keys: ["parking_v1"] },
   store:     { from: "billing", keys: ["storeitems_v1", "storesales_v1", "storebuys_v1"] },
+  tiffin:    { from: "billing", keys: ["tiffinplans_v1", "tiffinsubs_v1", "tiffinmenu_v1", "tiffinpicks_v1"] },
+  catering:  { from: "billing", keys: ["catermenu_v1", "caterorders_v1"] },
+  hotels:    { from: "billing", keys: ["hotels_v1", "hotelorders_v1"] },
   expenses:  { from: "manager", keys: ["expenses_v1"] },
   customers: { from: "manager", keys: ["customers_v1", "custpayments_v1", "creditpayments_v1", "offers_v1"] },
   cash:      { from: "manager", keys: ["cashdays_v1", "cashmoves_v1"] },
@@ -248,9 +259,9 @@ const FEATURES = {
 const FEATURE_ROLES = ["partner", "manager", "chef", "billing"];
 const FEATURE_DEFAULTS = {
   partner: Object.keys(FEATURES),
-  manager: ["billing", "kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "zones", "parking", "store", "expenses", "customers", "cash", "staff", "meals", "dashboard", "calendar", "notes"],
-  chef:    ["kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "zones", "staff", "meals", "notes"],
-  billing: ["billing", "kitchen", "orders", "customers", "cash", "zones", "parking", "store", "staff", "notes"]
+  manager: ["billing", "kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "zones", "parking", "store", "tiffin", "catering", "hotels", "expenses", "customers", "cash", "staff", "meals", "dashboard", "calendar", "notes"],
+  chef:    ["kitchen", "menu", "stock", "purchases", "orders", "vendors", "assets", "zones", "tiffin", "catering", "hotels", "staff", "meals", "notes"],
+  billing: ["billing", "kitchen", "orders", "customers", "cash", "zones", "parking", "store", "tiffin", "catering", "hotels", "staff", "notes"]
 };
 const KEY_FEATURES = {};
 Object.keys(FEATURES).forEach((f) => FEATURES[f].keys.forEach((k) => { (KEY_FEATURES[k] = KEY_FEATURES[k] || []).push(f); }));
@@ -586,8 +597,86 @@ async function handleCustMe(env, c) {
       discount: s.order && s.order.discount ? +s.order.discount : 0
     })),
     payments: pays.slice().sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 30).map((p) => ({ date: p.date, amount: +p.amount || 0, mode: p.mode || "" })),
-    menu, offers, upi: settings.upiId ? { id: settings.upiId, name: settings.upiName || "" } : null
+    menu, offers, upi: settings.upiId ? { id: settings.upiId, name: settings.upiName || "" } : null,
+    tiffin: settings.tiffinOn === true ? await tiffinForCustomer(env, c.outlet, cust.id, settings) : null
   });
+}
+// ---- customer tiffin: the next meals with their choices; pick or skip until the cutoff (same rules as the app) ----
+const TF_ORDER = ["breakfast", "lunch", "dinner"];
+const TF_CUT = { breakfast: "07:00", lunch: "10:30", dinner: "17:00" };
+const TF_NAME = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
+function istHM() { return new Date(Date.now() + TZ_OFFSET_MIN * 60000).toISOString().slice(11, 16); }
+function addDay(d, n) { const t = new Date(d + "T12:00:00Z"); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); }
+function tfCutS(st, m) { const c = ((st && st.tiffinCutoff) || {})[m]; return /^\d\d:\d\d$/.test(c || "") ? c : TF_CUT[m]; }
+function tfOpenS(st, d, m) { const t = istDay(0); return d > t || (d === t && istHM() < tfCutS(st, m)); }
+function tfDueS(s, d, m) {
+  if (!s || !s.start || d < s.start) return false;
+  if (s.status === "stopped" && (!s.stopDate || d >= s.stopDate)) return false;
+  if (!arr(s.meals).includes(m)) return false;
+  if (arr(s.offDays).includes(new Date(d + "T12:00:00Z").getUTCDay())) return false;
+  return !arr(s.pauses).some((p) => p && d >= p.from && d <= p.to);
+}
+function tfSkippedS(pm, s, d, m) { const p = pm[s.id + "|" + d + "|" + m]; return !!(p && p.skip); }
+function tfCountS(st, s, pm, stopD, stopM, uptoNow) {
+  const tot = +s.mealsTotal || 0, today = istDay(0), mi = TF_ORDER.indexOf(stopM);
+  let n = 0, cur = s.start, guard = 0;
+  while (cur && cur <= stopD && n < tot && guard++ < 800) {
+    for (let i = 0; i < 3 && n < tot; i++) {
+      const m = TF_ORDER[i];
+      if (!uptoNow && cur === stopD && i >= mi) break;
+      if (uptoNow && cur === today && tfOpenS(st, today, m)) continue;
+      if (tfDueS(s, cur, m) && !tfSkippedS(pm, s, cur, m)) n++;
+    }
+    cur = addDay(cur, 1);
+  }
+  return n;
+}
+function tfMenuForS(menu, d, m) {
+  const ex = menu.find((x) => x && x.date === d && x.meal === m); if (ex) return ex;
+  return menu.filter((x) => x && x.meal === m && x.date < d).sort((a, b) => b.date.localeCompare(a.date))[0] || null;
+}
+async function tiffinForCustomer(env, outlet, cid, st) {
+  const val = async (k) => arr((await readOne(env, outlet, k)).value);
+  const subs = (await val("tiffinsubs_v1")).filter((s) => s && s.customerId === cid);
+  if (!subs.length) return { subs: [] };
+  const plans = await val("tiffinplans_v1"), menu = await val("tiffinmenu_v1"), picks = await val("tiffinpicks_v1"), pm = {};
+  picks.forEach((p) => { if (p && p.id) pm[p.id] = p; });
+  const today = istDay(0);
+  return { subs: subs.map((s) => {
+    const left = Math.max(0, (+s.mealsTotal || 0) - tfCountS(st, s, pm, today, "dinner", true)), plan = plans.find((p) => p && p.id === s.planId);
+    const upcoming = [];
+    if (s.status !== "stopped" && left > 0) for (const d of [today, addDay(today, 1)]) for (const m of TF_ORDER) {
+      if (!tfDueS(s, d, m) || !tfOpenS(st, d, m) || tfCountS(st, s, pm, d, m, false) >= (+s.mealsTotal || 0)) continue;
+      const mn = tfMenuForS(menu, d, m), p = pm[s.id + "|" + d + "|" + m], groups = arr(mn && mn.groups).map((g) => ({ id: String(g.id), name: String(g.name || ""), options: arr(g.options).map(String) }));
+      const choices = {}; groups.forEach((g) => { const c = p && p.choices && p.choices[g.id]; choices[g.id] = g.options.includes(c) ? c : (g.options[0] || ""); });
+      upcoming.push({ date: d, meal: m, label: TF_NAME[m], cutoff: tfCutS(st, m), note: mn ? String(mn.note || "") : "", groups, choices, picked: !!(p && p.choices && !p.skip), skip: !!(p && p.skip) });
+    }
+    return { id: s.id, plan: plan ? plan.name : "Tiffin", meals: arr(s.meals), left, total: +s.mealsTotal || 0, status: s.status === "stopped" ? "stopped" : left > 0 ? "active" : "finished", way: s.way || "pickup", upcoming };
+  }) };
+}
+async function handleCustTiffin(req, env, c) {
+  let b = {}; try { b = await req.json(); } catch (e) { return json({ error: "bad request" }, 400); }
+  const st = (await readOne(env, c.outlet, "settings_v1")).value || {};
+  if (st.tiffinOn !== true) return json({ error: "Tiffin service is off." }, 403);
+  const d = String(b.date || ""), m = String(b.meal || ""), sid = String(b.subId || "");
+  if (!/^\d{4}-\d\d-\d\d$/.test(d) || !TF_ORDER.includes(m)) return json({ error: "bad request" }, 400);
+  if (d > addDay(istDay(0), 2)) return json({ error: "Too far ahead." }, 400);
+  if (!tfOpenS(st, d, m)) return json({ error: "Choices for this meal are closed. Please call the cafe." }, 409);
+  const sub = arr((await readOne(env, c.outlet, "tiffinsubs_v1")).value).find((s) => s && s.id === sid && s.customerId === c.cid);
+  if (!sub || !tfDueS(sub, d, m)) return json({ error: "No tiffin for you at this meal." }, 404);
+  const mn = tfMenuForS(arr((await readOne(env, c.outlet, "tiffinmenu_v1")).value), d, m), choices = {};
+  for (const g of arr(mn && mn.groups)) { const v = b.choices && b.choices[g.id]; if (v != null && !arr(g.options).includes(v)) return json({ error: "That option is not on the menu." }, 400); if (v != null) choices[g.id] = String(v); }
+  const id = sid + "|" + d + "|" + m;
+  for (let tries = 0; tries < 4; tries++) {
+    const cur = await readOne(env, c.outlet, "tiffinpicks_v1"), list = arr(cur.value).slice();
+    let rec = list.find((x) => x && x.id === id);
+    if (!rec) { rec = { id, subId: sid, date: d, meal: m }; list.push(rec); }
+    Object.assign(rec, { choices, skip: b.skip === true, by: "customer", byName: sub.name || "", at: Date.now() });
+    const w = await writeOne(env, c.outlet, "tiffinpicks_v1", list, cur.rev);
+    if (w.tooBig) return json({ error: "Storage full." }, 507);
+    if (!w.conflict) return json({ ok: true });
+  }
+  return json({ error: "Busy, please try again." }, 503);
 }
 // Staff: give a customer app access (returns the code once), or take it away.
 async function handleCustCodes(req, env, url, path, who) {
@@ -1035,6 +1124,10 @@ export default {
       if (path === "/api/cust/me" && req.method === "GET") {
         const c = await custWho(req, env);
         return c ? await handleCustMe(env, c) : json({ error: "login required" }, 401);
+      }
+      if (path === "/api/cust/tiffin" && req.method === "POST") {
+        const c = await custWho(req, env);
+        return c ? await handleCustTiffin(req, env, c) : json({ error: "login required" }, 401);
       }
       if (path.startsWith("/api/cust/photo/") && req.method === "GET") {
         const c = await custWho(req, env), id = path.slice(16);

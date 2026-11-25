@@ -28,7 +28,7 @@ async function open(b, errs){ const p = await (await b.newContext({ viewport:{wi
   assert(JSON.stringify(t)==='["Window","Table 1","Table 3","Table 4","Outside 1","Outside 2","Table 2"]', 'renamed, removed, added, reordered');
   const chips = await p.$$eval('[data-table]', a => a.map(x => x.getAttribute('data-table')));
   assert(JSON.stringify(chips)===JSON.stringify(t), 'Counter shows the new tables');
-  await p.click('#ct_upi'); assert(!/Zomato|Swiggy/.test(await p.textContent('#sheet')), 'no Zomato / Swiggy in Settings');
+  await p.click('#ct_upi'); assert(!(await p.isChecked('#up_ts_zomato')) && !(await p.isChecked('#up_ts_swiggy')), 'Zomato / Swiggy switched off by default in Settings');
   await p.click('#up_tables'); assert(/Tables · टेबल/.test(await p.textContent('#sheet h2')), 'Edit tables also in Settings');
   await p.click('#tb_c'); await p.waitForTimeout(100); assert(/Counter settings/.test(await p.textContent('#sheet h2')), 'back to Settings');
   await E(p, 'closeForm()'); await p.click('#ct_tables'); await p.waitForTimeout(300); await p.screenshot({ path: process.env.S+'/tables_edit.png' });

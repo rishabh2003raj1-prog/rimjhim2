@@ -66,7 +66,7 @@ async function open(b, errs){ const p = await (await b.newContext({ viewport:{wi
   assert(JSON.stringify(r)==='[80,20,"Vinayak Hospital, Room 204","done","Sonu"]', 'delivery sale and ticket done: '+JSON.stringify(r));
   // ZOMATO
   await E(p, `platformCfg = function(pl){ var c = (settings.platforms||{})[pl]||{}; return { enabled:true, commission:+c.commission, markup:+c.markup||0, packing:+c.packing||0, prep:15 }; };`);
-  await E(p, `settings.platforms={zomato:{enabled:true,commission:25,markup:10,packing:10,prep:15},swiggy:{enabled:true,commission:22,markup:0,packing:0,prep:15}}; saveSettings(); renderAll(); showView('counter');`);
+  await E(p, `settings.platforms={zomato:{enabled:true,commission:25,markup:10,packing:10,prep:15},swiggy:{enabled:true,commission:22,markup:0,packing:0,prep:15}}; saveSettings(); setCounterType('take'); renderAll(); showView('counter');`);
   await p.click('[data-ctype="zomato"]');
   assert(/₹65/.test(await p.textContent('.ctile[data-add="momo"]')), 'Zomato price with 10% markup (60 → 65)');
   await p.click('.ctile[data-add="momo"]'); await p.click('.ctile[data-add="momo"]'); await p.click('#ct_go');
@@ -85,7 +85,7 @@ async function open(b, errs){ const p = await (await b.newContext({ viewport:{wi
   await p.click(zs); await p.click('#rd_ok'); assert(/Match the order ID/.test(await p.textContent('#rd_err')), 'must match the rider order ID / OTP');
   await p.check('#rd_match'); await p.click('#rd_ok'); await p.waitForTimeout(100);
   assert(await E(p, `liveOrders.find(function(t){ return t.type==='zomato'; }).status`)==='done', 'Zomato order handed to rider');
-  await E(p, 'closeForm(); showView("counter")'); await p.click('[data-ctype="zomato"]'); await p.click('.ctile[data-add="momo"]'); await p.click('#ct_go'); await p.fill('#pf_id','4821'); await p.click('#pf_ok');
+  await E(p, 'closeForm(); setCounterType("take"); showView("counter")'); await p.click('[data-ctype="zomato"]'); await p.click('.ctile[data-add="momo"]'); await p.click('#ct_go'); await p.fill('#pf_id','4821'); await p.click('#pf_ok');
   assert(/already entered/.test(await p.textContent('#pf_err')), 'same Zomato order cannot be entered twice'); await E(p, 'closeForm(); counterOrder={}; renderCounter();');
   // sales list + payout
   await E(p, `recPeriod='day'; showView('records'); switchRecordsSub('sales');`);

@@ -259,6 +259,27 @@
   .ctables button.tbedit{border-style:dashed;}
   .surow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);} .surow > b{width:26px;height:26px;border-radius:13px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;background:#EFE8D8;font-size:13px;}
   .surow.done > b{background:#2E7D4F;color:#fff;} .surow.done .who{text-decoration:line-through;color:var(--ink-soft);} .surow > div{flex:1;min-width:0;}
+  .tfdays{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;} .tfdays button,.tfopts button,.tfsug button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font:inherit;font-size:13.5px;font-weight:600;}
+  .tfdays button.on,.tfopts button.on{background:var(--teal,#1F5C52);border-color:var(--teal,#1F5C52);color:#fff;}
+  .tfopts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;} .tfopts button{font-size:15px;padding:10px 14px;}
+  .tfsug{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0;} .tfsug button{font-size:12px;padding:5px 10px;color:var(--ink-soft);}
+  .tfmeal h3{display:flex;justify-content:space-between;align-items:center;gap:8px;} .tfbig{font-size:15px;background:#E4F0EC;color:#1F5C52;border-radius:999px;padding:3px 10px;}
+  .tfcounts{margin:8px 0;} .tfcounts>div{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:6px;font-size:13px;} .tfcounts>div>b{min-width:52px;}
+  .tfcounts span{background:#FFF4E0;border:1px solid #E7C98F;border-radius:10px;padding:4px 9px;} .tfcounts span.zero{opacity:.45;} .tfcounts span b{font-size:15px;}
+  .tfrow{cursor:pointer;} .tfrow.skip{opacity:.5;} .tfsub{cursor:pointer;} .tfsub.off{opacity:.6;}
+  .tfchk{display:flex;gap:12px;flex-wrap:wrap;} .tfchk label{display:flex;gap:6px;align-items:center;font-weight:600;font-size:14px;}
+  .field.three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+  .ctline{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line);font-size:13.5px;} .ctline>span{flex:1;min-width:0;} .ctline small{display:block;color:var(--ink-soft);font-size:11.5px;}
+  .ctline input{width:80px;padding:7px;border:1.5px solid var(--line);border-radius:10px;font:inherit;} .ctline>input:first-child{flex:1;width:auto;} .ctline b{min-width:64px;text-align:right;}
+  .ctord{cursor:pointer;} .ctord.soon{border-color:#C9772B;box-shadow:0 0 0 2px #FFE3C2 inset;}
+  .htbtns{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;} .htbtns button{margin:0;width:100%;}
+  .htmenu{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;} .htmenu button{position:relative;text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px;font:inherit;font-size:13.5px;}
+  .htmenu button b{display:block;margin-top:3px;} .htmenu button s{color:var(--ink-soft);font-weight:400;font-size:11.5px;} .htmenu button.on{border-color:#1F5C52;background:#E4F0EC;}
+  .htmenu button i{position:absolute;top:-6px;right:-6px;background:#1F5C52;color:#fff;border-radius:999px;font-style:normal;font-weight:700;font-size:12px;padding:2px 7px;}
+  .tsrc{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 8px;} .tsrcl{font-size:12px;color:var(--ink-soft);width:100%;}
+  .tsrc button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 13px;font:inherit;font-size:14px;font-weight:600;}
+  .tsrc button.on{background:#8A6D1F;border-color:#8A6D1F;color:#fff;} .tsrc button.zomato.on{background:#CB202D;border-color:#CB202D;} .tsrc button.swiggy.on{background:#FC8019;border-color:#FC8019;}
+  .tcust{margin:0 0 8px;}
   .ctbilling{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:8px 0;padding:9px 12px;border-radius:12px;background:#FFF1DC;border:1.5px solid #C9772B;font-size:14px;}
   .ctbilling small{display:block;font-size:11.5px;color:var(--ink-soft);} .ctbilling button{flex:none;border:1.5px solid #A6402D;background:#fff;color:#A6402D;border-radius:999px;padding:7px 14px;font:inherit;font-weight:700;font-size:13px;}
   .hnrow{display:grid;grid-template-columns:1fr 1.2fr;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);font-size:13.5px;} .hnrow input{width:100%;padding:8px 10px;border:1.5px solid var(--line);border-radius:10px;font:inherit;font-size:15px;}
@@ -812,6 +833,9 @@
         <button data-r="zones">Zones</button>
         <button data-r="parking">Parking</button>
         <button data-r="store">Store</button>
+        <button data-r="tiffin">Tiffin</button>
+        <button data-r="catering">Catering</button>
+        <button data-r="hotels">Hotels</button>
         <button data-r="vendors">Vendors</button>
         <button data-r="menu">Menu</button>
         <button data-r="stock">Stock</button>
@@ -832,6 +856,9 @@
       <div id="assetsView" class="reclist" style="display:none;"></div>
       <div id="zonesView" class="reclist" style="display:none;"></div>
       <div id="parkingView" class="reclist" style="display:none;"></div>
+      <div id="tiffinView" class="reclist" style="display:none;"></div>
+      <div id="cateringView" class="reclist" style="display:none;"></div>
+      <div id="hotelsView" class="reclist" style="display:none;"></div>
       <div id="storeView" class="reclist" style="display:none;"></div>
       <div id="vendorsView" class="reclist" style="display:none;"></div>
       <div id="menuView" class="reclist" style="display:none;"></div>
@@ -1195,7 +1222,8 @@ var PARK_KEY = "parking_v1", STORE_ITEMS_KEY = "storeitems_v1", STORE_SALES_KEY 
 var parking = [], storeItems = [], storeSales = [], storeBuys = [];
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
-  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY, LIVE_KEY, PARK_KEY, STORE_ITEMS_KEY, STORE_SALES_KEY, STORE_BUYS_KEY];
+  VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY, LIVE_KEY, PARK_KEY, STORE_ITEMS_KEY, STORE_SALES_KEY, STORE_BUYS_KEY,
+  "tiffinplans_v1", "tiffinsubs_v1", "tiffinmenu_v1", "tiffinpicks_v1", "catermenu_v1", "caterorders_v1", "hotels_v1", "hotelorders_v1"];
 var PHOTO_FIELDS = {}; PHOTO_FIELDS["parking_v1"] = "photo"; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
@@ -1439,6 +1467,8 @@ function setKeyValue(key, v){
     case RETAIL_KEY: retailItems = arr; break;      case RSALE_KEY: retailSales = arr; break;
     case PARK_KEY: parking = arr; break;            case STORE_ITEMS_KEY: storeItems = arr; break;
     case STORE_SALES_KEY: storeSales = arr; break;  case STORE_BUYS_KEY: storeBuys = arr; break;
+    case "tiffinplans_v1": tiffinPlans = arr; break; case "tiffinsubs_v1": tiffinSubs = arr; break; case "tiffinmenu_v1": tiffinMenu = arr; break; case "tiffinpicks_v1": tiffinPicks = arr; break;
+    case "catermenu_v1": caterMenu = arr; break;    case "caterorders_v1": caterOrders = arr; break; case "hotels_v1": hotels = arr; break; case "hotelorders_v1": hotelOrders = arr; break;
     case WASTE_KEY: wastage = arr; break;           case PREP_KEY: prepBatches = arr; break;
     case AUDIT_KEY: stockAudits = arr; break;       case CUST_KEY: customers = arr; break;
     case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;  case POS_KEY: pos = arr; break;  case LIVE_KEY: liveOrders = arr; break;
@@ -1656,9 +1686,9 @@ function canSwitchStores(){ return isOwner() || (cloud.who && cloud.who.outlet==
 var ACCESS_LABEL = { owner:"Owner", partner:"Partner", full:"Full access", manager:"Manager", chef:"Chef / kitchen", billing:"Billing / counter" };
 // Each role's screens. Anything not listed is hidden.
 var ROLE_SCREENS = {
-  manager: { nav:["dashboard","counter","kitchen","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","zones","parking","store","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
-  chef:    { nav:["kitchen","notes","staff","records"], rec:["purchases","orders","menu","stock","assets","zones","vendors"], staff:["roster","attendance","tasks","meals"] },
-  billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash","zones","parking","store"], staff:["roster","attendance","tasks"] }
+  manager: { nav:["dashboard","counter","kitchen","calendar","notes","staff","records"], rec:["sales","purchases","orders","expenses","fixed","customers","assets","zones","parking","store","tiffin","catering","hotels","vendors","menu","stock","cash","handover"], staff:["team","roster","attendance","tasks","meals"] },
+  chef:    { nav:["kitchen","notes","staff","records"], rec:["purchases","orders","menu","stock","assets","zones","vendors","tiffin","catering","hotels"], staff:["roster","attendance","tasks","meals"] },
+  billing: { nav:["counter","kitchen","notes","staff","records"], rec:["sales","orders","customers","cash","zones","parking","store","tiffin","catering","hotels"], staff:["roster","attendance","tasks"] }
 };
 // Owner's feature switches (Logins → What each role can use). The server sends this login's
 // { feature: on/off } as who.features and withholds the lists of features that are off.
@@ -1674,6 +1704,9 @@ var FEATURE_UI = [
   { id:"zones",     i:"🗺️", t:"Zones (areas)", hi:"जगहें", d:"Kitchen, store, washroom, seating… checks and problems", rec:["zones"] },
   { id:"parking",   i:"🅿️", t:"Parking", hi:"पार्किंग", d:"Vehicles in / out, charges, belongings", rec:["parking"] },
   { id:"store",     i:"🛍️", t:"General store", hi:"जनरल स्टोर", d:"Store billing, stock, order list, margins", rec:["store"] },
+  { id:"tiffin",    i:"🍱", t:"Tiffin service", hi:"टिफ़िन", d:"Subscribers, daily menu choices, kitchen count", rec:["tiffin"] },
+  { id:"catering",  i:"🎉", t:"Party catering", hi:"पार्टी कैटरिंग", d:"Party orders, advances, quotations, prep list", rec:["catering"] },
+  { id:"hotels",    i:"🏨", t:"Hotel orders", hi:"होटल ऑर्डर", d:"Orders from partner hotels at their rates, statements", rec:["hotels"] },
   { id:"expenses",  i:"💸", t:"Expenses & bills", hi:"खर्च", d:"Expenses, rent, electricity, fixed bills", rec:["expenses","fixed"] },
   { id:"customers", i:"👥", t:"Customers & udhaar", hi:"ग्राहक और उधार", d:"Customer list, udhaar, customer app codes", rec:["customers"] },
   { id:"cash",      i:"💵", t:"Cash count & handover", hi:"कैश", d:"Day's cash count, cash with each person", rec:["cash","handover"] },
@@ -1688,9 +1721,9 @@ var FEATURE_UI = [
 ];
 var FEATURE_DEFAULTS_UI = {
   partner: FEATURE_UI.map(function(f){ return f.id; }),
-  manager: ["billing","kitchen","menu","stock","purchases","orders","vendors","assets","zones","parking","store","expenses","customers","cash","staff","meals","dashboard","calendar","notes"],
-  chef:    ["kitchen","menu","stock","purchases","orders","vendors","assets","zones","staff","meals","notes"],
-  billing: ["billing","kitchen","orders","customers","cash","zones","parking","store","staff","notes"]
+  manager: ["billing","kitchen","menu","stock","purchases","orders","vendors","assets","zones","parking","store","tiffin","catering","hotels","expenses","customers","cash","staff","meals","dashboard","calendar","notes"],
+  chef:    ["kitchen","menu","stock","purchases","orders","vendors","assets","zones","tiffin","catering","hotels","staff","meals","notes"],
+  billing: ["billing","kitchen","orders","customers","cash","zones","parking","store","tiffin","catering","hotels","staff","notes"]
 };
 function myFeatures(){ return (cloud.who && cloud.who.features) || null; }
 function featOn(id){ var f = myFeatures(); return !f || f[id]!==false; }
@@ -1723,9 +1756,10 @@ function applyRoleUI(){
   }
   toggle("nav.tabs button", "data-v", rs && rs.nav);
   toggle("#recCtl button", "data-r", rs && rs.rec);
-  [["parking", parkingOn()],["store", storeOn()]].forEach(function(x){ var b = document.querySelector('#recCtl button[data-r="'+x[0]+'"]'); if(b && !x[1]) b.style.display = "none"; });
-  if(rs){ rs = { nav:rs.nav, staff:rs.staff, rec: rs.rec.filter(function(k){ return (k!=="parking" || parkingOn()) && (k!=="store" || storeOn()); }) }; }
-  else if((recSub==="parking" && !parkingOn()) || (recSub==="store" && !storeOn())) switchRecordsSub("sales");
+  var modOn = { parking:parkingOn(), store:storeOn(), tiffin:tiffinOn(), catering:cateringOn(), hotels:hotelsOn() };
+  Object.keys(modOn).forEach(function(k){ var b = document.querySelector('#recCtl button[data-r="'+k+'"]'); if(b && !modOn[k]) b.style.display = "none"; });
+  if(rs){ rs = { nav:rs.nav, staff:rs.staff, rec: rs.rec.filter(function(k){ return modOn[k]!==false; }) }; }
+  else if(modOn[recSub]===false) switchRecordsSub("sales");
   toggle("#staffCtl button", "data-s", rs && rs.staff);
   var fullish = isFullAccess();
   ["backupBtn","reportsBtn"].forEach(function(id){ var e = document.getElementById(id); if(e) e.style.display = (((fullish || (id==="reportsBtn" && myAccess()==="manager")) && featOn(id==="backupBtn" ? "backup" : "dashboard"))) ? "" : "none"; });
@@ -2365,7 +2399,7 @@ function readLists(){
   wastage = Array.isArray(wa) ? wa : [];
   prepBatches = Array.isArray(pb) ? pb : [];
   stockAudits = Array.isArray(au) ? au : [];
-  [[PARK_KEY,"parking"],[STORE_ITEMS_KEY,"storeItems"],[STORE_SALES_KEY,"storeSales"],[STORE_BUYS_KEY,"storeBuys"]].forEach(function(x){ var v = lsGet(x[0]); setKeyValue(x[0], Array.isArray(v) ? v : []); });
+  [[PARK_KEY,"parking"],[STORE_ITEMS_KEY,"storeItems"],[STORE_SALES_KEY,"storeSales"],[STORE_BUYS_KEY,"storeBuys"],["tiffinplans_v1"],["tiffinsubs_v1"],["tiffinmenu_v1"],["tiffinpicks_v1"],["catermenu_v1"],["caterorders_v1"],["hotels_v1"],["hotelorders_v1"]].forEach(function(x){ var v = lsGet(x[0]); setKeyValue(x[0], Array.isArray(v) ? v : []); });
   var rt = lsGet(RETAIL_KEY), rs = lsGet(RSALE_KEY);
   retailItems = Array.isArray(rt) ? rt : [];
   retailSales = Array.isArray(rs) ? rs : [];
@@ -2539,6 +2573,9 @@ function renderAll(){
   try{ renderZonesView(); }catch(e){}
   try{ renderParkingView(); }catch(e){}
   try{ renderStoreView(); }catch(e){}
+  try{ renderTiffinView(); }catch(e){ console.error(e); }
+  try{ renderCateringView(); }catch(e){ console.error(e); }
+  try{ renderHotelsView(); }catch(e){ console.error(e); }
   renderVendorsView();
   renderMenuView();
   renderStockView();
@@ -3839,7 +3876,7 @@ function wireEntryClicks(root){
 
 // ---------- RECORDS (Sales / Purchases / Investments / Expenses) ----------
 // Records tabs: a scrolling strip, or (▦ Big icons, remembered per phone) a grid of large icon tiles.
-var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"🤝", expenses:"💸", fixed:"💡", customers:"👥", assets:"🪑", zones:"🗺️", parking:"🅿️", store:"🛍️", vendors:"🏪",
+var REC_ICONS = { sales:"🧾", purchases:"🛒", orders:"📝", investments:"🤝", expenses:"💸", fixed:"💡", customers:"👥", assets:"🪑", zones:"🗺️", parking:"🅿️", store:"🛍️", tiffin:"🍱", catering:"🎉", hotels:"🏨", vendors:"🏪",
   menu:"📖", stock:"📦", cash:"💵", handover:"🔁", bank:"🏦", review:"🔍", loans:"💰", partners:"👔" };
 var REC_FULL = { purchases:"Purchases", expenses:"Expenses" }, REC_GRID_KEY = "rec_grid_v1";
 function recGridOn(){ try{ return localStorage.getItem(REC_GRID_KEY)==="1"; }catch(e){ return false; } }
@@ -3873,9 +3910,9 @@ function switchRecordsSub(name){
   recSub = name;
 
   Array.prototype.forEach.call(document.querySelectorAll("#recCtl button"), function(b){ b.classList.toggle("on", b.getAttribute("data-r")===name); });
-  var ids = {sales:"salesList", purchases:"purchList", orders:"ordersView", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", zones:"zonesView", parking:"parkingView", store:"storeView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
+  var ids = {sales:"salesList", purchases:"purchList", orders:"ordersView", investments:"investList", expenses:"expenseList", fixed:"fixedView", customers:"customersView", assets:"assetsView", zones:"zonesView", parking:"parkingView", store:"storeView", tiffin:"tiffinView", catering:"cateringView", hotels:"hotelsView", vendors:"vendorsView", menu:"menuView", stock:"stockView", cash:"cashView", handover:"handoverView", bank:"bankView", review:"reviewView", loans:"loansView", partners:"partnersView"};
   Object.keys(ids).forEach(function(k){ document.getElementById(ids[k]).style.display = (k===name) ? "block" : "none"; });
-  var titles = {sales:"Sales", purchases:"Purchases", orders:"Purchase orders", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", zones:"Zones · areas", parking:"Parking", store:"General store", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
+  var titles = {sales:"Sales", purchases:"Purchases", orders:"Purchase orders", investments:"Investments", expenses:"Expenses", fixed:"Monthly bills", customers:"Customers & loyalty", assets:"Assets & upkeep", zones:"Zones · areas", parking:"Parking", store:"General store", tiffin:"🍱 Tiffin service", catering:"🎉 Party catering", hotels:"🏨 Hotel orders", vendors:"Vendors & rates", menu:"Menu, recipes & SOPs", stock:"Ingredient stock", cash:"Cash & counter", handover:"Cash handover", bank:"Bank / UPI account", review:"Monthly cash review", loans:"Loans", partners:"Partners"};
   document.getElementById("recordsTitle").textContent = titles[name];
   updateRecordsTotal();
 }
@@ -3888,6 +3925,9 @@ function updateRecordsTotal(){
   else if(recSub==="investments"){ var li = recInvestIn(); lbl.textContent = rl+" · net "+rupeeSigned(li.reduce(function(a,v){return a+investAmt(v);},0)); }
   else if(recSub==="expenses"){ var le = recExpIn(); lbl.textContent = rl+" · "+rupee(le.reduce(function(a,x){return a+expAmt(x);},0)); }
   else if(recSub==="fixed"){ var ft = fixedMonthSummary(fcMonth); lbl.textContent = rupee(ft.paid)+" paid of "+rupee(ft.planned); }
+  else if(recSub==="tiffin"){ var tpm = tfPickMap(), tact = tiffinSubs.filter(function(x){ return tfActive(x, tpm); }), tlow = tact.filter(function(x){ return tfLeft(x, tpm)<=3; }).length; lbl.textContent = tact.length+" active"+(tlow?" · "+tlow+" to renew":""); }
+  else if(recSub==="catering"){ var cup = caterOrders.filter(function(o){ return ["enquiry","confirmed","ready"].indexOf(o.status)>=0 && o.date>=fmtDate(new Date()); }); lbl.textContent = cup.length+" coming up · "+rupee(cup.reduce(function(a,o){ return a+ctTotals(o).total; },0)); }
+  else if(recSub==="hotels"){ lbl.textContent = rupee(hotels.reduce(function(a,h){ return a+hotelDue(h); },0))+" to collect"; }
   else if(recSub==="parking"){ var pin = parking.filter(function(p){ return p.status==="in"; }).length; lbl.textContent = pin+" parked now"; }
   else if(recSub==="store"){ var tdy = fmtDate(new Date()), sst = storeSummary(function(d){ return d===tdy; }); lbl.textContent = "Today "+rupee(sst.sales)+" · profit "+rupee(sst.profit); }
   else if(recSub==="zones"){ var zz = cafeZones(), zd = zz.filter(function(z){ var st = zoneStatus(z); return st.due && !st.never; }).length, zo = zoneIssues(null, true).length; lbl.textContent = zz.length+" zone"+(zz.length!==1?"s":"")+(zd?" · "+zd+" due":"")+(zo?" · "+zo+" problem"+(zo!==1?"s":""):""); }
@@ -4668,7 +4708,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, parking:parking, storeItems:storeItems, storeSales:storeSales, storeBuys:storeBuys, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos, liveOrders:liveOrders };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, parking:parking, storeItems:storeItems, storeSales:storeSales, storeBuys:storeBuys, tiffinPlans:tiffinPlans, tiffinSubs:tiffinSubs, tiffinMenu:tiffinMenu, tiffinPicks:tiffinPicks, caterMenu:caterMenu, caterOrders:caterOrders, hotels:hotels, hotelOrders:hotelOrders, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos, liveOrders:liveOrders };
 }
 
 function exportBackup(){
@@ -4844,6 +4884,8 @@ function applyBackupData(data, errEl, partial){
     creditPayments = take("creditPayments", creditPayments); wastage = take("wastage", wastage);
     prepBatches = take("prepBatches", prepBatches); stockAudits = take("stockAudits", stockAudits);
     parking = take("parking", parking); storeItems = take("storeItems", storeItems); storeSales = take("storeSales", storeSales); storeBuys = take("storeBuys", storeBuys);
+    tiffinPlans = take("tiffinPlans", tiffinPlans); tiffinSubs = take("tiffinSubs", tiffinSubs); tiffinMenu = take("tiffinMenu", tiffinMenu); tiffinPicks = take("tiffinPicks", tiffinPicks);
+    caterMenu = take("caterMenu", caterMenu); caterOrders = take("caterOrders", caterOrders); hotels = take("hotels", hotels); hotelOrders = take("hotelOrders", hotelOrders);
     retailItems = take("retailItems", retailItems); retailSales = take("retailSales", retailSales);
     cafeUse = take("cafeUse", cafeUse); custPayments = take("custPayments", custPayments);
     payroll = take("payroll", payroll);
@@ -4867,6 +4909,8 @@ function saveEverything(){
   saveStaff(); saveRoster(); saveAttend(); saveTasks(); saveConduct(); saveCashDays(); saveSettings();
   saveMenu(); saveIngredients(); saveDishLog(); saveVendors(); saveAssets(); saveCustomers(); saveCreditPayments();
   saveWastage(); savePrep(); saveAudits(); saveRetail(); saveRetailSales(); saveCafeUse(); saveCustPayments(); saveOffers(); saveChecks(); savePos(); savePayroll(); saveCashMoves(); saveLoans();
+  saveParking(); saveStoreItems(); saveStoreSales(); saveStoreBuys();
+  saveTfPlans(); saveTfSubs(); saveTfMenu(); saveTfPicks(); saveCaterMenu(); saveCaterOrders(); saveHotels(); saveHotelOrders();
 }
 
 function importBackup(file){
@@ -10961,6 +11005,668 @@ function openFixDates(){
 // plates go straight into the dish counts, so stock and forecasts need no tally.
 // "Big & simple" (per phone) makes everything larger with fewer choices.
 var SIMPLE_KEY = "simple_mode_v1", VOICE_KEY = "counter_voice_v1";
+// ---------- 🍱 TIFFIN SERVICE (optional, per outlet) ----------
+// Plans (meals, number of tiffins, price), subscribers (linked to a customer), a menu per day and meal
+// with choice groups (e.g. Dal: Dal fry / Dal makhani · Sabzi: Paneer matar / Shahi paneer) and each
+// subscriber's picks. Customers pick or skip the next meals in their own app (/c) until the cutoff time;
+// no pick = the first option. Meals left = tiffins bought − meals served (skips and pauses don't count).
+var TF_PLANS_KEY = "tiffinplans_v1", TF_SUBS_KEY = "tiffinsubs_v1", TF_MENU_KEY = "tiffinmenu_v1", TF_PICKS_KEY = "tiffinpicks_v1";
+var tiffinPlans = [], tiffinSubs = [], tiffinMenu = [], tiffinPicks = [], tfSub = "kitchen", tfDay = 0, tfMenuDay = 1, tfMenuMeal = "lunch";
+function saveTfPlans(){ return lsSet(TF_PLANS_KEY, tiffinPlans); }
+function saveTfSubs(){ return lsSet(TF_SUBS_KEY, tiffinSubs); }
+function saveTfMenu(){ return lsSet(TF_MENU_KEY, tiffinMenu); }
+function saveTfPicks(){ return lsSet(TF_PICKS_KEY, tiffinPicks); }
+function tiffinOn(){ return settings.tiffinOn === true; }
+var TF_MEALS = { breakfast:{ t:"Breakfast", hi:"नाश्ता", i:"🌅", cut:"07:00" }, lunch:{ t:"Lunch", hi:"दोपहर का खाना", i:"☀️", cut:"10:30" }, dinner:{ t:"Dinner", hi:"रात का खाना", i:"🌙", cut:"17:00" } };
+var TF_ORDER = ["breakfast","lunch","dinner"];
+var TF_SUGGEST = { "Dal":["Dal fry","Dal makhani","Dal tadka","Chana dal","Rajma"], "Sabzi":["Paneer matar","Shahi paneer","Aloo gobi","Mix veg","Bhindi masala","Kadhi pakora"], "Sweet":["Gulab jamun","Kheer","Halwa"] };
+function tfCut(m){ var c = (settings.tiffinCutoff||{})[m]; return /^\d\d:\d\d$/.test(c||"") ? c : TF_MEALS[m].cut; }
+function tfOpen(d, m){ var t = fmtDate(new Date()); return d > t || (d === t && nowHM() < tfCut(m)); }
+function tfPickId(s, d, m){ return s.id+"|"+d+"|"+m; }
+function tfPickMap(){ var o = {}; tiffinPicks.forEach(function(p){ if(p && p.id) o[p.id] = p; }); return o; }
+function tfWeekday(d){ return new Date(d+"T12:00:00Z").getUTCDay(); }
+function tfPlan(id){ return tiffinPlans.find(function(p){ return p.id===id; }) || null; }
+// Is this subscriber due a tiffin at this date and meal (before skips and the meal count)?
+function tfDue(s, d, m){
+  if(!s || !s.start || d < s.start) return false;
+  if(s.status==="stopped" && (!s.stopDate || d >= s.stopDate)) return false;
+  if((s.meals||[]).indexOf(m) < 0) return false;
+  if((s.offDays||[]).indexOf(tfWeekday(d)) >= 0) return false;
+  if((s.pauses||[]).some(function(p){ return d >= p.from && d <= p.to; })) return false;
+  return true;
+}
+function tfSkipped(pm, s, d, m){ var p = pm[tfPickId(s, d, m)]; return !!(p && p.skip); }
+function tfCountBefore(s, pm, d, m){
+  var n = 0, cur = s.start, mi = TF_ORDER.indexOf(m), tot = +s.mealsTotal||0, guard = 0;
+  while(cur <= d && n < tot && guard++ < 800){
+    for(var i = 0; i < 3; i++){ if(cur === d && i >= mi) break; var mm = TF_ORDER[i]; if(tfDue(s, cur, mm) && !tfSkipped(pm, s, cur, mm)) n++; }
+    cur = addDays(cur, 1);
+  }
+  return n;
+}
+function tfServes(s, pm, d, m){ return tfDue(s, d, m) && !tfSkipped(pm, s, d, m) && tfCountBefore(s, pm, d, m) < (+s.mealsTotal||0); }
+function tfUsed(s, pm){
+  var t = fmtDate(new Date()), n = 0, cur = s.start, tot = +s.mealsTotal||0, guard = 0;
+  while(cur && cur <= t && n < tot && guard++ < 800){
+    TF_ORDER.forEach(function(m){ if(n >= tot || (cur === t && tfOpen(t, m))) return; if(tfDue(s, cur, m) && !tfSkipped(pm, s, cur, m)) n++; });
+    cur = addDays(cur, 1);
+  }
+  return n;
+}
+function tfLeft(s, pm){ return Math.max(0, (+s.mealsTotal||0) - tfUsed(s, pm || tfPickMap())); }
+function tfActive(s, pm){ return s.status !== "stopped" && tfLeft(s, pm) > 0; }
+// The menu for a day and meal: that day's, else the latest earlier one for the same meal.
+function tfMenuFor(d, m){
+  var ex = tiffinMenu.find(function(x){ return x.date===d && x.meal===m; }); if(ex) return ex;
+  var prev = tiffinMenu.filter(function(x){ return x.meal===m && x.date < d; }).sort(function(a,b){ return b.date.localeCompare(a.date); })[0];
+  return prev ? Object.assign({}, prev, { from:prev.date }) : null;
+}
+function tfChoices(s, pm, d, m){
+  var menu = tfMenuFor(d, m), p = pm[tfPickId(s, d, m)], out = {};
+  ((menu && menu.groups) || []).forEach(function(g){ var c = p && p.choices && p.choices[g.id]; out[g.id] = (g.options||[]).indexOf(c) >= 0 ? c : ((g.options||[])[0] || ""); });
+  return { choices:out, picked: !!(p && p.choices && !p.skip), by: p ? p.by : "", menu:menu };
+}
+function tfChoiceText(s, pm, d, m){ var c = tfChoices(s, pm, d, m); return ((c.menu && c.menu.groups) || []).map(function(g){ return c.choices[g.id]; }).filter(Boolean).join(" · "); }
+function tfMealsLabel(ms){ return TF_ORDER.filter(function(m){ return (ms||[]).indexOf(m) >= 0; }).map(function(m){ return TF_MEALS[m].i+" "+TF_MEALS[m].t; }).join(" + "); }
+function tfDayLabel(n){ return n===0 ? "Today · आज" : n===1 ? "Tomorrow · कल" : parseDate(addDays(fmtDate(new Date()), n)).toLocaleDateString("en-IN",{ weekday:"short", day:"numeric", month:"short" }); }
+// Link a subscriber to a customer record (by phone, else by name) so their app shows the tiffin.
+function tfLinkCustomer(name, phone){
+  var ph = String(phone||"").replace(/\D/g,"").slice(-10);
+  var c = customers.find(function(x){ return ph && String(x.phone||"").replace(/\D/g,"").slice(-10) === ph; }) ||
+          customers.find(function(x){ return String(x.name||"").trim().toLowerCase() === name.trim().toLowerCase(); });
+  if(!c && canWriteKey(CUST_KEY)){ c = { id:uid(), name:name, phone:ph }; customers.push(c); saveCustomers(); }
+  else if(c && ph && !c.phone && canWriteKey(CUST_KEY)){ c.phone = ph; saveCustomers(); }
+  return c ? c.id : "";
+}
+// A tiffin payment is a sale on the day it is paid (Udhaar = owed by the customer).
+function tfRecordPay(s, amount, mode, meals, what){
+  if(!(amount > 0) || mode === "none") return;
+  var d = fmtDate(new Date()), rec = { id:uid(), date:d, customer:s.name, desc:"🍱 Tiffin · "+what+" · "+meals+" meals", amount:amount, gst:0, mode:mode, tiffin:s.id };
+  sales.push(rec); saveSales();
+  (s.payments = s.payments || []).push({ date:d, amount:amount, mode:mode, meals:meals, saleId:rec.id, byName:myName()||"Owner" });
+}
+function renderTiffinView(){
+  var el = document.getElementById("tiffinView"); if(!el) return;
+  if(!tiffinOn()){ el.innerHTML = '<div class="empty">Tiffin service is switched off for this outlet (Counter → ⚙️ Settings → Extra businesses).</div>'; return; }
+  var canEdit = canWriteKey(TF_SUBS_KEY), canMenu = canWriteKey(TF_MENU_KEY), canPlan = canWriteKey(TF_PLANS_KEY);
+  var subs = [["kitchen","🍳 Kitchen list"],["menu","📋 Menu & choices"],["subs","👥 Subscribers"],["plans","🏷️ Plans"]];
+  var html = '<div class="segctl recctl5" id="tfCtl" style="margin-bottom:10px;">'+subs.map(function(s){ return '<button data-tfs="'+s[0]+'" class="'+(tfSub===s[0]?'on':'')+'">'+s[1]+'</button>'; }).join("")+'</div>';
+  var pm = tfPickMap(), today = fmtDate(new Date());
+  if(tfSub==="kitchen"){
+    var d = addDays(today, tfDay);
+    html += '<div class="tfdays">'+[0,1].map(function(n){ return '<button data-tfday="'+n+'" class="'+(tfDay===n?'on':'')+'">'+tfDayLabel(n)+'</button>'; }).join("")+'</div>';
+    var any = false;
+    TF_ORDER.forEach(function(m){
+      var due = tiffinSubs.filter(function(s){ return tfDue(s, d, m) && tfCountBefore(s, pm, d, m) < (+s.mealsTotal||0); });
+      if(!due.length) return; any = true;
+      var serve = due.filter(function(s){ return !tfSkipped(pm, s, d, m); }), skip = due.length - serve.length, menu = tfMenuFor(d, m), counts = {};
+      serve.forEach(function(s){ var c = tfChoices(s, pm, d, m); ((menu && menu.groups) || []).forEach(function(g){ var k = g.name+"|"+c.choices[g.id]; counts[k] = (counts[k]||0) + 1; }); });
+      html += '<div class="card tfmeal"><h3>'+TF_MEALS[m].i+' '+TF_MEALS[m].t+' · '+TF_MEALS[m].hi+' <span class="tfbig">'+serve.length+' tiffin'+(serve.length!==1?'s':'')+'</span></h3>'+
+        '<div class="muted" style="font-size:12px;">'+(tfOpen(d, m) ? '⏳ Choices open till '+tfCut(m)+(d!==today?' on the day':'') : '🔒 Choices closed')+(skip?' · '+skip+' skipped':'')+(menu && menu.note?' · '+esc(menu.note):'')+'</div>';
+      if(menu && (menu.groups||[]).length) html += '<div class="tfcounts">'+menu.groups.map(function(g){ return '<div><b>'+esc(g.name)+'</b>'+(g.options||[]).map(function(o){ var n = counts[g.name+"|"+o]||0; return '<span class="'+(n?'':'zero')+'"><span class="notr">'+esc(o)+'</span> <b>'+n+'</b></span>'; }).join("")+'</div>'; }).join("")+'</div>';
+      else html += '<div class="backupnote">No menu for this meal yet — set it in 📋 Menu & choices.</div>';
+      html += due.map(function(s){ var sk = tfSkipped(pm, s, d, m), c = tfChoices(s, pm, d, m);
+        return '<div class="psrow tfrow'+(sk?' skip':'')+'" data-tfpick="'+esc(s.id)+'|'+d+'|'+m+'"><span><b class="notr">'+esc(s.name)+'</b>'+(s.way==="delivery" && s.address ? ' · 🛵 <span class="notr">'+esc(s.address)+'</span>' : ' · 🙋 pickup')+
+          '<br><span class="muted" style="font-size:11.5px;">'+(sk ? '⏭️ Skipped' : esc(tfChoiceText(s, pm, d, m))+(c.picked ? ' ✔ '+(c.by==="customer"?'picked by customer':'picked') : ' · (usual)'))+'</span></span><b>'+(sk?'—':'🍱')+'</b></div>'; }).join("");
+      html += '</div>';
+    });
+    if(!any) html += '<div class="empty">No tiffins for '+tfDayLabel(tfDay).split(" · ")[0].toLowerCase()+'.</div>';
+  } else if(tfSub==="menu"){
+    var md = addDays(today, tfMenuDay);
+    html += '<div class="tfdays">'+[0,1,2].map(function(n){ return '<button data-tfmday="'+n+'" class="'+(tfMenuDay===n?'on':'')+'">'+tfDayLabel(n)+'</button>'; }).join("")+'</div>';
+    html += '<div class="tfdays">'+TF_ORDER.map(function(m){ return '<button data-tfmeal="'+m+'" class="'+(tfMenuMeal===m?'on':'')+'">'+TF_MEALS[m].i+' '+TF_MEALS[m].t+'</button>'; }).join("")+'</div>';
+    var mn = tfMenuFor(md, tfMenuMeal);
+    html += '<div class="card"><h3>'+TF_MEALS[tfMenuMeal].t+' · '+tfDayLabel(tfMenuDay)+'</h3>'+
+      (mn && mn.from ? '<div class="backupnote">Same as '+esc(parseDate(mn.from).toLocaleDateString("en-IN",{day:"numeric",month:"short"}))+' (nothing set for this day). Edit to change it.</div>' : '')+
+      (mn ? (mn.note ? '<div class="psrow"><span>Always in the tiffin</span><b class="notr">'+esc(mn.note)+'</b></div>' : '')+(mn.groups||[]).map(function(g){ return '<div class="psrow"><span>'+esc(g.name)+' — choose one</span><b class="notr">'+esc((g.options||[]).join(" / "))+'</b></div>'; }).join("") : '<div class="empty">No menu yet.</div>')+
+      (canMenu ? '<button class="btn-save" id="tf_menued" style="margin-top:10px;">✏️ '+(mn && !mn.from ? 'Edit' : 'Set')+' this menu</button>' : '')+'</div>';
+    html += '<div class="backupnote">Customers choose until '+TF_ORDER.map(function(m){ return TF_MEALS[m].t+' '+tfCut(m); }).join(" · ")+' on the day (change in 🏷️ Plans). No choice = the first option.</div>';
+  } else if(tfSub==="subs"){
+    if(canEdit) html += '<button class="btn-save" id="tf_new" style="width:100%;margin-bottom:10px;">➕ New subscriber · नया ग्राहक</button>';
+    var list = tiffinSubs.slice().sort(function(a,b){ return (tfActive(b,pm)?1:0) - (tfActive(a,pm)?1:0) || String(a.name).localeCompare(String(b.name)); });
+    if(!list.length) html += '<div class="empty">No subscribers yet.</div>';
+    html += list.map(function(s){ var left = tfLeft(s, pm), pl = tfPlan(s.planId), act = s.status!=="stopped" && left>0;
+      return '<div class="card tfsub'+(act?'':' off')+'" data-tfsub="'+esc(s.id)+'"><div class="psrow" style="border:none;"><span><b class="notr">'+esc(s.name)+'</b>'+(s.phone?' · '+esc(s.phone):'')+'<br><span class="muted" style="font-size:12px;">'+esc(pl ? pl.name : "Plan")+' · '+tfMealsLabel(s.meals)+'</span></span>'+
+        '<span style="text-align:right;"><b class="'+(left<=3?'bad':'')+'">'+left+' left</b><br><span class="muted" style="font-size:11.5px;">'+(s.status==="stopped" ? 'stopped' : left<=0 ? 'finished — renew' : left<=3 ? 'renew soon' : 'of '+(+s.mealsTotal||0))+'</span></span></div></div>'; }).join("");
+  } else {
+    if(canPlan) html += '<button class="btn-save" id="tf_newplan" style="width:100%;margin-bottom:10px;">➕ New plan</button>';
+    if(!tiffinPlans.length) html += '<div class="empty">No plans yet. Example: Monthly lunch — 26 tiffins — ₹2,600 — Sunday off.</div>';
+    html += tiffinPlans.map(function(p){ return '<div class="card" data-tfplan="'+esc(p.id)+'" style="cursor:pointer;"><div class="psrow" style="border:none;"><span><b>'+esc(p.name)+'</b>'+(p.active===false?' · off':'')+'<br><span class="muted" style="font-size:12px;">'+tfMealsLabel(p.meals)+' · '+(+p.count||0)+' tiffins'+((p.offDays||[]).indexOf(0)>=0?' · Sunday off':'')+(p.desc?' · '+esc(p.desc):'')+'</span></span><b>'+rupee(p.price)+'</b></div></div>'; }).join("");
+    if(canPlan) html += '<div class="card"><h3>⏰ Choices close at</h3><div class="field three">'+TF_ORDER.map(function(m){ return '<div><label>'+TF_MEALS[m].i+' '+TF_MEALS[m].t+'</label><input type="time" id="tf_cut_'+m+'" value="'+tfCut(m)+'"></div>'; }).join("")+'</div><button class="btn-additem" id="tf_cutsave">Save times</button></div>';
+  }
+  el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tfs]"), function(b){ b.addEventListener("click", function(){ tfSub = b.getAttribute("data-tfs"); renderTiffinView(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tfday]"), function(b){ b.addEventListener("click", function(){ tfDay = +b.getAttribute("data-tfday"); renderTiffinView(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tfmday]"), function(b){ b.addEventListener("click", function(){ tfMenuDay = +b.getAttribute("data-tfmday"); renderTiffinView(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tfmeal]"), function(b){ b.addEventListener("click", function(){ tfMenuMeal = b.getAttribute("data-tfmeal"); renderTiffinView(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tfpick]"), function(b){ b.addEventListener("click", function(){ var a = b.getAttribute("data-tfpick").split("|"); var s = tiffinSubs.find(function(x){ return x.id===a[0]; }); if(s) openTfPick(s, a[1], a[2]); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tfsub]"), function(b){ b.addEventListener("click", function(){ openTfSub(b.getAttribute("data-tfsub")); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tfplan]"), function(b){ b.addEventListener("click", function(){ if(canPlan) openTfPlan(b.getAttribute("data-tfplan")); }); });
+  var x;
+  if((x = el.querySelector("#tf_new"))) x.addEventListener("click", function(){ openTfSubForm(null); });
+  if((x = el.querySelector("#tf_newplan"))) x.addEventListener("click", function(){ openTfPlan(null); });
+  if((x = el.querySelector("#tf_menued"))) x.addEventListener("click", function(){ openTfMenu(addDays(today, tfMenuDay), tfMenuMeal); });
+  if((x = el.querySelector("#tf_cutsave"))) x.addEventListener("click", function(){ var c = {}; TF_ORDER.forEach(function(m){ var v = el.querySelector("#tf_cut_"+m).value; if(/^\d\d:\d\d$/.test(v)) c[m] = v; }); settings.tiffinCutoff = c; saveSettings(); appAlert("Saved ✔"); renderTiffinView(); });
+  if(recSub==="tiffin") updateRecordsTotal();
+}
+function tfOpenSheet(html){ var sheet = document.getElementById("sheet"); sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on"); return sheet; }
+function tfErr(sheet, m){ var e = sheet.querySelector(".err"); e.textContent = m; e.style.display = "block"; }
+function openTfPlan(id){
+  var p = id ? tfPlan(id) : null, isNew = !p; p = p || { meals:["lunch"], count:26, price:0, offDays:[0], active:true };
+  var sheet = tfOpenSheet('<h2 class="serif">🏷️ '+(isNew?'New plan':'Edit plan')+'</h2>'+
+    '<div class="field"><label>Plan name</label><input id="tp_name" placeholder="e.g. Monthly lunch" value="'+esc(p.name||"")+'"></div>'+
+    '<div class="field"><label>Meals</label><div class="tfchk">'+TF_ORDER.map(function(m){ return '<label><input type="checkbox" data-tpm="'+m+'"'+((p.meals||[]).indexOf(m)>=0?' checked':'')+'> '+TF_MEALS[m].i+' '+TF_MEALS[m].t+'</label>'; }).join("")+'</div></div>'+
+    '<div class="field two"><div><label>Number of tiffins</label><input id="tp_count" type="number" inputmode="numeric" value="'+esc(p.count||"")+'"></div><div><label>Price ₹</label><input id="tp_price" type="number" inputmode="numeric" value="'+esc(p.price||"")+'"></div></div>'+
+    '<label class="poclose"><input type="checkbox" id="tp_sun"'+((p.offDays||[]).indexOf(0)>=0?' checked':'')+'> Sunday off (no tiffin on Sundays)</label>'+
+    '<div class="field"><label>What is in it (optional)</label><input id="tp_desc" placeholder="e.g. 4 roti, rice, dal, sabzi, salad" value="'+esc(p.desc||"")+'"></div>'+
+    (!isNew ? '<label class="poclose"><input type="checkbox" id="tp_off"'+(p.active===false?' checked':'')+'> Stop selling this plan</label>' : '')+
+    '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="tp_cancel">Cancel</button><button class="btn-save" id="tp_save">Save</button></div>');
+  sheet.querySelector("#tp_cancel").addEventListener("click", closeForm);
+  sheet.querySelector("#tp_save").addEventListener("click", function(){
+    var name = sheet.querySelector("#tp_name").value.trim(), meals = TF_ORDER.filter(function(m){ return sheet.querySelector('[data-tpm="'+m+'"]').checked; });
+    var count = parseInt(sheet.querySelector("#tp_count").value, 10), price = parseFloat(sheet.querySelector("#tp_price").value);
+    if(!name) return tfErr(sheet, "Give the plan a name."); if(!meals.length) return tfErr(sheet, "Tick at least one meal.");
+    if(!(count > 0)) return tfErr(sheet, "How many tiffins are in this plan?"); if(!(price >= 0)) return tfErr(sheet, "Type the price.");
+    var rec = Object.assign(isNew ? { id:uid() } : tfPlan(id), { name:name, meals:meals, count:count, price:price||0, offDays: sheet.querySelector("#tp_sun").checked ? [0] : [], desc: sheet.querySelector("#tp_desc").value.trim() });
+    var off = sheet.querySelector("#tp_off"); rec.active = !(off && off.checked);
+    if(isNew) tiffinPlans.push(rec); saveTfPlans(); closeForm(); renderTiffinView();
+  });
+}
+function openTfSubForm(id){
+  var s = id ? tiffinSubs.find(function(x){ return x.id===id; }) : null, isNew = !s, plans = tiffinPlans.filter(function(p){ return p.active!==false || (s && s.planId===p.id); });
+  if(isNew && !plans.length){ appAlert("Make a plan first (🏷️ Plans)."); tfSub = "plans"; renderTiffinView(); return; }
+  s = s || { planId: plans[0].id, meals: plans[0].meals.slice(), start: addDays(fmtDate(new Date()), 1), way:"pickup", offDays: (plans[0].offDays||[]).slice() };
+  var p0 = tfPlan(s.planId) || plans[0];
+  var sheet = tfOpenSheet('<h2 class="serif">🍱 '+(isNew?'New subscriber':'Edit subscriber')+'</h2>'+
+    '<div class="field two"><div><label>Name</label><input id="ts_name" list="ts_custs" value="'+esc(s.name||"")+'" autocomplete="off"><datalist id="ts_custs">'+customers.map(function(c){ return '<option value="'+esc(c.name)+'">'; }).join("")+'</datalist></div><div><label>Phone</label><input id="ts_phone" inputmode="tel" value="'+esc(s.phone||"")+'"></div></div>'+
+    '<div class="field"><label>Plan</label><select id="ts_plan">'+plans.map(function(p){ return '<option value="'+esc(p.id)+'"'+(p.id===s.planId?' selected':'')+'>'+esc(p.name)+' · '+(+p.count||0)+' tiffins · '+rupee(p.price)+'</option>'; }).join("")+'</select></div>'+
+    '<div class="field"><label>Meals</label><div class="tfchk">'+TF_ORDER.map(function(m){ return '<label><input type="checkbox" data-tsm="'+m+'"'+((s.meals||[]).indexOf(m)>=0?' checked':'')+'> '+TF_MEALS[m].i+' '+TF_MEALS[m].t+'</label>'; }).join("")+'</div></div>'+
+    '<div class="field two"><div><label>Starts on</label><input type="date" id="ts_start" value="'+esc(s.start)+'"></div><div><label>Pickup or delivery</label><select id="ts_way"><option value="pickup"'+(s.way!=="delivery"?' selected':'')+'>🙋 Pickup at the counter</option><option value="delivery"'+(s.way==="delivery"?' selected':'')+'>🛵 Delivery</option></select></div></div>'+
+    '<div class="field"><label>Address / room (for delivery)</label><input id="ts_addr" value="'+esc(s.address||"")+'"></div>'+
+    '<label class="poclose"><input type="checkbox" id="ts_sun"'+((s.offDays||[]).indexOf(0)>=0?' checked':'')+'> Sunday off</label>'+
+    (isNew ? '<div class="dgroup">Payment for '+'<span id="ts_cnt">'+(+p0.count||0)+'</span> tiffins</div><div class="field two"><div><label>Amount ₹</label><input id="ts_amt" type="number" inputmode="numeric" value="'+esc(p0.price||0)+'"></div><div><label>Paid by</label><select id="ts_mode"><option value="Cash">💵 Cash</option><option value="UPI">📱 UPI</option><option value="Credit">📒 Udhaar (pay later)</option><option value="none">Not now</option></select></div></div>' : '')+
+    '<div class="field"><label>Note (optional)</label><input id="ts_note" placeholder="e.g. less oil, no onion" value="'+esc(s.note||"")+'"></div>'+
+    '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="ts_cancel">Cancel</button><button class="btn-save" id="ts_save">Save</button></div>');
+  sheet.querySelector("#ts_cancel").addEventListener("click", closeForm);
+  sheet.querySelector("#ts_plan").addEventListener("change", function(){ var p = tfPlan(this.value); if(!p) return;
+    TF_ORDER.forEach(function(m){ sheet.querySelector('[data-tsm="'+m+'"]').checked = p.meals.indexOf(m) >= 0; }); sheet.querySelector("#ts_sun").checked = (p.offDays||[]).indexOf(0) >= 0;
+    if(isNew){ sheet.querySelector("#ts_amt").value = p.price||0; sheet.querySelector("#ts_cnt").textContent = +p.count||0; } });
+  sheet.querySelector("#ts_save").addEventListener("click", function(){
+    var name = sheet.querySelector("#ts_name").value.trim(), phone = sheet.querySelector("#ts_phone").value.replace(/[^\d+]/g,""), plan = tfPlan(sheet.querySelector("#ts_plan").value);
+    var meals = TF_ORDER.filter(function(m){ return sheet.querySelector('[data-tsm="'+m+'"]').checked; }), start = sheet.querySelector("#ts_start").value, way = sheet.querySelector("#ts_way").value, addr = sheet.querySelector("#ts_addr").value.trim();
+    if(!name) return tfErr(sheet, "Type the customer's name."); if(!meals.length) return tfErr(sheet, "Tick at least one meal."); if(!/^\d{4}-\d\d-\d\d$/.test(start)) return tfErr(sheet, "Pick the start date.");
+    if(way==="delivery" && !addr) return tfErr(sheet, "Type the delivery address.");
+    var rec = isNew ? { id:uid(), at:Date.now(), status:"active", mealsTotal:+plan.count||0, payments:[], pauses:[], byName:myName()||"Owner" } : tiffinSubs.find(function(x){ return x.id===id; });
+    Object.assign(rec, { name:name, phone:phone, planId:plan.id, meals:meals, start:start, way:way, address:addr, offDays: sheet.querySelector("#ts_sun").checked ? [0] : [], note: sheet.querySelector("#ts_note").value.trim() });
+    rec.customerId = tfLinkCustomer(name, phone) || rec.customerId || "";
+    if(isNew){ tiffinSubs.push(rec); tfRecordPay(rec, parseFloat(sheet.querySelector("#ts_amt").value)||0, sheet.querySelector("#ts_mode").value, rec.mealsTotal, plan.name); }
+    saveTfSubs(); closeForm(); renderAll();
+    if(isNew) appAlert("✔ "+name+" added. To let them choose meals in their own app: Records → Customers → "+name+" → Give app access.");
+  });
+}
+function openTfSub(id){
+  var s = tiffinSubs.find(function(x){ return x.id===id; }); if(!s) return;
+  var pm = tfPickMap(), left = tfLeft(s, pm), pl = tfPlan(s.planId), canEdit = canWriteKey(TF_SUBS_KEY), today = fmtDate(new Date());
+  var html = '<h2 class="serif">🍱 <span class="notr">'+esc(s.name)+'</span></h2>'+
+    '<div class="card"><div class="psrow"><span>Plan</span><b>'+esc(pl ? pl.name : "—")+'</b></div><div class="psrow"><span>Meals</span><b>'+tfMealsLabel(s.meals)+'</b></div>'+
+    '<div class="psrow"><span>Tiffins left</span><b class="'+(left<=3?'bad':'ok')+'">'+left+' of '+(+s.mealsTotal||0)+'</b></div>'+
+    '<div class="psrow"><span>Since</span><b>'+esc(parseDate(s.firstStart||s.start).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}))+'</b></div>'+
+    '<div class="psrow"><span>'+(s.way==="delivery"?'🛵 Delivery':'🙋 Pickup')+'</span><b class="notr">'+esc(s.address||"")+'</b></div>'+
+    (s.phone ? '<div class="psrow"><span>Phone</span><b>'+esc(s.phone)+'</b></div>' : '')+(s.note ? '<div class="psrow"><span>Note</span><b class="notr">'+esc(s.note)+'</b></div>' : '')+
+    ((s.pauses||[]).filter(function(p){ return p.to >= today; }).map(function(p){ return '<div class="psrow"><span>⏸️ Paused</span><b>'+esc(p.from)+' → '+esc(p.to)+'</b></div>'; }).join(""))+
+    (s.status==="stopped" ? '<div class="psrow"><span>Status</span><b class="bad">Stopped</b></div>' : '')+'</div>';
+  html += '<div class="dgroup">Next meals</div>'+[0,1].map(function(n){ var d = addDays(today, n); return TF_ORDER.filter(function(m){ return tfDue(s, d, m); }).map(function(m){ var sk = tfSkipped(pm, s, d, m);
+    return '<div class="psrow" data-tfpick="'+esc(s.id)+'|'+d+'|'+m+'" style="cursor:pointer;"><span>'+tfDayLabel(n).split(" · ")[0]+' · '+TF_MEALS[m].i+' '+TF_MEALS[m].t+'</span><b class="notr">'+(sk ? '⏭️ Skipped' : esc(tfChoiceText(s, pm, d, m)||"🍱"))+'</b></div>'; }).join(""); }).join("");
+  html += '<div class="dgroup">Payments</div>'+((s.payments||[]).length ? s.payments.slice().reverse().map(function(p){ return '<div class="psrow"><span>'+esc(p.date)+' · '+esc(p.mode==="Credit"?"Udhaar":p.mode)+' · '+(+p.meals||0)+' tiffins</span><b>'+rupee(p.amount)+'</b></div>'; }).join("") : '<div class="muted">None recorded.</div>');
+  if(canEdit) html += '<div class="zbtns" style="margin-top:12px;"><button class="btn-save" id="tsd_renew">🔁 Renew / add tiffins</button><button class="btn-additem" id="tsd_pause">⏸️ Pause days</button>'+
+    '<button class="btn-additem" id="tsd_edit">✏️ Edit</button><button class="btn-additem" id="tsd_stop">'+(s.status==="stopped"?'▶️ Restart':'⏹️ Stop')+'</button></div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="tsd_close">Close</button></div>';
+  var sheet = tfOpenSheet(html);
+  sheet.querySelector("#tsd_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-tfpick]"), function(b){ b.addEventListener("click", function(){ var a = b.getAttribute("data-tfpick").split("|"); openTfPick(s, a[1], a[2], function(){ openTfSub(s.id); }); }); });
+  var x;
+  if((x = sheet.querySelector("#tsd_edit"))) x.addEventListener("click", function(){ openTfSubForm(s.id); });
+  if((x = sheet.querySelector("#tsd_stop"))) x.addEventListener("click", function(){
+    if(s.status==="stopped"){ s.status = "active"; delete s.stopDate; saveTfSubs(); renderAll(); openTfSub(s.id); return; }
+    askConfirm("Stop "+s.name+"'s tiffin from tomorrow? "+left+" tiffins are left (refund or keep them as you agree).", function(){ s.status = "stopped"; s.stopDate = addDays(today, 1); saveTfSubs(); renderAll(); openTfSub(s.id); }); });
+  if((x = sheet.querySelector("#tsd_pause"))) x.addEventListener("click", function(){
+    var sh = tfOpenSheet('<h2 class="serif">⏸️ Pause '+esc(s.name)+'</h2><div class="backupnote">No tiffin on these days; they are not counted, so the plan lasts longer.</div>'+
+      '<div class="field two"><div><label>From</label><input type="date" id="tpz_from" value="'+addDays(today,1)+'"></div><div><label>To</label><input type="date" id="tpz_to" value="'+addDays(today,1)+'"></div></div>'+
+      '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="tpz_back">← Back</button><button class="btn-save" id="tpz_ok">Pause</button></div>');
+    sh.querySelector("#tpz_back").addEventListener("click", function(){ openTfSub(s.id); });
+    sh.querySelector("#tpz_ok").addEventListener("click", function(){ var f = sh.querySelector("#tpz_from").value, t = sh.querySelector("#tpz_to").value;
+      if(!f || !t || t < f) return tfErr(sh, "Pick the days."); (s.pauses = s.pauses || []).push({ from:f, to:t, byName:myName()||"Owner" }); saveTfSubs(); renderAll(); openTfSub(s.id); }); });
+  if((x = sheet.querySelector("#tsd_renew"))) x.addEventListener("click", function(){
+    var p = tfPlan(s.planId) || tiffinPlans[0] || { count:26, price:0, name:"Tiffin" };
+    var sh = tfOpenSheet('<h2 class="serif">🔁 Renew · '+esc(s.name)+'</h2><div class="backupnote">'+left+' tiffins left now.</div>'+
+      '<div class="field two"><div><label>Add tiffins</label><input id="trn_cnt" type="number" inputmode="numeric" value="'+(+p.count||0)+'"></div><div><label>Amount ₹</label><input id="trn_amt" type="number" inputmode="numeric" value="'+(+p.price||0)+'"></div></div>'+
+      '<div class="field"><label>Paid by</label><select id="trn_mode"><option value="Cash">💵 Cash</option><option value="UPI">📱 UPI</option><option value="Credit">📒 Udhaar (pay later)</option><option value="none">Not now</option></select></div>'+
+      '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="trn_back">← Back</button><button class="btn-save" id="trn_ok">✔ Add</button></div>');
+    sh.querySelector("#trn_back").addEventListener("click", function(){ openTfSub(s.id); });
+    sh.querySelector("#trn_ok").addEventListener("click", function(){ var n = parseInt(sh.querySelector("#trn_cnt").value, 10), a = parseFloat(sh.querySelector("#trn_amt").value)||0;
+      if(!(n > 0)) return tfErr(sh, "How many tiffins to add?");
+      // A finished plan restarts from today, so the empty days in between are not counted again.
+      if(left <= 0){ s.firstStart = s.firstStart || s.start; s.start = (s.meals||[]).some(function(mm){ return tfOpen(today, mm); }) ? today : addDays(today, 1); s.mealsTotal = 0; s.pauses = []; }
+      s.mealsTotal = (+s.mealsTotal||0) + n; if(s.status==="stopped"){ s.status = "active"; delete s.stopDate; }
+      tfRecordPay(s, a, sh.querySelector("#trn_mode").value, n, (tfPlan(s.planId)||{name:"Tiffin"}).name+" (renewal)"); saveTfSubs(); renderAll(); openTfSub(s.id); }); });
+}
+// Staff set (or change) a subscriber's choice for one meal — e.g. when the customer phones.
+function openTfPick(s, d, m, back){
+  var pm = tfPickMap(), c = tfChoices(s, pm, d, m), sk = tfSkipped(pm, s, d, m), groups = (c.menu && c.menu.groups) || [], can = canWriteKey(TF_PICKS_KEY);
+  var html = '<h2 class="serif">'+TF_MEALS[m].i+' <span class="notr">'+esc(s.name)+'</span></h2><div class="backupnote">'+esc(parseDate(d).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"}))+' · '+TF_MEALS[m].t+(c.menu && c.menu.note ? ' · '+esc(c.menu.note) : '')+'</div>';
+  if(!groups.length) html += '<div class="empty">No choices on this menu.</div>';
+  html += groups.map(function(g){ return '<div class="dgroup">'+esc(g.name)+'</div><div class="tfopts">'+(g.options||[]).map(function(o){ return '<button data-g="'+esc(g.id)+'" data-o="'+esc(o)+'" class="notr'+(c.choices[g.id]===o?' on':'')+'"'+(can?'':' disabled')+'>'+esc(o)+'</button>'; }).join("")+'</div>'; }).join("");
+  html += (can ? '<label class="poclose"><input type="checkbox" id="tk_skip"'+(sk?' checked':'')+'> ⏭️ Skip this meal (not counted)</label>' : '')+
+    '<div class="sheetbtns"><button class="btn-cancel" id="tk_back">'+(back?'← Back':'Close')+'</button>'+(can?'<button class="btn-save" id="tk_ok">Save</button>':'')+'</div>';
+  var sheet = tfOpenSheet(html), pick = Object.assign({}, c.choices);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-g]"), function(b){ b.addEventListener("click", function(){ var g = b.getAttribute("data-g"); pick[g] = b.getAttribute("data-o");
+    Array.prototype.forEach.call(sheet.querySelectorAll('[data-g="'+g+'"]'), function(x){ x.classList.toggle("on", x===b); }); }); });
+  sheet.querySelector("#tk_back").addEventListener("click", function(){ if(back) back(); else closeForm(); });
+  var ok = sheet.querySelector("#tk_ok"); if(ok) ok.addEventListener("click", function(){
+    var id = tfPickId(s, d, m), rec = tiffinPicks.find(function(x){ return x.id===id; });
+    if(!rec){ rec = { id:id, subId:s.id, date:d, meal:m }; tiffinPicks.push(rec); }
+    Object.assign(rec, { choices:pick, skip: sheet.querySelector("#tk_skip").checked, by:"staff", byName:myName()||"Owner", at:Date.now() });
+    // Old picks are not needed after a few weeks.
+    var cut = addDays(fmtDate(new Date()), -60); tiffinPicks = tiffinPicks.filter(function(x){ return x.date >= cut; });
+    saveTfPicks(); renderAll(); if(back) back(); else closeForm(); });
+}
+function openTfMenu(d, m){
+  var cur = tfMenuFor(d, m), groups = cur ? JSON.parse(JSON.stringify(cur.groups||[])) : [{ id:uid(), name:"Dal", options:["Dal fry","Dal makhani"] },{ id:uid(), name:"Sabzi", options:["Paneer matar","Shahi paneer"] }];
+  var note = cur ? (cur.note||"") : "";
+  function draw(){
+    var sheet = tfOpenSheet('<h2 class="serif">📋 '+TF_MEALS[m].t+' menu</h2><div class="backupnote">'+esc(parseDate(d).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"}))+'. Customers pick one option from each group.</div>'+
+      '<div class="field"><label>Always in the tiffin</label><input id="tm_note" placeholder="e.g. 4 roti · rice · salad" value="'+esc(note)+'"></div>'+
+      groups.map(function(g, i){ var sug = TF_SUGGEST[g.name] || [];
+        return '<div class="card tfgrp"><div class="field two"><div><label>Group</label><input data-gn="'+i+'" value="'+esc(g.name)+'"></div><div style="display:flex;align-items:flex-end;"><button class="btn-additem" data-grm="'+i+'">Remove group</button></div></div>'+
+          '<label style="font-size:12px;">Options (comma between them)</label><input data-go="'+i+'" value="'+esc((g.options||[]).join(", "))+'">'+
+          (sug.length ? '<div class="tfsug">'+sug.filter(function(o){ return (g.options||[]).indexOf(o) < 0; }).map(function(o){ return '<button data-gs="'+i+'" data-v="'+esc(o)+'">+ '+esc(o)+'</button>'; }).join("")+'</div>' : '')+'</div>'; }).join("")+
+      '<button class="btn-additem" id="tm_add">➕ Add a choice group</button>'+
+      '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="tm_cancel">Cancel</button><button class="btn-save" id="tm_save">Save menu</button></div>');
+    function read(){ note = sheet.querySelector("#tm_note").value.trim(); groups.forEach(function(g, i){ g.name = sheet.querySelector('[data-gn="'+i+'"]').value.trim(); g.options = sheet.querySelector('[data-go="'+i+'"]').value.split(/[,\n]/).map(function(x){ return x.trim(); }).filter(Boolean); }); }
+    sheet.querySelector("#tm_cancel").addEventListener("click", closeForm);
+    sheet.querySelector("#tm_add").addEventListener("click", function(){ read(); groups.push({ id:uid(), name:"", options:[] }); draw(); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-grm]"), function(b){ b.addEventListener("click", function(){ read(); groups.splice(+b.getAttribute("data-grm"), 1); draw(); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-gs]"), function(b){ b.addEventListener("click", function(){ read(); var g = groups[+b.getAttribute("data-gs")]; g.options.push(b.getAttribute("data-v")); draw(); }); });
+    sheet.querySelector("#tm_save").addEventListener("click", function(){
+      read(); var gs = groups.filter(function(g){ return g.name && g.options.length; });
+      if(groups.some(function(g){ return (g.name && !g.options.length) || (!g.name && g.options.length); })) return tfErr(sheet, "Each group needs a name and at least one option.");
+      var ex = tiffinMenu.find(function(x){ return x.date===d && x.meal===m; });
+      if(ex) Object.assign(ex, { groups:gs, note:note, at:Date.now() }); else tiffinMenu.push({ id:d+"|"+m, date:d, meal:m, groups:gs, note:note, at:Date.now() });
+      var cut = addDays(fmtDate(new Date()), -90); var keepLast = {};
+      tiffinMenu.slice().sort(function(a,b){ return b.date.localeCompare(a.date); }).forEach(function(x){ if(!keepLast[x.meal]) keepLast[x.meal] = x.id; });
+      tiffinMenu = tiffinMenu.filter(function(x){ return x.date >= cut || keepLast[x.meal]===x.id; });
+      saveTfMenu(); closeForm(); renderAll();
+    });
+  }
+  draw();
+}
+
+// ---------- 🎉 PARTY CATERING (optional, per outlet) ----------
+// Its own menu (rates per plate / kg / piece), orders for an event date with guests, venue, extras
+// (transport, service staff), discount, advance payments and a quotation PDF. Each payment received is a
+// sale on that day; at settlement any balance left can be put on udhaar. The kitchen gets a prep list per day.
+var CATER_MENU_KEY = "catermenu_v1", CATER_ORDERS_KEY = "caterorders_v1";
+var caterMenu = [], caterOrders = [], ctSub = "orders";
+function saveCaterMenu(){ return lsSet(CATER_MENU_KEY, caterMenu); }
+function saveCaterOrders(){ return lsSet(CATER_ORDERS_KEY, caterOrders); }
+function cateringOn(){ return settings.cateringOn === true; }
+var CT_UNITS = { plate:"plate", kg:"kg", piece:"piece", litre:"litre", tray:"tray" };
+var CT_STATUS = { enquiry:{ t:"Enquiry", hi:"पूछताछ", c:"muted" }, confirmed:{ t:"Confirmed", hi:"पक्का", c:"ok" }, ready:{ t:"Ready", hi:"तैयार", c:"ok" }, delivered:{ t:"Delivered", hi:"पहुँचा दिया", c:"ok" }, settled:{ t:"Settled", hi:"हिसाब पूरा", c:"muted" }, cancelled:{ t:"Cancelled", hi:"रद्द", c:"bad" } };
+var CT_EVENTS = ["Birthday","Wedding","Engagement","Puja / Kirtan","Office party","Kitty party","Anniversary","Other"];
+function ctTotals(o){
+  var items = (o.items||[]).reduce(function(a,i){ return a + (+i.qty||0)*(+i.rate||0); },0), extras = (o.extras||[]).reduce(function(a,x){ return a + (+x.amt||0); },0);
+  var total = Math.max(0, items + extras - (+o.discount||0)), paid = (o.payments||[]).reduce(function(a,p){ return a + (+p.amount||0); },0);
+  return { items:items, extras:extras, total:total, paid:paid, due: Math.max(0, total - paid - (+o.udhaar||0)), perGuest: o.guests>0 ? Math.round(total/o.guests) : 0 };
+}
+function ctNo(){ return 1 + caterOrders.reduce(function(a,o){ return Math.max(a, +o.no||0); },0); }
+function ctPay(o, amount, mode, what){
+  var d = fmtDate(new Date()), rec = { id:uid(), date:d, customer:o.customer, desc:"🎉 Catering C-"+o.no+" · "+what+(o.event?" · "+o.event:"")+" "+o.date, amount:amount, gst:0, mode:mode, catering:o.id };
+  sales.push(rec); saveSales(); return rec;
+}
+function renderCateringView(){
+  var el = document.getElementById("cateringView"); if(!el) return;
+  if(!cateringOn()){ el.innerHTML = '<div class="empty">Party catering is switched off for this outlet (Counter → ⚙️ Settings → Extra businesses).</div>'; return; }
+  var can = canWriteKey(CATER_ORDERS_KEY), canMenu = canWriteKey(CATER_MENU_KEY), today = fmtDate(new Date());
+  var subs = [["orders","🎉 Orders"],["prep","🍳 Prep list"],["menu","📖 Catering menu"]];
+  var html = '<div class="segctl recctl5" id="ctCtl" style="margin-bottom:10px;">'+subs.map(function(s){ return '<button data-cts="'+s[0]+'" class="'+(ctSub===s[0]?'on':'')+'">'+s[1]+'</button>'; }).join("")+'</div>';
+  if(ctSub==="orders"){
+    if(can) html += '<button class="btn-save" id="ct_neword" style="width:100%;margin-bottom:10px;">➕ New party order · नया ऑर्डर</button>';
+    var open = caterOrders.filter(function(o){ return ["settled","cancelled"].indexOf(o.status)<0; }).sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
+    var done = caterOrders.filter(function(o){ return ["settled","cancelled"].indexOf(o.status)>=0; }).sort(function(a,b){ return b.date.localeCompare(a.date); }).slice(0, 15);
+    if(!open.length && !done.length) html += '<div class="empty">No party orders yet.</div>';
+    function row(o){ var t = ctTotals(o), st = CT_STATUS[o.status]||CT_STATUS.enquiry, soon = o.date >= today && o.date <= addDays(today, 2) && o.status!=="cancelled";
+      return '<div class="card ctord'+(soon?' soon':'')+'" data-ctord="'+esc(o.id)+'"><div class="psrow" style="border:none;"><span><b>C-'+o.no+' · <span class="notr">'+esc(o.customer)+'</span></b><br><span class="muted" style="font-size:12px;">'+esc(parseDate(o.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short"}))+(o.time?' '+esc(o.time):'')+' · '+(+o.guests||0)+' guests'+(o.event?' · '+esc(o.event):'')+'</span></span>'+
+        '<span style="text-align:right;"><b>'+rupee(t.total)+'</b><br><span class="'+st.c+'" style="font-size:12px;font-weight:700;">'+st.t+'</span>'+(t.due>0 && o.status!=="cancelled" && o.status!=="enquiry"?'<br><span class="bad" style="font-size:11.5px;">'+rupee(t.due)+' due</span>':'')+'</span></div></div>'; }
+    if(open.length) html += '<div class="dgroup">Coming up</div>'+open.map(row).join("");
+    if(done.length) html += '<div class="dgroup">Done</div>'+done.map(row).join("");
+  } else if(ctSub==="prep"){
+    var days = []; caterOrders.forEach(function(o){ if(["confirmed","ready"].indexOf(o.status)>=0 && o.date >= today && days.indexOf(o.date)<0) days.push(o.date); }); days.sort();
+    if(!days.length) html += '<div class="empty">No confirmed party orders coming up.</div>';
+    html += days.slice(0, 7).map(function(d){ var ords = caterOrders.filter(function(o){ return o.date===d && ["confirmed","ready"].indexOf(o.status)>=0; }), tot = {};
+      ords.forEach(function(o){ (o.items||[]).forEach(function(i){ var k = i.name+"|"+i.unit; tot[k] = (tot[k]||0) + (+i.qty||0); }); });
+      return '<div class="card"><h3>'+esc(parseDate(d).toLocaleDateString("en-IN",{weekday:"long",day:"numeric",month:"short"}))+'</h3>'+
+        Object.keys(tot).map(function(k){ var a = k.split("|"); return '<div class="psrow"><span class="notr">'+esc(a[0])+'</span><b>'+tot[k]+' '+esc(a[1])+'</b></div>'; }).join("")+
+        '<div class="muted" style="font-size:12px;margin-top:6px;">'+ords.map(function(o){ return 'C-'+o.no+' '+esc(o.customer)+(o.time?' '+esc(o.time):'')+' · '+(+o.guests||0)+' guests · '+esc(o.venue||""); }).join("<br>")+'</div></div>'; }).join("");
+  } else {
+    if(canMenu) html += '<button class="btn-save" id="ct_newitem" style="width:100%;margin-bottom:10px;">➕ Add catering item</button>';
+    if(!caterMenu.length) html += '<div class="empty">No catering items yet. Example: Veg thali (per plate) ₹180, Paneer tikka (per kg) ₹900, Gulab jamun (per piece) ₹15.</div>';
+    var cats = []; caterMenu.forEach(function(m){ var c = m.cat||"Other"; if(cats.indexOf(c)<0) cats.push(c); });
+    html += cats.map(function(c){ return '<div class="dgroup">'+esc(c)+'</div>'+caterMenu.filter(function(m){ return (m.cat||"Other")===c; }).map(function(m){
+      return '<div class="psrow" data-ctitem="'+esc(m.id)+'" style="cursor:pointer;'+(m.active===false?'opacity:.5;':'')+'"><span class="notr">'+esc(m.name)+(m.min?' <span class="muted">(min '+m.min+')</span>':'')+'</span><b>'+rupee(m.rate)+' / '+esc(m.unit||"plate")+'</b></div>'; }).join(""); }).join("");
+  }
+  el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll("[data-cts]"), function(b){ b.addEventListener("click", function(){ ctSub = b.getAttribute("data-cts"); renderCateringView(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ctord]"), function(b){ b.addEventListener("click", function(){ openCaterOrder(b.getAttribute("data-ctord")); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ctitem]"), function(b){ b.addEventListener("click", function(){ if(canMenu) openCaterItem(b.getAttribute("data-ctitem")); }); });
+  var x;
+  if((x = el.querySelector("#ct_neword"))) x.addEventListener("click", function(){ if(!caterMenu.some(function(m){ return m.active!==false; })){ appAlert("Add your catering items first (📖 Catering menu)."); ctSub = "menu"; renderCateringView(); return; } openCaterForm(null); });
+  if((x = el.querySelector("#ct_newitem"))) x.addEventListener("click", function(){ openCaterItem(null); });
+  if(recSub==="catering") updateRecordsTotal();
+}
+function openCaterItem(id){
+  var m = id ? caterMenu.find(function(x){ return x.id===id; }) : null, isNew = !m; m = m || { unit:"plate", cat:"Main course" };
+  var sheet = tfOpenSheet('<h2 class="serif">📖 '+(isNew?'New catering item':'Edit item')+'</h2>'+
+    '<div class="field"><label>Name</label><input id="ci_name" value="'+esc(m.name||"")+'" placeholder="e.g. Veg thali, Paneer tikka"></div>'+
+    '<div class="field two"><div><label>Rate ₹</label><input id="ci_rate" type="number" inputmode="decimal" value="'+esc(m.rate||"")+'"></div><div><label>Per</label><select id="ci_unit">'+Object.keys(CT_UNITS).map(function(u){ return '<option value="'+u+'"'+(m.unit===u?' selected':'')+'>'+u+'</option>'; }).join("")+'</select></div></div>'+
+    '<div class="field two"><div><label>Group</label><input id="ci_cat" list="ci_cats" value="'+esc(m.cat||"")+'"><datalist id="ci_cats"><option value="Starters"><option value="Main course"><option value="Breads"><option value="Rice"><option value="Sweets"><option value="Drinks"><option value="Packages"></datalist></div><div><label>Minimum order</label><input id="ci_min" type="number" inputmode="numeric" value="'+esc(m.min||"")+'"></div></div>'+
+    (!isNew ? '<label class="poclose"><input type="checkbox" id="ci_off"'+(m.active===false?' checked':'')+'> Not available now</label>' : '')+
+    '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="ci_cancel">Cancel</button><button class="btn-save" id="ci_save">Save</button></div>');
+  sheet.querySelector("#ci_cancel").addEventListener("click", closeForm);
+  sheet.querySelector("#ci_save").addEventListener("click", function(){
+    var name = sheet.querySelector("#ci_name").value.trim(), rate = parseFloat(sheet.querySelector("#ci_rate").value);
+    if(!name) return tfErr(sheet, "Type the item name."); if(!(rate > 0)) return tfErr(sheet, "Type the rate.");
+    var rec = isNew ? { id:uid() } : m; Object.assign(rec, { name:name, rate:rate, unit:sheet.querySelector("#ci_unit").value, cat:sheet.querySelector("#ci_cat").value.trim()||"Other", min:parseInt(sheet.querySelector("#ci_min").value,10)||0 });
+    var off = sheet.querySelector("#ci_off"); rec.active = !(off && off.checked);
+    if(isNew) caterMenu.push(rec); saveCaterMenu(); closeForm(); renderCateringView();
+  });
+}
+function openCaterForm(id){
+  var o = id ? caterOrders.find(function(x){ return x.id===id; }) : null, isNew = !o;
+  var w = o ? JSON.parse(JSON.stringify(o)) : { date:addDays(fmtDate(new Date()), 3), time:"13:00", guests:50, items:[], extras:[], discount:0, status:"enquiry" };
+  function draw(){
+    var t = ctTotals(w), avail = caterMenu.filter(function(m){ return m.active!==false; });
+    var sheet = tfOpenSheet('<h2 class="serif">🎉 '+(isNew?'New party order':'Edit C-'+w.no)+'</h2>'+
+      '<div class="field two"><div><label>Customer</label><input id="co_cust" list="co_custs" value="'+esc(w.customer||"")+'"><datalist id="co_custs">'+customers.map(function(c){ return '<option value="'+esc(c.name)+'">'; }).join("")+'</datalist></div><div><label>Phone</label><input id="co_phone" inputmode="tel" value="'+esc(w.phone||"")+'"></div></div>'+
+      '<div class="field two"><div><label>Event</label><input id="co_event" list="co_events" value="'+esc(w.event||"")+'"><datalist id="co_events">'+CT_EVENTS.map(function(e){ return '<option value="'+esc(e)+'">'; }).join("")+'</datalist></div><div><label>Guests</label><input id="co_guests" type="number" inputmode="numeric" value="'+esc(w.guests||"")+'"></div></div>'+
+      '<div class="field two"><div><label>Date</label><input id="co_date" type="date" value="'+esc(w.date)+'"></div><div><label>Time</label><input id="co_time" type="time" value="'+esc(w.time||"")+'"></div></div>'+
+      '<div class="field"><label>Venue / address</label><input id="co_venue" value="'+esc(w.venue||"")+'"></div>'+
+      '<div class="dgroup">Items</div>'+(w.items.length ? w.items.map(function(i, k){ return '<div class="ctline"><span class="notr">'+esc(i.name)+'<small>'+rupee(i.rate)+' / '+esc(i.unit)+'</small></span><input type="number" inputmode="decimal" data-cq="'+k+'" value="'+esc(i.qty)+'"><b>'+rupee((+i.qty||0)*(+i.rate||0))+'</b><button class="ndel" data-crm="'+k+'">✕</button></div>'; }).join("") : '<div class="muted">No items yet.</div>')+
+      '<div class="field two" style="margin-top:6px;"><div><select id="co_pick"><option value="">+ Add item…</option>'+avail.map(function(m){ return '<option value="'+esc(m.id)+'">'+esc(m.name)+' · '+rupee(m.rate)+'/'+esc(m.unit)+'</option>'; }).join("")+'</select></div><div><button class="btn-additem" id="co_addall">Per plate × guests</button></div></div>'+
+      '<div class="dgroup">Extras</div>'+(w.extras||[]).map(function(x, k){ return '<div class="ctline"><span>'+esc(x.t)+'</span><input type="number" inputmode="decimal" data-xa="'+k+'" value="'+esc(x.amt)+'"><b></b><button class="ndel" data-xrm="'+k+'">✕</button></div>'; }).join("")+
+      '<div class="tfsug">'+["Transport","Service staff","Utensils / setup","Packing"].filter(function(n){ return !(w.extras||[]).some(function(x){ return x.t===n; }); }).map(function(n){ return '<button data-xadd="'+esc(n)+'">+ '+esc(n)+'</button>'; }).join("")+'</div>'+
+      '<div class="field two"><div><label>Discount ₹</label><input id="co_disc" type="number" inputmode="decimal" value="'+esc(w.discount||"")+'"></div><div><label>Status</label><select id="co_status">'+["enquiry","confirmed"].concat(isNew?[]:["ready","delivered"]).map(function(s){ return '<option value="'+s+'"'+(w.status===s?' selected':'')+'>'+CT_STATUS[s].t+'</option>'; }).join("")+'</select></div></div>'+
+      '<div class="field"><label>Notes (menu changes, less spicy, Jain…)</label><input id="co_notes" value="'+esc(w.notes||"")+'"></div>'+
+      '<div class="card"><div class="psrow"><span>Items</span><b>'+rupee(t.items)+'</b></div>'+(t.extras?'<div class="psrow"><span>Extras</span><b>'+rupee(t.extras)+'</b></div>':'')+(w.discount?'<div class="psrow"><span>Discount</span><b>− '+rupee(w.discount)+'</b></div>':'')+'<div class="psrow tot"><span><b>Total</b>'+(t.perGuest?' · '+rupee(t.perGuest)+' per guest':'')+'</span><b>'+rupee(t.total)+'</b></div></div>'+
+      (isNew ? '<div class="field two"><div><label>Advance received ₹</label><input id="co_adv" type="number" inputmode="decimal" value="'+esc(w._adv||"")+'"></div><div><label>Paid by</label><select id="co_advmode"><option value="Cash">💵 Cash</option><option value="UPI">📱 UPI</option></select></div></div>' : '')+
+      '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="co_cancel">Cancel</button><button class="btn-save" id="co_save">Save</button></div>');
+    function read(){ ["cust:customer","phone:phone","event:event","date:date","time:time","venue:venue","notes:notes","status:status"].forEach(function(p){ var a = p.split(":"); w[a[1]] = sheet.querySelector("#co_"+a[0]).value.trim(); });
+      w.guests = parseInt(sheet.querySelector("#co_guests").value,10)||0; w.discount = parseFloat(sheet.querySelector("#co_disc").value)||0;
+      Array.prototype.forEach.call(sheet.querySelectorAll("[data-cq]"), function(q){ w.items[+q.getAttribute("data-cq")].qty = parseFloat(q.value)||0; });
+      Array.prototype.forEach.call(sheet.querySelectorAll("[data-xa]"), function(q){ w.extras[+q.getAttribute("data-xa")].amt = parseFloat(q.value)||0; });
+      var adv = sheet.querySelector("#co_adv"); if(adv) w._adv = adv.value; }
+    sheet.querySelector("#co_cancel").addEventListener("click", function(){ if(isNew) closeForm(); else openCaterOrder(id); });
+    sheet.querySelector("#co_pick").addEventListener("change", function(){ var m = caterMenu.find(function(x){ return x.id===this.value; }, this); if(!m) return; read();
+      var ex = w.items.find(function(i){ return i.itemId===m.id; }); if(ex) ex.qty += m.unit==="plate" ? 0 : 1;
+      else w.items.push({ itemId:m.id, name:m.name, unit:m.unit, rate:m.rate, qty: m.unit==="plate" ? (w.guests||1) : Math.max(1, m.min||1) }); draw(); });
+    sheet.querySelector("#co_addall").addEventListener("click", function(){ read(); w.items.forEach(function(i){ if(i.unit==="plate") i.qty = w.guests||i.qty; }); draw(); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-crm]"), function(b){ b.addEventListener("click", function(){ read(); w.items.splice(+b.getAttribute("data-crm"),1); draw(); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-xrm]"), function(b){ b.addEventListener("click", function(){ read(); w.extras.splice(+b.getAttribute("data-xrm"),1); draw(); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-xadd]"), function(b){ b.addEventListener("click", function(){ read(); (w.extras = w.extras||[]).push({ t:b.getAttribute("data-xadd"), amt:0 }); draw(); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-cq],[data-xa],#co_disc"), function(q){ q.addEventListener("change", function(){ read(); draw(); }); });
+    sheet.querySelector("#co_save").addEventListener("click", function(){
+      read();
+      if(!w.customer) return tfErr(sheet, "Type the customer's name."); if(!/^\d{4}-\d\d-\d\d$/.test(w.date)) return tfErr(sheet, "Pick the event date.");
+      if(!w.items.length) return tfErr(sheet, "Add at least one item.");
+      var low = w.items.find(function(i){ var m = caterMenu.find(function(x){ return x.id===i.itemId; }); return m && m.min && i.qty < m.min; });
+      if(low) return tfErr(sheet, low.name+": minimum order is "+caterMenu.find(function(x){ return x.id===low.itemId; }).min+".");
+      var rec;
+      if(isNew){ rec = Object.assign({ id:uid(), no:ctNo(), at:Date.now(), payments:[], byName:myName()||"Owner" }, w); delete rec._adv; caterOrders.push(rec);
+        var adv = parseFloat(w._adv)||0; if(adv > 0){ var sr = ctPay(rec, adv, sheet.querySelector("#co_advmode").value, "advance"); rec.payments.push({ date:sr.date, amount:adv, mode:sr.mode, saleId:sr.id, byName:myName()||"Owner" }); if(rec.status==="enquiry") rec.status = "confirmed"; } }
+      else { rec = caterOrders.find(function(x){ return x.id===id; }); ["customer","phone","event","date","time","venue","notes","status","guests","discount","items","extras"].forEach(function(k){ rec[k] = w[k]; }); rec.updated = Date.now(); }
+      if(rec.phone) tfLinkCustomer(rec.customer, rec.phone);
+      saveCaterOrders(); closeForm(); renderAll(); openCaterOrder(rec.id);
+    });
+  }
+  draw();
+}
+function openCaterOrder(id){
+  var o = caterOrders.find(function(x){ return x.id===id; }); if(!o) return;
+  var t = ctTotals(o), st = CT_STATUS[o.status]||CT_STATUS.enquiry, can = canWriteKey(CATER_ORDERS_KEY), closed = ["settled","cancelled"].indexOf(o.status)>=0;
+  var html = '<h2 class="serif">🎉 C-'+o.no+' · <span class="notr">'+esc(o.customer)+'</span></h2>'+
+    '<div class="card"><div class="psrow"><span>Status</span><b class="'+st.c+'">'+st.t+' · '+st.hi+'</b></div>'+
+    '<div class="psrow"><span>When</span><b>'+esc(parseDate(o.date).toLocaleDateString("en-IN",{weekday:"short",day:"numeric",month:"short",year:"numeric"}))+(o.time?' · '+esc(o.time):'')+'</b></div>'+
+    '<div class="psrow"><span>Guests</span><b>'+(+o.guests||0)+(o.event?' · '+esc(o.event):'')+'</b></div>'+(o.venue?'<div class="psrow"><span>Venue</span><b class="notr">'+esc(o.venue)+'</b></div>':'')+(o.phone?'<div class="psrow"><span>Phone</span><b>'+esc(o.phone)+'</b></div>':'')+(o.notes?'<div class="psrow"><span>Notes</span><b class="notr">'+esc(o.notes)+'</b></div>':'')+'</div>'+
+    '<div class="card">'+(o.items||[]).map(function(i){ return '<div class="psrow"><span class="notr">'+i.qty+' '+esc(i.unit)+' × '+esc(i.name)+'</span><b>'+rupee(i.qty*i.rate)+'</b></div>'; }).join("")+
+      (o.extras||[]).filter(function(x){ return +x.amt; }).map(function(x){ return '<div class="psrow"><span>'+esc(x.t)+'</span><b>'+rupee(x.amt)+'</b></div>'; }).join("")+
+      (o.discount?'<div class="psrow"><span>Discount</span><b>− '+rupee(o.discount)+'</b></div>':'')+
+      '<div class="psrow tot"><span><b>Total</b></span><b>'+rupee(t.total)+'</b></div><div class="psrow"><span>Received</span><b class="ok">'+rupee(t.paid)+'</b></div>'+(o.udhaar?'<div class="psrow"><span>On udhaar</span><b>'+rupee(o.udhaar)+'</b></div>':'')+
+      '<div class="psrow"><span><b>Balance</b></span><b class="'+(t.due>0?'bad':'ok')+'">'+rupee(t.due)+'</b></div></div>'+
+    ((o.payments||[]).length ? '<div class="dgroup">Payments</div>'+o.payments.map(function(p){ return '<div class="psrow"><span>'+esc(p.date)+' · '+esc(p.mode)+'</span><b>'+rupee(p.amount)+'</b></div>'; }).join("") : '');
+  if(can && !closed){
+    html += '<div class="zbtns" style="margin-top:12px;"><button class="btn-save" id="cd_pay">💰 Payment received</button><button class="btn-additem" id="cd_edit">✏️ Edit order</button>';
+    var nx = { enquiry:["confirmed","✔ Confirm order"], confirmed:["ready","🍳 Food ready"], ready:["delivered","🚚 Delivered"], delivered:["settled","🧾 Settle (close)"] }[o.status];
+    if(nx) html += '<button class="btn-additem" id="cd_next" data-st="'+nx[0]+'">'+nx[1]+'</button>';
+    html += '<button class="btn-additem" id="cd_cancel" style="color:#A6402D;">❌ Cancel order</button></div>';
+  }
+  html += '<div class="zbtns"><button class="btn-additem" id="cd_pdf">📄 Quotation / bill PDF</button></div><div class="sheetbtns"><button class="btn-cancel" id="cd_close">Close</button></div>';
+  var sheet = tfOpenSheet(html), x;
+  sheet.querySelector("#cd_close").addEventListener("click", closeForm);
+  sheet.querySelector("#cd_pdf").addEventListener("click", function(){ caterPdf(o, this); });
+  if((x = sheet.querySelector("#cd_edit"))) x.addEventListener("click", function(){ openCaterForm(o.id); });
+  if((x = sheet.querySelector("#cd_cancel"))) x.addEventListener("click", function(){ askConfirm("Cancel party order C-"+o.no+"?"+(t.paid?" "+rupee(t.paid)+" was received — record any refund in Expenses.":""), function(){ o.status = "cancelled"; o.cancelledBy = myName()||"Owner"; o.cancelledAt = Date.now(); saveCaterOrders(); renderAll(); openCaterOrder(o.id); }); });
+  if((x = sheet.querySelector("#cd_next"))) x.addEventListener("click", function(){ var ns = this.getAttribute("data-st");
+    if(ns==="settled" && ctTotals(o).due > 0){
+      var due = ctTotals(o).due;
+      __queueDlg(function(){ __showDlg(rupee(due)+" is still due. How was it settled?", [
+        { label:"💵 Paid cash now", cls:"dlgyes", fn:function(){ var sr = ctPay(o, due, "Cash", "balance"); o.payments.push({ date:sr.date, amount:due, mode:"Cash", saleId:sr.id, byName:myName()||"Owner" }); o.status = "settled"; saveCaterOrders(); renderAll(); openCaterOrder(o.id); } },
+        { label:"📱 Paid UPI now", cls:"dlgyes", fn:function(){ var sr = ctPay(o, due, "UPI", "balance"); o.payments.push({ date:sr.date, amount:due, mode:"UPI", saleId:sr.id, byName:myName()||"Owner" }); o.status = "settled"; saveCaterOrders(); renderAll(); openCaterOrder(o.id); } },
+        { label:"📒 Put on udhaar", cls:"dlgyes", fn:function(){ ctPay(o, due, "Credit", "balance on udhaar"); o.udhaar = (+o.udhaar||0) + due; o.status = "settled"; saveCaterOrders(); renderAll(); openCaterOrder(o.id); } },
+        { label:"↩️ Not yet", cls:"dlgno" } ]); });
+      return;
+    }
+    o.status = ns; (o.log = o.log||[]).push({ st:ns, at:Date.now(), byName:myName()||"Owner" }); saveCaterOrders(); renderAll(); openCaterOrder(o.id); });
+  if((x = sheet.querySelector("#cd_pay"))) x.addEventListener("click", function(){
+    var due = ctTotals(o).due;
+    var sh = tfOpenSheet('<h2 class="serif">💰 Payment · C-'+o.no+'</h2><div class="backupnote">Balance '+rupee(due)+'.</div>'+
+      '<div class="field two"><div><label>Amount ₹</label><input id="cp_amt" type="number" inputmode="decimal" value="'+(due>0?due:"")+'"></div><div><label>Paid by</label><select id="cp_mode"><option value="Cash">💵 Cash</option><option value="UPI">📱 UPI</option></select></div></div>'+
+      '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="cp_back">← Back</button><button class="btn-save" id="cp_ok">✔ Save</button></div>');
+    sh.querySelector("#cp_back").addEventListener("click", function(){ openCaterOrder(o.id); });
+    sh.querySelector("#cp_ok").addEventListener("click", function(){ var a = parseFloat(sh.querySelector("#cp_amt").value);
+      if(!(a > 0)) return tfErr(sh, "Type the amount."); var sr = ctPay(o, a, sh.querySelector("#cp_mode").value, o.payments.length ? "payment" : "advance");
+      o.payments.push({ date:sr.date, amount:a, mode:sr.mode, saleId:sr.id, byName:myName()||"Owner" }); if(o.status==="enquiry") o.status = "confirmed"; saveCaterOrders(); renderAll(); openCaterOrder(o.id); }); });
+}
+function caterPdf(o, btn){
+  var label = btn ? btn.textContent : ""; if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var t = ctTotals(o), doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4" }), M = 40, y = 46, teal = [31,92,82];
+    doc.setFont("helvetica","bold"); doc.setFontSize(18); doc.setTextColor(36,26,18); doc.text(pdfClean(OUTLET.name), M, y); y += 20;
+    doc.setFontSize(12); doc.setTextColor(91,80,68); doc.text((o.status==="enquiry" ? "Quotation" : "Catering order")+" C-"+o.no, M, y); y += 16;
+    doc.setFont("helvetica","normal"); doc.setFontSize(10);
+    [["Customer", o.customer+(o.phone?"  ("+o.phone+")":"")], ["Event", (o.event||"Party")+"  -  "+(+o.guests||0)+" guests"], ["Date", pdfDate(o.date)+(o.time?"  "+o.time:"")], ["Venue", o.venue||"-"]].forEach(function(r){ doc.text(r[0]+": "+pdfClean(r[1]), M, y); y += 13; });
+    y += 4;
+    var body = (o.items||[]).map(function(i){ return [pdfClean(i.name), i.qty+" "+i.unit, pdfMoneyP(i.rate), pdfMoneyP(i.qty*i.rate)]; });
+    (o.extras||[]).filter(function(x){ return +x.amt; }).forEach(function(x){ body.push([pdfClean(x.t), "", "", pdfMoneyP(x.amt)]); });
+    if(o.discount) body.push(["Discount", "", "", "-"+pdfMoneyP(o.discount)]);
+    body.push([{ content:"Total", styles:{ fontStyle:"bold" } }, "", "", { content:pdfMoneyP(t.total), styles:{ fontStyle:"bold" } }]);
+    if(t.paid) body.push(["Received", "", "", pdfMoneyP(t.paid)]);
+    body.push([{ content:"Balance", styles:{ fontStyle:"bold" } }, "", "", { content:pdfMoneyP(t.due + (+o.udhaar||0)), styles:{ fontStyle:"bold" } }]);
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Item","Qty","Rate","Amount"]], headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" }, styles:{ fontSize:10, cellPadding:4 },
+      columnStyles:{ 1:{halign:"right"}, 2:{halign:"right"}, 3:{halign:"right"} }, didParseCell:function(d){ if(d.section==="head" && d.column.index>=1) d.cell.styles.halign = "right"; }, body:body });
+    y = doc.lastAutoTable.finalY + 16;
+    if(t.perGuest){ doc.setFontSize(10); doc.text("About "+pdfMoneyP(t.perGuest)+" per guest.", M, y); y += 14; }
+    if(o.notes){ doc.text("Notes: "+pdfClean(o.notes), M, y); y += 14; }
+    doc.setFontSize(9); doc.setTextColor(91,80,68); doc.text("Thank you for choosing us.", M, y+6);
+    pdfFooter(doc, OUTLET.name+" - catering C-"+o.no);
+    done(); sharePdf(doc, (OUTLET.name+"_Catering_C"+o.no).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
+  }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
+}
+
+// ---------- 🏨 HOTEL COLLAB ORDERS (optional, per outlet) ----------
+// Nearby hotels order food for their guests at their own rates: a hotel discount % on the cafe menu,
+// prices set per dish, and extra dishes only for that hotel (a separate menu). Orders go to the kitchen
+// as deliveries; they are billed on the hotel's account (udhaar under the hotel's name) or paid at once.
+// A monthly statement PDF lists every order and payment.
+var HOTELS_KEY = "hotels_v1", HOTEL_ORDERS_KEY = "hotelorders_v1";
+var hotels = [], hotelOrders = [], htSub = "orders", htMonth = fmtDate(new Date()).slice(0,7);
+function saveHotels(){ return lsSet(HOTELS_KEY, hotels); }
+function saveHotelOrders(){ return lsSet(HOTEL_ORDERS_KEY, hotelOrders); }
+function hotelsOn(){ return settings.hotelsOn === true; }
+function hotelOf(id){ return hotels.find(function(h){ return h.id===id; }) || null; }
+// The hotel's menu: its own price per dish (or the cafe price less its discount %), plus its extra dishes.
+function hotelMenu(h){
+  var out = [], only = h.only === true;
+  menuItems.filter(function(m){ return m.active!==false && +m.price>0; }).forEach(function(m){
+    var r = (h.rates||{})[m.id];
+    if(only && !(r > 0)) return;
+    out.push({ id:m.id, name:m.name, price: r > 0 ? +r : Math.round((+m.price||0) * (1 - (+h.disc||0)/100)), base:+m.price, cafe:true });
+  });
+  (h.extras||[]).forEach(function(x){ if(x.name && +x.price>0) out.push({ id:"x:"+x.id, name:x.name, price:+x.price, extra:true }); });
+  return out;
+}
+function hotelDue(h){
+  var name = String(h.name||"").trim().toLowerCase();
+  var credit = sales.filter(function(s){ return s.mode==="Credit" && String(s.customer||"").trim().toLowerCase()===name; }).reduce(function(a,s){ return a+saleTotal(s); },0);
+  var c = customers.find(function(x){ return String(x.name||"").trim().toLowerCase()===name; });
+  var paid = c ? creditPayments.filter(function(p){ return p.customerId===c.id; }).reduce(function(a,p){ return a+(+p.amount||0); },0) : 0;
+  return Math.max(0, r2(credit - paid));
+}
+function renderHotelsView(){
+  var el = document.getElementById("hotelsView"); if(!el) return;
+  if(!hotelsOn()){ el.innerHTML = '<div class="empty">Hotel orders are switched off for this outlet (Counter → ⚙️ Settings → Extra businesses).</div>'; return; }
+  var can = canWriteKey(HOTEL_ORDERS_KEY), canH = canWriteKey(HOTELS_KEY), today = fmtDate(new Date());
+  var subs = [["orders","🏨 Orders"],["hotels","🤝 Hotels & rates"],["statement","🧾 Statements"]];
+  var html = '<div class="segctl recctl5" id="htCtl" style="margin-bottom:10px;">'+subs.map(function(s){ return '<button data-hts="'+s[0]+'" class="'+(htSub===s[0]?'on':'')+'">'+s[1]+'</button>'; }).join("")+'</div>';
+  var act = hotels.filter(function(h){ return h.active!==false; });
+  if(htSub==="orders"){
+    if(can && act.length) html += '<div class="htbtns">'+act.map(function(h){ return '<button class="btn-save" data-htnew="'+esc(h.id)+'">➕ <span class="notr">'+esc(h.name)+'</span></button>'; }).join("")+'</div>';
+    else if(!act.length) html += '<div class="empty">Add a hotel first (🤝 Hotels & rates).</div>';
+    var list = hotelOrders.filter(function(o){ return o.date >= addDays(today, -3); }).sort(function(a,b){ return (b.at||0)-(a.at||0); });
+    html += list.length ? '<div class="dgroup">Last few days</div>'+list.map(function(o){ var h = hotelOf(o.hotelId);
+      return '<div class="psrow" data-htord="'+esc(o.id)+'" style="cursor:pointer;'+(o.status==="cancelled"?'opacity:.5;':'')+'"><span><b>H-'+o.no+' · <span class="notr">'+esc(h?h.name:"Hotel")+'</span></b>'+(o.room?' · Room '+esc(o.room):'')+'<br><span class="muted" style="font-size:11.5px;">'+esc(o.date)+' '+esc(o.time||"")+' · '+esc((o.items||[]).map(function(i){ return i.qty+"× "+i.name; }).join(", "))+'</span></span><span style="text-align:right;"><b>'+rupee(o.total)+'</b><br><span class="muted" style="font-size:11.5px;">'+(o.status==="cancelled"?'cancelled':o.mode==="Credit"?'on account':esc(o.mode))+'</span></span></div>'; }).join("") : (act.length ? '<div class="empty">No hotel orders in the last few days.</div>' : '');
+  } else if(htSub==="hotels"){
+    if(canH) html += '<button class="btn-save" id="ht_newh" style="width:100%;margin-bottom:10px;">➕ Add hotel</button>';
+    if(!hotels.length) html += '<div class="empty">No hotels yet.</div>';
+    html += hotels.map(function(h){ var due = hotelDue(h);
+      return '<div class="card" data-hth="'+esc(h.id)+'" style="cursor:pointer;'+(h.active===false?'opacity:.55;':'')+'"><div class="psrow" style="border:none;"><span><b class="notr">'+esc(h.name)+'</b><br><span class="muted" style="font-size:12px;">'+(h.disc?h.disc+'% off the menu':'Menu prices')+(Object.keys(h.rates||{}).length?' · '+Object.keys(h.rates).length+' own prices':'')+((h.extras||[]).length?' · '+h.extras.length+' extra dishes':'')+(h.only?' · only listed dishes':'')+'</span></span><span style="text-align:right;">'+(due>0?'<b class="bad">'+rupee(due)+'</b><br><span class="muted" style="font-size:11.5px;">to collect</span>':'<span class="muted">nothing due</span>')+'</span></div></div>'; }).join("");
+  } else {
+    html += '<div class="field two"><div><label>Month</label><input type="month" id="ht_month" value="'+esc(htMonth)+'"></div><div></div></div>';
+    html += hotels.map(function(h){ var ords = hotelOrders.filter(function(o){ return o.hotelId===h.id && o.status!=="cancelled" && o.date.slice(0,7)===htMonth; }), tot = ords.reduce(function(a,o){ return a+(+o.total||0); },0);
+      return '<div class="card"><div class="psrow" style="border:none;"><span><b class="notr">'+esc(h.name)+'</b><br><span class="muted" style="font-size:12px;">'+ords.length+' order'+(ords.length!==1?'s':'')+' · due now '+rupee(hotelDue(h))+'</span></span><b>'+rupee(tot)+'</b></div><button class="btn-additem" data-htpdf="'+esc(h.id)+'">📄 Statement PDF</button></div>'; }).join("") || '<div class="empty">No hotels yet.</div>';
+  }
+  el.innerHTML = html;
+  Array.prototype.forEach.call(el.querySelectorAll("[data-hts]"), function(b){ b.addEventListener("click", function(){ htSub = b.getAttribute("data-hts"); renderHotelsView(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-htnew]"), function(b){ b.addEventListener("click", function(){ openHotelOrder(b.getAttribute("data-htnew")); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-htord]"), function(b){ b.addEventListener("click", function(){ openHotelOrderView(b.getAttribute("data-htord")); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-hth]"), function(b){ b.addEventListener("click", function(){ if(canH) openHotelForm(b.getAttribute("data-hth")); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-htpdf]"), function(b){ b.addEventListener("click", function(){ hotelStatementPdf(hotelOf(b.getAttribute("data-htpdf")), htMonth, b); }); });
+  var x;
+  if((x = el.querySelector("#ht_newh"))) x.addEventListener("click", function(){ openHotelForm(null); });
+  if((x = el.querySelector("#ht_month"))) x.addEventListener("change", function(){ if(this.value) htMonth = this.value; renderHotelsView(); });
+  if(recSub==="hotels") updateRecordsTotal();
+}
+function openHotelForm(id){
+  var h = id ? hotelOf(id) : null, isNew = !h, w = h ? JSON.parse(JSON.stringify(h)) : { disc:10, rates:{}, extras:[], only:false, pay:"account" };
+  function draw(){
+    var sheet = tfOpenSheet('<h2 class="serif">🏨 '+(isNew?'Add hotel':'Edit hotel')+'</h2>'+
+      '<div class="field two"><div><label>Hotel name</label><input id="hf_name" value="'+esc(w.name||"")+'"></div><div><label>Contact / phone</label><input id="hf_phone" inputmode="tel" value="'+esc(w.phone||"")+'"></div></div>'+
+      '<div class="field two"><div><label>Discount on our menu %</label><input id="hf_disc" type="number" inputmode="decimal" value="'+esc(w.disc||0)+'"></div><div><label>Payment</label><select id="hf_pay"><option value="account"'+(w.pay!=="cash"?' selected':'')+'>On account (monthly)</option><option value="cash"'+(w.pay==="cash"?' selected':'')+'>Pay with each order</option></select></div></div>'+
+      '<label class="poclose"><input type="checkbox" id="hf_only"'+(w.only?' checked':'')+'> Hotel menu = only the dishes with a price below</label>'+
+      '<div class="dgroup">Hotel prices per dish (blank = menu price − discount)</div><div class="htrates">'+menuItems.filter(function(m){ return m.active!==false && +m.price>0; }).map(function(m){ var r = (w.rates||{})[m.id];
+        return '<div class="ctline"><span class="notr">'+esc(m.name)+'<small>menu '+rupee(m.price)+'</small></span><input type="number" inputmode="decimal" data-hr="'+esc(m.id)+'" placeholder="'+Math.round((+m.price||0)*(1-(+w.disc||0)/100))+'" value="'+(r>0?esc(r):"")+'"></div>'; }).join("")+'</div>'+
+      '<div class="dgroup">Extra dishes only for this hotel</div>'+(w.extras||[]).map(function(x, k){ return '<div class="ctline"><input data-xn="'+k+'" value="'+esc(x.name)+'" placeholder="Dish"><input type="number" inputmode="decimal" data-xp="'+k+'" value="'+esc(x.price||"")+'" placeholder="₹"><button class="ndel" data-xd="'+k+'">✕</button></div>'; }).join("")+
+      '<button class="btn-additem" id="hf_addx">➕ Add extra dish</button>'+
+      (!isNew ? '<label class="poclose"><input type="checkbox" id="hf_off"'+(w.active===false?' checked':'')+'> Paused (no new orders)</label>' : '')+
+      '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="hf_cancel">Cancel</button><button class="btn-save" id="hf_save">Save</button></div>');
+    function read(){ w.name = sheet.querySelector("#hf_name").value.trim(); w.phone = sheet.querySelector("#hf_phone").value.trim(); w.disc = Math.min(90, Math.max(0, parseFloat(sheet.querySelector("#hf_disc").value)||0));
+      w.pay = sheet.querySelector("#hf_pay").value; w.only = sheet.querySelector("#hf_only").checked; w.rates = {};
+      Array.prototype.forEach.call(sheet.querySelectorAll("[data-hr]"), function(i){ var v = parseFloat(i.value); if(v>0) w.rates[i.getAttribute("data-hr")] = v; });
+      Array.prototype.forEach.call(sheet.querySelectorAll("[data-xn]"), function(i){ var k = +i.getAttribute("data-xn"); w.extras[k].name = i.value.trim(); w.extras[k].price = parseFloat(sheet.querySelector('[data-xp="'+k+'"]').value)||0; });
+      var off = sheet.querySelector("#hf_off"); if(off) w.active = !off.checked; }
+    sheet.querySelector("#hf_cancel").addEventListener("click", closeForm);
+    sheet.querySelector("#hf_addx").addEventListener("click", function(){ read(); w.extras.push({ id:uid(), name:"", price:0 }); draw(); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-xd]"), function(b){ b.addEventListener("click", function(){ read(); w.extras.splice(+b.getAttribute("data-xd"),1); draw(); }); });
+    sheet.querySelector("#hf_save").addEventListener("click", function(){
+      read(); if(!w.name) return tfErr(sheet, "Type the hotel's name.");
+      if(hotels.some(function(x){ return x.id!==id && String(x.name).trim().toLowerCase()===w.name.toLowerCase(); })) return tfErr(sheet, "This hotel is already added.");
+      w.extras = (w.extras||[]).filter(function(x){ return x.name && x.price>0; });
+      if(isNew){ w.id = uid(); w.active = true; hotels.push(w); } else Object.assign(hotelOf(id), w);
+      tfLinkCustomer(w.name, w.phone); saveHotels(); closeForm(); renderAll();
+    });
+  }
+  draw();
+}
+function openHotelOrder(hid){
+  var h = hotelOf(hid); if(!h) return; var cart = {}, menu = hotelMenu(h);
+  function draw(){
+    var tot = menu.reduce(function(a,m){ return a + (cart[m.id]||0)*m.price; },0);
+    var sheet = tfOpenSheet('<h2 class="serif">🏨 <span class="notr">'+esc(h.name)+'</span></h2><div class="backupnote">Hotel prices'+(h.disc?' ('+h.disc+'% off the menu)':'')+'. Tap to add.</div>'+
+      '<div class="field two"><div><label>Room / guest</label><input id="ho_room" value="'+esc(cart._room||"")+'"></div><div><label>Payment</label><select id="ho_mode"><option value="Credit"'+(h.pay!=="cash"?' selected':'')+'>📒 Hotel account</option><option value="Cash"'+(h.pay==="cash"?' selected':'')+'>💵 Cash</option><option value="UPI">📱 UPI</option></select></div></div>'+
+      '<div class="htmenu">'+menu.map(function(m){ var q = cart[m.id]||0; return '<button data-hm="'+esc(m.id)+'" class="'+(q?'on':'')+'"><span class="notr">'+esc(m.name)+'</span><b>'+rupee(m.price)+(m.cafe && m.price<m.base?' <s>'+rupee(m.base)+'</s>':'')+'</b>'+(q?'<i>'+q+'</i>':'')+'</button>'; }).join("")+'</div>'+
+      '<div class="card"><div class="psrow tot"><span><b>Total</b> · '+Object.keys(cart).filter(function(k){ return k[0]!=="_" && cart[k]>0; }).length+' dishes</span><b>'+rupee(tot)+'</b></div>'+
+        menu.filter(function(m){ return cart[m.id]>0; }).map(function(m){ return '<div class="psrow"><span class="notr">'+cart[m.id]+'× '+esc(m.name)+'</span><span><b>'+rupee(cart[m.id]*m.price)+'</b> <button class="ndel" data-hmm="'+esc(m.id)+'">−</button></span></div>'; }).join("")+'</div>'+
+      '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="ho_cancel">Cancel</button><button class="btn-save" id="ho_ok">✔ Send to kitchen</button></div>');
+    var rm = sheet.querySelector("#ho_room"), md = sheet.querySelector("#ho_mode");
+    if(cart._mode) md.value = cart._mode;
+    function keep(){ cart._room = rm.value; cart._mode = md.value; }
+    sheet.querySelector("#ho_cancel").addEventListener("click", closeForm);
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-hm]"), function(b){ b.addEventListener("click", function(){ keep(); var k = b.getAttribute("data-hm"); cart[k] = (cart[k]||0)+1; draw(); }); });
+    Array.prototype.forEach.call(sheet.querySelectorAll("[data-hmm]"), function(b){ b.addEventListener("click", function(){ keep(); var k = b.getAttribute("data-hmm"); cart[k] = Math.max(0,(cart[k]||0)-1); draw(); }); });
+    sheet.querySelector("#ho_ok").addEventListener("click", function(){
+      keep(); var lines = menu.filter(function(m){ return cart[m.id]>0; }); if(!lines.length) return tfErr(sheet, "Add at least one dish.");
+      var now = new Date(), day = fmtDate(now), items = lines.map(function(m){ return { menuId:m.cafe ? m.id : "", extraId:m.extra ? m.id.slice(2) : "", name:m.name, qty:cart[m.id], price:m.price }; });
+      var total = items.reduce(function(a,i){ return a+i.qty*i.price; },0), mode = cart._mode, room = String(cart._room||"").trim();
+      var no = 1 + hotelOrders.reduce(function(a,o){ return Math.max(a, +o.no||0); },0), oid = uid(), sid = uid(), bno = nextBillNo(day);
+      var rec = { id:sid, date:day, customer:h.name, desc:"🏨 Hotel order H-"+no+(room?" · Room "+room:"")+": "+items.map(function(i){ return i.qty+"× "+i.name; }).join(", "), amount:total, gst:0, mode:mode,
+                  order:{ no:bno, time:nowHM(), items:items, given:0, type:"hotel", hotelId:h.id, room:room, hotelOrder:oid } };
+      sales.push(rec);
+      items.forEach(function(i){ if(i.menuId) dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:sid }); });
+      hotelOrders.push({ id:oid, no:no, hotelId:h.id, date:day, time:nowHM(), at:now.getTime(), room:room, items:items, total:total, mode:mode, saleId:sid, status:"sent", byName:myName()||"Owner" });
+      createTicket({ type:"delivery", paid:true, saleId:sid, amount:total, items:items, cname:"🏨 "+h.name, phone:h.phone||"", address:(room?"Room "+room+" · ":"")+h.name, charge:0, hotel:h.id });
+      if(mode==="Credit") tfLinkCustomer(h.name, h.phone);
+      saveSales(); saveDishLog(); saveHotelOrders(); closeForm(); renderAll();
+      appAlert("✔ H-"+no+" sent to the kitchen · "+rupee(total)+(mode==="Credit"?" on "+h.name+"'s account":""));
+    });
+  }
+  draw();
+}
+function openHotelOrderView(id){
+  var o = hotelOrders.find(function(x){ return x.id===id; }); if(!o) return; var h = hotelOf(o.hotelId), can = canWriteKey(HOTEL_ORDERS_KEY) && canWriteKey(SALES_KEY);
+  var sheet = tfOpenSheet('<h2 class="serif">🏨 H-'+o.no+' · <span class="notr">'+esc(h?h.name:"Hotel")+'</span></h2>'+
+    '<div class="card">'+(o.items||[]).map(function(i){ return '<div class="psrow"><span class="notr">'+i.qty+'× '+esc(i.name)+'</span><b>'+rupee(i.qty*i.price)+'</b></div>'; }).join("")+'<div class="psrow tot"><span><b>Total</b></span><b>'+rupee(o.total)+'</b></div>'+
+    '<div class="psrow"><span>'+esc(o.date)+' '+esc(o.time||"")+(o.room?' · Room '+esc(o.room):'')+'</span><b>'+(o.status==="cancelled"?'<span class="bad">Cancelled</span>':o.mode==="Credit"?'On account':esc(o.mode))+'</b></div></div>'+
+    '<div class="sheetbtns"><button class="btn-cancel" id="hv_close">Close</button>'+(can && o.status!=="cancelled" && o.date===fmtDate(new Date()) ? '<button class="btn-additem" id="hv_cx" style="color:#A6402D;">❌ Cancel order</button>' : '')+'</div>');
+  sheet.querySelector("#hv_close").addEventListener("click", closeForm);
+  var cx = sheet.querySelector("#hv_cx"); if(cx) cx.addEventListener("click", function(){ askConfirm("Cancel H-"+o.no+"? Its bill is removed.", function(){
+    o.status = "cancelled"; o.cancelledBy = myName()||"Owner"; o.cancelledAt = Date.now();
+    var s = sales.find(function(x){ return x.id===o.saleId; });
+    if(s){ if(canWriteKey(CHECKS_KEY)){ checks.push({ id:uid(), kind:"void", date:s.date, time:nowHM(), billNo:s.order ? s.order.no : "", amount:saleTotal(s), items:"Hotel H-"+o.no+": "+(o.items||[]).map(function(i){ return i.qty+"× "+i.name; }).join(", "), mode:s.mode, byName:myName()||"Owner" }); saveChecks(); }
+      sales = sales.filter(function(x){ return x.id!==s.id; }); dishLog = dishLog.filter(function(d){ return d.orderId!==s.id; }); saveSales(); saveDishLog(); }
+    var tk = liveOrders.find(function(t){ return t.saleId===o.saleId && t.status!=="done"; }); if(tk){ tk.status = "cancelled"; tLog(tk, "cancelled"); saveLive(); }
+    saveHotelOrders(); closeForm(); renderAll(); }); });
+}
+function hotelStatementPdf(h, mKey, btn){
+  if(!h) return; var label = btn ? btn.textContent : ""; if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var ords = hotelOrders.filter(function(o){ return o.hotelId===h.id && o.status!=="cancelled" && o.date.slice(0,7)===mKey; }).sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
+    var c = customers.find(function(x){ return String(x.name||"").trim().toLowerCase()===String(h.name).trim().toLowerCase(); });
+    var pays = c ? creditPayments.filter(function(p){ return p.customerId===c.id && String(p.date||"").slice(0,7)===mKey; }) : [];
+    var doc = new window.jspdf.jsPDF({ unit:"pt", format:"a4" }), M = 40, y = 46, teal = [31,92,82], tot = ords.reduce(function(a,o){ return a+(+o.total||0); },0);
+    doc.setFont("helvetica","bold"); doc.setFontSize(17); doc.setTextColor(36,26,18); doc.text(pdfClean(OUTLET.name), M, y); y += 18;
+    doc.setFont("helvetica","normal"); doc.setFontSize(11); doc.setTextColor(91,80,68); doc.text("Statement for "+pdfClean(h.name)+" - "+monthLabel(mKey), M, y); y += 14;
+    doc.setFontSize(9); doc.text("Orders: "+ords.length+"   |   Total: "+pdfMoneyP(tot)+"   |   Due now: "+pdfMoneyP(hotelDue(h)), M, y); y += 14;
+    doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Date","Order","Room","Items","Paid","Amount"]], headStyles:{ fillColor:teal, textColor:255, fontStyle:"bold" },
+      styles:{ fontSize:8.5, cellPadding:3.3, overflow:"linebreak" }, columnStyles:{ 0:{cellWidth:60}, 1:{cellWidth:40}, 2:{cellWidth:40}, 4:{cellWidth:56}, 5:{halign:"right",cellWidth:70} },
+      body: ords.length ? ords.map(function(o){ return [pdfDate(o.date), "H-"+o.no, pdfClean(o.room||""), pdfClean((o.items||[]).map(function(i){ return i.qty+"x "+i.name; }).join(", ")), o.mode==="Credit"?"Account":pdfClean(o.mode), pdfMoneyP(o.total)]; }) : [["","","","No orders this month","",""]] });
+    y = doc.lastAutoTable.finalY + 14;
+    if(pays.length) doc.autoTable({ startY:y, margin:{left:M,right:M}, head:[["Payments received","Mode","Amount"]], headStyles:{ fillColor:teal, textColor:255 }, styles:{ fontSize:9 }, columnStyles:{ 2:{halign:"right"} },
+      body: pays.map(function(p){ return [pdfDate(p.date), pdfClean(p.mode||""), pdfMoneyP(p.amount)]; }) });
+    pdfFooter(doc, OUTLET.name+" - "+h.name+" statement "+monthLabel(mKey));
+    done(); sharePdf(doc, (h.name+"_Statement_"+mKey).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
+  }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
+}
+
 // ---------- ORDER TYPES & LIVE ORDERS ----------
 // Dine-in (table, bill at the end), Takeaway (pay first), Delivery (own rider; pay now or cash on
 // delivery), Zomato and Swiggy (entered from the partner app with the platform's order ID).
@@ -10976,8 +11682,11 @@ var counterTable = null, counterTicket = null, counterMeta = {};
 function releaseCounterTicket(){ counterTicket = null; counterOrder = {}; counterDisc = null; counterMeta = {}; }
 function setCounterType(t){ counterType = t; counterTable = null; counterTicket = null; counterMeta = {}; try{ localStorage.setItem(TYPE_KEY, t); }catch(e){} }
 function isPlatform(t){ return !!(CHANNELS[t] && CHANNELS[t].platform); }
-// Zomato / Swiggy are switched off (the owner removed them); the code stays for a future direct link.
-function platformCfg(p){ var c = (settings.platforms||{})[p] || {}; return { enabled: c.enabled===true && false, commission: c.commission===0 || +c.commission>0 ? +c.commission : 25, markup: +c.markup||0, packing: +c.packing||0, prep: +c.prep>0 ? +c.prep : 15 }; }
+// Takeaway details: under Takeaway the counter can pick 🧍 Customer (name + phone), 🔴 Zomato or 🟠 Swiggy
+// (order ID, commission, payout). Each one has its own switch per outlet (settings.takeawaySrc); all off = plain takeaway.
+function takeSrcOn(k){ return !!((settings.takeawaySrc||{})[k]); }
+var counterSrc = "walk";
+function platformCfg(p){ var c = (settings.platforms||{})[p] || {}; return { enabled: takeSrcOn(p), commission: c.commission===0 || +c.commission>0 ? +c.commission : 25, markup: +c.markup||0, packing: +c.packing||0, prep: +c.prep>0 ? +c.prep : 15 }; }
 // Indoor / outdoor for each table: set in the table editor, else guessed from the name.
 function tableZone(t){ var z = (settings.tableZones||{})[t]; if(z==="in" || z==="out") return z; return /out|outside|bahar|बाहर|terrace|garden|lawn|patio|footpath/i.test(t||"") ? "out" : "in"; }
 function tableNo(t){ var m = String(t||"").match(/(\d+)\s*$/) || String(t||"").match(/(\d+)/); return m ? m[1] : String(t||"").trim().charAt(0).toUpperCase(); }
@@ -11148,8 +11857,19 @@ function counterTypeHtml(){
   // An order billed, paid or cancelled on another phone must not keep this Counter stuck.
   if(counterTicket){ var held = liveOrders.find(function(x){ return x.id===counterTicket; }); if(!held || held.paid || held.status==="done" || held.status==="cancelled") releaseCounterTicket(); }
   if(isPlatform(counterType) && !platformCfg(counterType).enabled && !counterTicket) setCounterType("take");
-  var html = '<div class="ctype">'+Object.keys(CHANNELS).filter(function(k){ return !CHANNELS[k].platform || platformCfg(k).enabled; }).map(function(k){
-    var c = CHANNELS[k]; return '<button data-ctype="'+k+'" class="'+k+(counterType===k?" on":"")+'"><span>'+c.i+'</span>'+c.t+'</button>'; }).join("")+'</div>';
+  var html = '<div class="ctype">'+Object.keys(CHANNELS).filter(function(k){ return !CHANNELS[k].platform; }).map(function(k){
+    var c = CHANNELS[k]; return '<button data-ctype="'+k+'" class="'+k+(counterType===k || (k==="take" && isPlatform(counterType))?" on":"")+'"><span>'+c.i+'</span>'+c.t+'</button>'; }).join("")+'</div>';
+  var plats = ["zomato","swiggy"].filter(function(k){ return platformCfg(k).enabled; });
+  if(counterSrc==="customer" && !takeSrcOn("customer")) counterSrc = "walk";
+  if((counterType==="take" || isPlatform(counterType)) && !counterTicket && (plats.length || takeSrcOn("customer"))){
+    var srcNow = isPlatform(counterType) ? counterType : counterSrc;
+    html += '<div class="tsrc"><span class="tsrcl">Takeaway for · किसका</span>'+
+      '<button data-tsrc="walk" class="'+(srcNow==="walk"?"on":"")+'">🛍️ Counter</button>'+
+      (takeSrcOn("customer") ? '<button data-tsrc="customer" class="'+(srcNow==="customer"?"on":"")+'">🧍 Customer</button>' : '')+
+      plats.map(function(k){ return '<button data-ctype="'+k+'" class="'+k+(srcNow===k?" on":"")+'">'+CHANNELS[k].i+' '+CHANNELS[k].t+'</button>'; }).join("")+'</div>';
+    if(counterType==="take" && counterSrc==="customer")
+      html += '<div class="field two tcust"><div><input id="ct_cname" placeholder="Customer name · नाम" value="'+esc(counterMeta.cname||"")+'" autocomplete="off"></div><div><input id="ct_cphone" inputmode="tel" placeholder="Phone (optional)" value="'+esc(counterMeta.phone||"")+'" autocomplete="off"></div></div>';
+  }
   if(counterType==="dine" && !counterTicket){
     html += '<div class="ctables">'+cafeTables().map(function(tb){ var o = openTicketFor(tb);
       var z = tableZone(tb);
@@ -11165,7 +11885,10 @@ function counterTypeHtml(){
   return html;
 }
 function wireCounterType(el){
-  Array.prototype.forEach.call(el.querySelectorAll("[data-ctype]"), function(b){ b.addEventListener("click", function(){ if(counterTicket) releaseCounterTicket(); setCounterType(b.getAttribute("data-ctype")); renderCounter(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ctype]"), function(b){ b.addEventListener("click", function(){ if(counterTicket) releaseCounterTicket(); var keep = counterType==="take" && b.getAttribute("data-ctype")==="take" ? { cname:counterMeta.cname, phone:counterMeta.phone } : null; setCounterType(b.getAttribute("data-ctype")); if(keep) Object.assign(counterMeta, keep); renderCounter(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-tsrc]"), function(b){ b.addEventListener("click", function(){ counterSrc = b.getAttribute("data-tsrc"); if(counterType!=="take") setCounterType("take"); if(counterSrc!=="customer"){ delete counterMeta.cname; delete counterMeta.phone; } renderCounter(); }); });
+  var cn = el.querySelector("#ct_cname"); if(cn) cn.addEventListener("input", function(){ counterMeta.cname = cn.value.trim(); });
+  var cp = el.querySelector("#ct_cphone"); if(cp) cp.addEventListener("input", function(){ counterMeta.phone = cp.value.replace(/[^\d+]/g,""); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-table]"), function(b){ b.addEventListener("click", function(){ var tb = b.getAttribute("data-table"); counterTable = counterTable===tb ? null : tb; renderCounter(); }); });
   var te = el.querySelector("#ct_tables"); if(te) te.addEventListener("click", function(){ openTablesEditor(null); });
   var tcx = el.querySelector("#ct_tabcx"); if(tcx) tcx.addEventListener("click", function(ev){ ev.preventDefault(); cancelTab(heldTab()); });
@@ -11498,6 +12221,9 @@ function renderCounter(){
     '<button id="ct_bills">🧾 Today’s bills</button>'+
     (parkingOn() && canReadKey(PARK_KEY) ? '<button id="ct_park">🅿️ Parking ('+parking.filter(function(p){ return p.status==="in"; }).length+')</button>' : '')+
     (storeOn() && canReadKey(STORE_ITEMS_KEY) ? '<button id="ct_store">🛍️ Store bill</button>' : '')+
+    (tiffinOn() && canReadKey(TF_SUBS_KEY) ? '<button id="ct_tiffin">🍱 Tiffin</button>' : '')+
+    (cateringOn() && canReadKey(CATER_ORDERS_KEY) ? '<button id="ct_cater">🎉 Party orders</button>' : '')+
+    (hotelsOn() && canReadKey(HOTEL_ORDERS_KEY) ? '<button id="ct_hotel">🏨 Hotel order</button>' : '')+
     (canWriteKey(LIVE_KEY) && waiterOn() ? (function(){ var wm = waiterMode(), wn = wm ? waiterTasks(wm!=="all"?wm:"").length : waiterTasks("").length; return '<button id="ct_waiter" class="'+(wm?"on":"")+(wn?" warn":"")+'">🛎️ Waiter'+(wn?' ('+wn+')':'')+(wm?' · 🔔':'')+'</button>'; })() : '')+
     (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checksInUse() && checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
@@ -11547,6 +12273,7 @@ function wireCounterTools(el){
   var lv = document.getElementById("ct_live"); if(lv) lv.addEventListener("click", function(){ openLiveOrders(false); });
   var rsh = document.getElementById("ct_rush"); if(rsh) rsh.addEventListener("click", function(){ setRush(!rushOn()); releaseCounterTicket(); counterTable = null; if(rushOn()) counterType = "take"; renderCounter();
     if(rushOn()) appAlert("⚡ Rush hour ON on this phone: tap items, then 💳 Pay now (token) or ⏸️ Pay later. No tables or kitchen steps. Tap ⚡ again to switch off."); });
+  [["ct_tiffin","tiffin"],["ct_cater","catering"],["ct_hotel","hotels"]].forEach(function(x){ var b = document.getElementById(x[0]); if(b) b.addEventListener("click", function(){ showView("records"); switchRecordsSub(x[1]); }); });
   var cpk = document.getElementById("ct_park"); if(cpk) cpk.addEventListener("click", function(){ showView("records"); switchRecordsSub("parking"); });
   var cst = document.getElementById("ct_store"); if(cst) cst.addEventListener("click", function(){ storeSub = "bill"; showView("records"); switchRecordsSub("store"); });
   var wb = document.getElementById("ct_waiter"); if(wb) wb.addEventListener("click", function(){ waiterUnlockSound(); openWaiterSheet(); });
@@ -11576,14 +12303,21 @@ function openUpiSettings(){
     html += '<div class="dgroup">Extra businesses at '+esc(OUTLET.name||"this outlet")+'</div>'+
       '<div class="field two"><div><label>🅿️ Parking</label><select id="up_park"><option value="off"'+(!parkingOn()?' selected':'')+'>Off</option><option value="on"'+(parkingOn()?' selected':'')+'>On — vehicle parking</option></select></div>'+
       '<div><label>🛍️ General store</label><select id="up_store"><option value="off"'+(!storeOn()?' selected':'')+'>Off</option><option value="on"'+(storeOn()?' selected':'')+'>On — separate store</option></select></div></div>'+
+      '<div class="field three"><div><label>🍱 Tiffin service</label><select id="up_tiffin"><option value="off"'+(!tiffinOn()?' selected':'')+'>Off</option><option value="on"'+(tiffinOn()?' selected':'')+'>On</option></select></div>'+
+      '<div><label>🎉 Party catering</label><select id="up_cater"><option value="off"'+(!cateringOn()?' selected':'')+'>Off</option><option value="on"'+(cateringOn()?' selected':'')+'>On</option></select></div>'+
+      '<div><label>🏨 Hotel orders</label><select id="up_hotels"><option value="off"'+(!hotelsOn()?' selected':'')+'>Off</option><option value="on"'+(hotelsOn()?' selected':'')+'>On</option></select></div></div>'+
       '<div class="backupnote" style="margin:-4px 0 8px;">Most outlets keep these off. When on, Records gets a Parking / Store tab and the Counter a button for it.</div>';
     html += '<div class="dgroup">Order types</div>'+
       '<div class="field"><label>Dine-in service at '+esc(OUTLET.name||"this outlet")+'</label><select id="up_waiter"><option value="on"'+(waiterOn()?' selected':'')+'>🛎️ Waiters serve at the tables (waiter alerts on)</option><option value="off"'+(!waiterOn()?' selected':'')+'>🙋 Self service — customers collect at the counter</option></select>'+
       '<div class="backupnote" style="margin:4px 0 0;">Self service hides the 🛎️ Waiter button and its alerts on every phone of this outlet; the kitchen guide says “call the customer to collect” instead.</div></div>'+
       '<div class="psrow"><span>Tables: '+esc(cafeTables().join(", "))+'</span><button class="btn-additem" id="up_tables" style="width:auto;padding:6px 12px;">✏️ Edit tables</button></div>'+
-      '<div class="field"><label>Own delivery charge (₹)</label><input id="up_dcharge" type="number" inputmode="numeric" value="'+esc(deliveryCharge())+'"></div>';
+      '<div class="field"><label>Own delivery charge (₹)</label><input id="up_dcharge" type="number" inputmode="numeric" value="'+esc(deliveryCharge())+'"></div>'+
+      '<div class="dgroup">Takeaway details</div><div class="backupnote" style="margin-top:0;">Turn on the ones this outlet uses. They show as choices under 🛍️ Takeaway. All off = plain takeaway.</div>'+
+      [["customer","🧍 Customer — name and phone on the bill"],["zomato","🔴 Zomato — order ID, commission, payout"],["swiggy","🟠 Swiggy — order ID, commission, payout"]].map(function(x){
+        return '<label class="poclose"><input type="checkbox" id="up_ts_'+x[0]+'"'+(takeSrcOn(x[0])?' checked':'')+'> '+x[1]+'</label>'+
+          (x[0]!=="customer" ? '<div class="field two" style="margin:-2px 0 8px 26px;"><div><label>Commission %</label><input id="up_pc_'+x[0]+'" type="number" inputmode="decimal" value="'+esc(platformCfg(x[0]).commission)+'"></div><div><label>Packing ₹</label><input id="up_pp_'+x[0]+'" type="number" inputmode="decimal" value="'+esc(platformCfg(x[0]).packing)+'"></div></div>' : ''); }).join("");
     html += '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
-    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge","up_waiter","up_park","up_store"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
+    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge","up_waiter","up_park","up_store","up_tiffin","up_cater","up_hotels","up_pc_zomato","up_pp_zomato","up_pc_swiggy","up_pp_swiggy"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     Object.keys(keep).forEach(function(k){ var e = document.getElementById(k); if(e) e.value = keep[k]; });
     function err(m){ var e = document.getElementById("up_err"); e.textContent = m; e.style.display = "block"; }
@@ -11605,7 +12339,13 @@ function openUpiSettings(){
       settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx;
       var dc = parseFloat(document.getElementById("up_dcharge").value); settings.deliveryCharge = dc>=0 ? dc : 0;
       settings.waiterService = document.getElementById("up_waiter").value !== "off";
+      var ts = {}; ["customer","zomato","swiggy"].forEach(function(k){ ts[k] = document.getElementById("up_ts_"+k).checked; }); settings.takeawaySrc = ts;
+      var pl = Object.assign({}, settings.platforms||{});
+      ["zomato","swiggy"].forEach(function(k){ var c = Object.assign({}, pl[k]||{}), cm = parseFloat(document.getElementById("up_pc_"+k).value), pk = parseFloat(document.getElementById("up_pp_"+k).value);
+        if(cm>=0 && cm<=60) c.commission = cm; c.packing = pk>=0 ? pk : 0; pl[k] = c; });
+      settings.platforms = pl;
       settings.parkingOn = document.getElementById("up_park").value === "on"; settings.storeOn = document.getElementById("up_store").value === "on";
+      settings.tiffinOn = document.getElementById("up_tiffin").value === "on"; settings.cateringOn = document.getElementById("up_cater").value === "on"; settings.hotelsOn = document.getElementById("up_hotels").value === "on";
       saveSettings();
       if(canOffers){ offers = offs; saveOffers(); }
       closeForm(); renderCounter();
@@ -11734,11 +12474,12 @@ function finishCounterBill(mode, customer, given, plat){
   var charge = counterType==="delivery" ? (+counterMeta.charge||0) : 0;
   var sub = orderTotal(), disc = plat ? 0 : discountAmt(sub), total = plat ? (plat.gross - plat.commission) : sub - disc + charge;
   var tk = counterTicket ? liveOrders.find(function(x){ return x.id===counterTicket; }) : null;
-  var rec = { id:id, date:day, customer: customer || (plat ? CHANNELS[plat.platform].t+" #"+plat.pid : counterType==="delivery" && counterMeta.cname ? counterMeta.cname : "Counter"), desc:"", amount:total, gst:0, mode:mode,
+  var rec = { id:id, date:day, customer: customer || (plat ? CHANNELS[plat.platform].t+" #"+plat.pid : (counterType==="delivery" || counterType==="take") && counterMeta.cname ? counterMeta.cname : "Counter"), desc:"", amount:total, gst:0, mode:mode,
               order:{ no:no, time:("0"+now.getHours()).slice(-2)+":"+("0"+now.getMinutes()).slice(-2), items:items, given: given||0, type:counterType } };
   if(counterTable) rec.order.table = counterTable;
   if(charge) rec.order.deliveryCharge = charge;
   if(counterType==="delivery"){ rec.order.address = counterMeta.address||""; rec.order.phone = counterMeta.phone||""; }
+  if(counterType==="take" && counterMeta.cname){ rec.order.src = "customer"; if(counterMeta.phone) rec.order.phone = counterMeta.phone; }
   if(plat){ Object.assign(rec.order, { platform:plat.platform, pid:plat.pid, gross:plat.gross, commission:plat.commission, packing:plat.packing }); }
   if(disc){ rec.order.subtotal = sub; rec.order.discount = disc; rec.order.discountLabel = counterDisc.label; if(counterDisc.offer) rec.order.offerId = counterDisc.offer; }
   rec.desc = (CHANNELS[counterType] ? CHANNELS[counterType].t+" · " : "")+"Bill "+no+": "+billText(rec)+(disc ? " · discount "+rupee(disc) : "")+(plat ? " · "+CHANNELS[plat.platform].t+" #"+plat.pid+", customer paid "+rupee(plat.gross)+", commission ~"+rupee(plat.commission) : "");
