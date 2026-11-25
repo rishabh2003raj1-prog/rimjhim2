@@ -548,6 +548,33 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### 🧑‍🍳 Staff details (Staff → Team → ✏️ Edit)
+Each staff member has: **name, mobile number, age** (typed, or worked out from the date of birth), **address**, **ID
+proof** (Aadhaar / Voter ID / PAN / Driving licence / Passport / Ration card / Other) with its number (an Aadhaar
+must have 12 digits) and **photos of the front and back**, **date and time of joining**, **salary**, **bonus** (amount
+and what it is for, e.g. Diwali), **paid leave days a month** (blank = the shop rule; used in the salary
+calculation), **duty hours** (from–to, hours shown) and **weekly off**, **scope of work**, **lock-in period**
+(months; the end date is shown) and **notice period** (days). The profile shows them all with the ID photos.
+Salary, bonus and paid leave are seen and changed by the owner / partners only (the server keeps them from managers);
+ID numbers are shown masked to anyone but the owner / partners; counter and kitchen logins never get these details.
+
+### 🙂 Attendance with face and location check
+- **Register the face** (owner / manager): staff profile → **📷 Register face**: three photos with the front camera.
+  The phone turns the face into 128 numbers (face-api, MIT licence, in `public/vendor/faceapi`; it runs on the phone
+  and no photo goes to any other company). The numbers and one photo are kept on the staff record (never sent to
+  counter / kitchen logins).
+- **Set the cafe location**: Staff → Attendance → **📍 Set cafe location** while standing in the cafe, and the
+  allowed distance (default 100 m).
+- **Check in / out**: Staff → Attendance → **🙂 Face check-in / out**, or **🙂 Staff check-in** on the Counter, on any
+  cafe phone. Tap your name, look at the camera, tap 📸. The phone sends the face numbers, its GPS and the selfie to
+  the server (`POST /api/checkin`), which compares the face with the registered one (distance < 0.5) and the
+  GPS with the cafe (distance − GPS accuracy ≤ allowed distance). The first tap of the day is **In**, the next
+  **Out**; a second tap within a minute is refused. Times use Indian time.
+- **Result**: a check-in that passes both checks marks the day **Present** ("🙂 by face"), unless a person already
+  set a status. A failed check is saved and flagged but attendance is not marked. Attendance shows a badge per check-in
+  (🟢 In 09:02 🙂✓ 📍✓, red when a check fails); tap it to see the selfie next to the registered photo, how alike
+  they are, the distance and a map link. Check-ins are kept 120 days (`checkins_v1`, written only by the server).
+
 ### 🛍️ Takeaway details: Customer / Zomato / Swiggy
 Counter → ⚙️ Settings → **Takeaway details** has a switch for each (per outlet, `settings.takeawaySrc`), all off by
 default. Each one that is on shows as a choice under 🛍️ Takeaway: **🛍️ Counter** (plain), **🧍 Customer** (name and

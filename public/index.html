@@ -259,6 +259,15 @@
   .ctables button.tbedit{border-style:dashed;}
   .surow{display:flex;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);} .surow > b{width:26px;height:26px;border-radius:13px;flex:0 0 26px;display:flex;align-items:center;justify-content:center;background:#EFE8D8;font-size:13px;}
   .surow.done > b{background:#2E7D4F;color:#fff;} .surow.done .who{text-decoration:line-through;color:var(--ink-soft);} .surow > div{flex:1;min-width:0;}
+  .camwrap{position:relative;border-radius:16px;overflow:hidden;background:#111;aspect-ratio:3/4;max-height:56vh;margin:8px auto;} .camwrap video{width:100%;height:100%;object-fit:cover;transform:scaleX(-1);}
+  .camoval{position:absolute;left:18%;right:18%;top:12%;bottom:18%;border:3px dashed rgba(255,255,255,.75);border-radius:50%;}
+  .ckpeople{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;} .ckpeople button{text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:14px;padding:12px;font:inherit;}
+  .ckpeople button b{display:block;font-size:16px;} .ckpeople button span{font-size:12px;color:var(--ink-soft);} .ckpeople button i{display:block;font-size:11px;color:#A6402D;font-style:normal;} .ckpeople button.in{border-color:#2E7D4F;background:#EEF7F1;}
+  .attname:has(.ckrow){flex-wrap:wrap;} .ckrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;flex-basis:100%;} .ckb{font-size:11.5px;border-radius:999px;padding:2px 8px;cursor:pointer;border:1px solid;} .ckb.ok{color:#2E7D4F;border-color:#9FD0B2;background:#EEF7F1;} .ckb.bad{color:#A6402D;border-color:#E3B1A6;background:#FBEDEA;}
+  .ckphotos{display:flex;gap:8px;} .ckphotos figure{flex:1;margin:0;text-align:center;font-size:12px;color:var(--ink-soft);} .ckphotos img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:12px;}
+  .ckdone .tokbig{font-size:54px;} .ckdone.bad .tokbig{color:#A6402D;}
+  .sidphotos{display:flex;gap:8px;} .sidph{flex:1;height:96px;border:1.5px dashed var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;cursor:pointer;font-size:13px;color:var(--ink-soft);}
+  .sidph img{width:100%;height:100%;object-fit:cover;}
   .tfdays{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;} .tfdays button,.tfopts button,.tfsug button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font:inherit;font-size:13.5px;font-weight:600;}
   .tfdays button.on,.tfopts button.on{background:var(--teal,#1F5C52);border-color:var(--teal,#1F5C52);color:#fff;}
   .tfopts{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:6px;} .tfopts button{font-size:15px;padding:10px 14px;}
@@ -1223,8 +1232,8 @@ var parking = [], storeItems = [], storeSales = [], storeBuys = [];
 var SYNC_KEYS = [SALES_KEY, PURCH_KEY, NOTES_KEY, INVEST_KEY, EXPENSE_KEY, PARTNERS_KEY, BILLS_KEY, CASH_KEY, CAFEUSE_KEY,
   PAYROLL_KEY, CASHMOVE_KEY, LOANS_KEY, RETAIL_KEY, RSALE_KEY, WASTE_KEY, PREP_KEY, AUDIT_KEY, CUST_KEY, CUSTPAY_KEY, OFFERS_KEY, CREDPAY_KEY, ASSETS_KEY,
   VENDORS_KEY, MENU_KEY, ING_KEY, DISH_KEY, SETTINGS_KEY, STAFF_KEY, ROSTER_KEY, ATTEND_KEY, TASKS_KEY, CONDUCT_KEY, CHECKS_KEY, POS_KEY, LIVE_KEY, PARK_KEY, STORE_ITEMS_KEY, STORE_SALES_KEY, STORE_BUYS_KEY,
-  "tiffinplans_v1", "tiffinsubs_v1", "tiffinmenu_v1", "tiffinpicks_v1", "catermenu_v1", "caterorders_v1", "hotels_v1", "hotelorders_v1"];
-var PHOTO_FIELDS = {}; PHOTO_FIELDS["parking_v1"] = "photo"; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo";
+  "tiffinplans_v1", "tiffinsubs_v1", "tiffinmenu_v1", "tiffinpicks_v1", "catermenu_v1", "caterorders_v1", "hotels_v1", "hotelorders_v1", "checkins_v1"];
+var PHOTO_FIELDS = {}; PHOTO_FIELDS["parking_v1"] = "photo"; PHOTO_FIELDS[BILLS_KEY] = "image"; PHOTO_FIELDS[ASSETS_KEY] = "photo"; PHOTO_FIELDS[MENU_KEY] = "photo"; PHOTO_FIELDS[ING_KEY] = "photo"; PHOTO_FIELDS["staff_v1"] = "idPhoto";
 // Every place in a list that can hold a photo: the item's own field, and for menu
 // items each SOP step's photo too.
 function photoSlots(key, list){
@@ -1234,6 +1243,7 @@ function photoSlots(key, list){
     if(!x) return;
     out.push([x, field]);
     if(key===MENU_KEY && Array.isArray(x.sop)) x.sop.forEach(function(st){ if(st) out.push([st, "photo"]); });
+    if(key===STAFF_KEY){ out.push([x, "idPhoto2"]); out.push([x, "facePhoto"]); }
     if(key===PARK_KEY && Array.isArray(x.pics)) x.pics.forEach(function(pc){ if(pc) out.push([pc, "src"]); });
   });
   return out;
@@ -1468,7 +1478,7 @@ function setKeyValue(key, v){
     case PARK_KEY: parking = arr; break;            case STORE_ITEMS_KEY: storeItems = arr; break;
     case STORE_SALES_KEY: storeSales = arr; break;  case STORE_BUYS_KEY: storeBuys = arr; break;
     case "tiffinplans_v1": tiffinPlans = arr; break; case "tiffinsubs_v1": tiffinSubs = arr; break; case "tiffinmenu_v1": tiffinMenu = arr; break; case "tiffinpicks_v1": tiffinPicks = arr; break;
-    case "catermenu_v1": caterMenu = arr; break;    case "caterorders_v1": caterOrders = arr; break; case "hotels_v1": hotels = arr; break; case "hotelorders_v1": hotelOrders = arr; break;
+    case "catermenu_v1": caterMenu = arr; break;    case "caterorders_v1": caterOrders = arr; break; case "hotels_v1": hotels = arr; break; case "hotelorders_v1": hotelOrders = arr; break; case "checkins_v1": checkins = arr; break;
     case WASTE_KEY: wastage = arr; break;           case PREP_KEY: prepBatches = arr; break;
     case AUDIT_KEY: stockAudits = arr; break;       case CUST_KEY: customers = arr; break;
     case CUSTPAY_KEY: custPayments = arr; break;    case OFFERS_KEY: offers = arr; break;  case CHECKS_KEY: checks = arr; break;  case POS_KEY: pos = arr; break;  case LIVE_KEY: liveOrders = arr; break;
@@ -2399,7 +2409,7 @@ function readLists(){
   wastage = Array.isArray(wa) ? wa : [];
   prepBatches = Array.isArray(pb) ? pb : [];
   stockAudits = Array.isArray(au) ? au : [];
-  [[PARK_KEY,"parking"],[STORE_ITEMS_KEY,"storeItems"],[STORE_SALES_KEY,"storeSales"],[STORE_BUYS_KEY,"storeBuys"],["tiffinplans_v1"],["tiffinsubs_v1"],["tiffinmenu_v1"],["tiffinpicks_v1"],["catermenu_v1"],["caterorders_v1"],["hotels_v1"],["hotelorders_v1"]].forEach(function(x){ var v = lsGet(x[0]); setKeyValue(x[0], Array.isArray(v) ? v : []); });
+  [[PARK_KEY,"parking"],[STORE_ITEMS_KEY,"storeItems"],[STORE_SALES_KEY,"storeSales"],[STORE_BUYS_KEY,"storeBuys"],["tiffinplans_v1"],["tiffinsubs_v1"],["tiffinmenu_v1"],["tiffinpicks_v1"],["catermenu_v1"],["caterorders_v1"],["hotels_v1"],["hotelorders_v1"],["checkins_v1"]].forEach(function(x){ var v = lsGet(x[0]); setKeyValue(x[0], Array.isArray(v) ? v : []); });
   var rt = lsGet(RETAIL_KEY), rs = lsGet(RSALE_KEY);
   retailItems = Array.isArray(rt) ? rt : [];
   retailSales = Array.isArray(rs) ? rs : [];
@@ -4708,7 +4718,7 @@ function openBackupSheet(){
 }
 
 function backupPayload(){
-  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, parking:parking, storeItems:storeItems, storeSales:storeSales, storeBuys:storeBuys, tiffinPlans:tiffinPlans, tiffinSubs:tiffinSubs, tiffinMenu:tiffinMenu, tiffinPicks:tiffinPicks, caterMenu:caterMenu, caterOrders:caterOrders, hotels:hotels, hotelOrders:hotelOrders, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos, liveOrders:liveOrders };
+  return { exportedAt: new Date().toISOString(), sales:sales, purchases:purchases, investments:investments, expenses:expenses, notes:notes, partners:PARTNERS, bills:bills, staff:staff, roster:roster, attendance:attendance, tasks:tasks, conduct:conduct, cashDays:cashDays, settings:settings, menuItems:menuItems, ingredients:ingredients, dishLog:dishLog, vendors:vendors, assets:assets, customers:customers, custPayments:custPayments, offers:offers, creditPayments:creditPayments, wastage:wastage, prepBatches:prepBatches, stockAudits:stockAudits, parking:parking, storeItems:storeItems, storeSales:storeSales, storeBuys:storeBuys, tiffinPlans:tiffinPlans, tiffinSubs:tiffinSubs, tiffinMenu:tiffinMenu, tiffinPicks:tiffinPicks, caterMenu:caterMenu, caterOrders:caterOrders, hotels:hotels, hotelOrders:hotelOrders, checkins:checkins, retailItems:retailItems, retailSales:retailSales, cafeUse:cafeUse, payroll:payroll, cashMoves:cashMoves, loans:loans, checks:checks, pos:pos, liveOrders:liveOrders };
 }
 
 function exportBackup(){
@@ -4885,7 +4895,7 @@ function applyBackupData(data, errEl, partial){
     prepBatches = take("prepBatches", prepBatches); stockAudits = take("stockAudits", stockAudits);
     parking = take("parking", parking); storeItems = take("storeItems", storeItems); storeSales = take("storeSales", storeSales); storeBuys = take("storeBuys", storeBuys);
     tiffinPlans = take("tiffinPlans", tiffinPlans); tiffinSubs = take("tiffinSubs", tiffinSubs); tiffinMenu = take("tiffinMenu", tiffinMenu); tiffinPicks = take("tiffinPicks", tiffinPicks);
-    caterMenu = take("caterMenu", caterMenu); caterOrders = take("caterOrders", caterOrders); hotels = take("hotels", hotels); hotelOrders = take("hotelOrders", hotelOrders);
+    caterMenu = take("caterMenu", caterMenu); caterOrders = take("caterOrders", caterOrders); hotels = take("hotels", hotels); hotelOrders = take("hotelOrders", hotelOrders); checkins = take("checkins", checkins);
     retailItems = take("retailItems", retailItems); retailSales = take("retailSales", retailSales);
     cafeUse = take("cafeUse", cafeUse); custPayments = take("custPayments", custPayments);
     payroll = take("payroll", payroll);
@@ -11667,6 +11677,144 @@ function hotelStatementPdf(h, mKey, btn){
   }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
 }
 
+// ---------- 🙂 FACE + LOCATION ATTENDANCE ----------
+// Staff check in / out on any cafe phone: tap your name, take a selfie. The phone turns the face
+// into numbers (face-api, runs on the phone; nothing goes to another company) and reads its GPS.
+// The server compares the face with the one registered by the owner / manager and the GPS with the
+// cafe's location, saves the check-in with the selfie, and marks the day Present when both pass.
+var CHECKIN_KEY = "checkins_v1", checkins = [];
+function saveCheckins(){ return lsSet(CHECKIN_KEY, checkins); }
+var FACE_DIR = "vendor/faceapi";
+function faceLib(){
+  if(window.__faceReady) return window.__faceReady;
+  window.__faceReady = (window.faceapi ? Promise.resolve() : loadScript(FACE_DIR+"/face-api.js")).then(function(){
+    return Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(FACE_DIR), faceapi.nets.faceLandmark68TinyNet.loadFromUri(FACE_DIR), faceapi.nets.faceRecognitionNet.loadFromUri(FACE_DIR)]);
+  }).catch(function(e){ window.__faceReady = null; throw e; });
+  return window.__faceReady;
+}
+// Face numbers from a photo (null = no face found). Tests replace this.
+var faceDescriptor = function(canvas){
+  return faceLib().then(function(){
+    return faceapi.detectSingleFace(canvas, new faceapi.TinyFaceDetectorOptions({ inputSize:320, scoreThreshold:0.5 })).withFaceLandmarks(true).withFaceDescriptor();
+  }).then(function(r){ return r ? { desc: Array.prototype.map.call(r.descriptor, function(v){ return Math.round(v*10000)/10000; }), score: Math.round(r.detection.score*100)/100 } : null; });
+};
+var getLocation = function(){
+  return new Promise(function(res){
+    if(!navigator.geolocation) return res({ error:"This phone can't share its location." });
+    navigator.geolocation.getCurrentPosition(function(p){ res({ lat:p.coords.latitude, lng:p.coords.longitude, acc:Math.round(p.coords.accuracy||0) }); },
+      function(e){ res({ error: e && e.code===1 ? "Location is blocked. Allow location for this app in the phone settings." : "Couldn't get the location. Go near a window or turn on GPS." }); },
+      { enableHighAccuracy:true, timeout:15000, maximumAge:20000 });
+  });
+};
+// Front camera in a sheet; onShot(canvas) gets a 480px photo.
+function openCamera(title, hint, onShot, onBack){
+  var sheet = tfOpenSheet('<h2 class="serif">'+title+'</h2><div class="backupnote">'+hint+'</div><div class="camwrap"><video id="cam_v" autoplay playsinline muted></video><div class="camoval"></div></div>'+
+    '<div class="err" id="cam_err"></div><div class="sheetbtns"><button class="btn-cancel" id="cam_back">← Back</button><button class="btn-save" id="cam_shot">📸 Take photo</button></div>');
+  var v = sheet.querySelector("#cam_v"), stream = null;
+  function stop(){ if(stream) stream.getTracks().forEach(function(t){ t.stop(); }); stream = null; }
+  function err(m){ var e = sheet.querySelector("#cam_err"); e.textContent = m; e.style.display = "block"; }
+  sheet.querySelector("#cam_back").addEventListener("click", function(){ stop(); if(onBack) onBack(); else closeForm(); });
+  if(!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)){ err("This phone's browser can't open the camera here."); return; }
+  navigator.mediaDevices.getUserMedia({ video:{ facingMode:"user", width:{ ideal:640 }, height:{ ideal:640 } }, audio:false }).then(function(st){ stream = st; v.srcObject = st; })
+    .catch(function(){ err("Camera is blocked. Allow the camera for this app in the phone settings, then try again."); });
+  sheet.querySelector("#cam_shot").addEventListener("click", function(){
+    if(!stream || !v.videoWidth) return err("Camera is not ready yet.");
+    var w = v.videoWidth, h = v.videoHeight, sc = Math.min(1, 480/Math.max(w, h)), c = document.createElement("canvas");
+    c.width = Math.round(w*sc); c.height = Math.round(h*sc); c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+    stop(); onShot(c);
+  });
+}
+function avgDesc(list){ var n = list.length, out = []; for(var i = 0; i < 128; i++){ var t = 0; list.forEach(function(d){ t += d[i]; }); out.push(Math.round(t/n*10000)/10000); } return out; }
+function openFaceRegister(staffId){
+  var s = staffById(staffId); if(!s) return; var shots = [], photo = "";
+  function take(){
+    openCamera("📷 Register face · "+esc(s.name), "Shot "+(shots.length+1)+" of 3. Face the camera in good light, no cap or mask. "+(shots.length?"Turn the head a little.":""), function(c){
+      var busy = tfOpenSheet('<h2 class="serif">Checking the face…</h2><div class="backupnote">First time can take a few seconds.</div>');
+      faceDescriptor(c).then(function(r){
+        if(!r){ appAlert("No face found. Look straight at the camera in good light."); take(); return; }
+        shots.push(r.desc); if(!photo) photo = c.toDataURL("image/jpeg", 0.7);
+        if(shots.length < 3) take(); else save();
+      }).catch(function(){ appAlert("Couldn't load the face checker. Check the internet and try again."); openStaffProfile(s.id); });
+    }, function(){ if(shots.length) save(); else openStaffProfile(s.id); });
+  }
+  function save(){
+    s.faceDesc = avgDesc(shots); s.facePhoto = photo; s.faceAt = Date.now(); s.faceBy = myName()||"Owner";
+    saveStaff(); renderAll(); appAlert("✔ Face registered for "+s.name+" ("+shots.length+" photo"+(shots.length!==1?"s":"")+")."); openStaffProfile(s.id);
+  }
+  take();
+}
+function checkinsFor(date, staffId){ return checkins.filter(function(c){ return c.date===date && (!staffId || c.staffId===staffId); }).sort(function(a,b){ return (a.at||0)-(b.at||0); }); }
+function checkinBadge(c){
+  var ok = c.faceOk!==false && c.locOk!==false;
+  return '<span class="ckb '+(ok?'ok':'bad')+'" data-ckv="'+esc(c.id)+'">'+(c.kind==="out"?'🔴 Out ':'🟢 In ')+esc(c.time||"")+' '+(c.faceOk===true?'🙂✓':c.faceOk===false?'🙂✗':'🙂?')+(c.locOk===true?' 📍✓':c.locOk===false?' 📍✗':' 📍?')+'</span>';
+}
+function openCheckinView(id){
+  var c = checkins.find(function(x){ return x.id===id; }); if(!c) return; var s = staffById(c.staffId) || { name:c.name };
+  var sheet = tfOpenSheet('<h2 class="serif">'+(c.kind==="out"?'🔴 Check-out':'🟢 Check-in')+' · <span class="notr">'+esc(s.name||c.name)+'</span></h2>'+
+    '<div class="ckphotos">'+(c.photo?'<figure><img src="'+esc(c.photo)+'" alt=""><figcaption>Now</figcaption></figure>':'')+(s.facePhoto?'<figure><img src="'+esc(s.facePhoto)+'" alt=""><figcaption>Registered</figcaption></figure>':'')+'</div>'+
+    '<div class="card"><div class="psrow"><span>When</span><b>'+esc(c.date)+' '+esc(c.time||"")+'</b></div>'+
+    '<div class="psrow"><span>Face</span><b class="'+(c.faceOk===false?'bad':c.faceOk?'ok':'')+'">'+(c.faceOk===true?'✔ Matches':c.faceOk===false?'✗ Does not match':'Not checked')+(c.faceDist!=null?' ('+Math.round(Math.max(0,1-c.faceDist)*100)+'% alike)':'')+(c.faceNote?' · '+esc(c.faceNote):'')+'</b></div>'+
+    '<div class="psrow"><span>Place</span><b class="'+(c.locOk===false?'bad':c.locOk?'ok':'')+'">'+(c.dist!=null?Math.round(c.dist)+' m from the cafe'+(c.acc?' (±'+c.acc+' m)':''):(c.locNote||'No location'))+(c.locOk===true?' ✔':c.locOk===false?' ✗':'')+'</b></div>'+
+    (c.lat!=null?'<div class="psrow"><span>Map</span><b><a target="_blank" rel="noopener" href="https://maps.google.com/?q='+c.lat+','+c.lng+'">Open in maps</a></b></div>':'')+
+    '<div class="psrow"><span>On phone</span><b>'+esc(c.by||"")+'</b></div></div><div class="sheetbtns"><button class="btn-cancel" id="ckv_close">Close</button></div>');
+  sheet.querySelector("#ckv_close").addEventListener("click", closeForm);
+}
+function openFaceCheckin(){
+  var people = activeStaff();
+  var sheet = tfOpenSheet('<h2 class="serif">🙂 Check in / out · हाज़िरी</h2><div class="backupnote">Tap your name, then look at the camera. · अपना नाम दबाएँ और कैमरे में देखें।</div>'+
+    (!settings.outletLoc ? '<div class="backupnote" style="background:#FFF4E0;">The cafe location is not set, so the place is not checked. Owner / manager: Staff → Attendance → 📍 Set cafe location.</div>' : '')+
+    '<div class="ckpeople">'+people.map(function(s){ var last = checkinsFor(fmtDate(new Date()), s.id).slice(-1)[0], inNow = last && last.kind==="in";
+      return '<button data-ckin="'+esc(s.id)+'" class="'+(inNow?'in':'')+'"><b class="notr">'+esc(s.name)+'</b><span>'+(inNow ? '🟢 in since '+esc(last.time)+' · tap to check out' : last ? '🔴 out at '+esc(last.time) : 'tap to check in')+'</span>'+(s.faceAt?'':'<i>no face registered</i>')+'</button>'; }).join("")+'</div>'+
+    '<div class="sheetbtns"><button class="btn-cancel" id="ck_close">Close</button></div>');
+  sheet.querySelector("#ck_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-ckin]"), function(b){ b.addEventListener("click", function(){ faceCheckinFor(b.getAttribute("data-ckin")); }); });
+}
+function faceCheckinFor(staffId){
+  var s = staffById(staffId); if(!s) return;
+  var locP = getLocation();
+  openCamera("🙂 "+esc(s.name), "Look straight at the camera and tap 📸. · कैमरे में देखें।", function(c){
+    tfOpenSheet('<h2 class="serif">Checking… · जाँच हो रही है</h2><div class="backupnote">Face and place are being checked.</div>');
+    var photo = c.toDataURL("image/jpeg", 0.6);
+    Promise.all([faceDescriptor(c).catch(function(){ return { failed:true }; }), locP]).then(function(r){
+      var f = r[0], loc = r[1];
+      if(f === null){ appAlert("No face found in the photo. Look straight at the camera in good light and try again."); faceCheckinFor(staffId); return; }
+      return api("POST", "/api/photos"+API_Q, { dataUrl:photo }).then(function(up){
+        var body = { staffId:staffId, photo: up.ok && up.data ? up.data.url : "", desc: f && f.desc ? f.desc : null, faceScore: f && f.score, lat:loc.lat, lng:loc.lng, acc:loc.acc, locError:loc.error||"" };
+        return api("POST", "/api/checkin"+API_Q, body);
+      }).then(function(res){
+        if(!res.ok){ appAlert((res.data && res.data.error) || "Couldn't save. Check the internet and try again."); openFaceCheckin(); return; }
+        var k = res.data.checkin; checkins = checkins.filter(function(x){ return x.id!==k.id; }).concat([k]);
+        setTimeout(function(){ try{ pollRemote(); }catch(e){} }, 300);
+        var ok = k.faceOk!==false && k.locOk!==false;
+        sayHindi(ok ? (k.kind==="in" ? "हाज़िरी लग गई" : "छुट्टी दर्ज हो गई") : "जाँच नहीं हुई");
+        var sh = tfOpenSheet('<div class="pdone ckdone '+(ok?'':'bad')+'"><div class="tokbig">'+(ok?'✔':'⚠️')+'</div><b>'+esc(s.name)+' · '+(k.kind==="in"?'Checked in':'Checked out')+' '+esc(k.time)+'</b>'+
+          '<div>'+(k.faceOk===true?'🙂 Face matches':k.faceOk===false?'🙂 Face does not match':'🙂 Face not checked'+(k.faceNote?' ('+esc(k.faceNote)+')':''))+'</div>'+
+          '<div>'+(k.locOk===true?'📍 At the cafe ('+Math.round(k.dist)+' m)':k.locOk===false?'📍 Not at the cafe ('+Math.round(k.dist)+' m away)':'📍 '+esc(k.locNote||'Place not checked'))+'</div>'+
+          (!ok?'<div class="muted" style="margin-top:6px;">Saved for the owner / manager to look at. Attendance is not marked automatically.</div>':(res.data.attendance?'<div class="muted" style="margin-top:6px;">Marked Present for today.</div>':''))+
+          '</div><div class="sheetbtns"><button class="btn-save" id="ckd_ok" style="flex:1;">OK</button></div>');
+        sh.querySelector("#ckd_ok").addEventListener("click", function(){ closeForm(); renderAll(); });
+      });
+    }).catch(function(){ appAlert("Couldn't save. Check the internet and try again."); openFaceCheckin(); });
+  }, openFaceCheckin);
+}
+function openCafeLocation(){
+  var cur = settings.outletLoc || null;
+  var sheet = tfOpenSheet('<h2 class="serif">📍 Cafe location</h2><div class="backupnote">Stand inside the cafe and tap “Use this phone’s location”. Check-ins farther than the distance below are flagged.</div>'+
+    (cur ? '<div class="psrow"><span>Saved</span><b>'+cur.lat.toFixed(5)+', '+cur.lng.toFixed(5)+' · <a target="_blank" rel="noopener" href="https://maps.google.com/?q='+cur.lat+','+cur.lng+'">map</a></b></div>' : '')+
+    '<div class="field"><label>Allowed distance (metres)</label><input id="cl_r" type="number" inputmode="numeric" value="'+esc(cur && cur.radius || 100)+'"></div>'+
+    '<div class="err" id="cl_err"></div><div class="zbtns"><button class="btn-save" id="cl_here">📍 Use this phone\'s location</button>'+(cur?'<button class="btn-additem" id="cl_save">Save distance</button>':'')+'</div>'+
+    (cur ? '<button class="btn-additem" id="cl_off" style="color:#A6402D;">Turn off the place check</button>' : '')+
+    '<div class="sheetbtns"><button class="btn-cancel" id="cl_close">Close</button></div>');
+  function r(){ var v = parseInt(sheet.querySelector("#cl_r").value, 10); return v >= 20 && v <= 2000 ? v : 100; }
+  sheet.querySelector("#cl_close").addEventListener("click", function(){ closeForm(); renderStaffSection(); });
+  sheet.querySelector("#cl_here").addEventListener("click", function(){ var b = this; b.disabled = true; b.textContent = "Finding…";
+    getLocation().then(function(l){ b.disabled = false; b.textContent = "📍 Use this phone's location";
+      if(l.error){ var e = sheet.querySelector("#cl_err"); e.textContent = l.error; e.style.display = "block"; return; }
+      settings.outletLoc = { lat:Math.round(l.lat*1e6)/1e6, lng:Math.round(l.lng*1e6)/1e6, radius:r(), acc:l.acc, at:Date.now() }; saveSettings(); appAlert("✔ Cafe location saved (±"+l.acc+" m)."); openCafeLocation(); }); });
+  var sv = sheet.querySelector("#cl_save"); if(sv) sv.addEventListener("click", function(){ settings.outletLoc = Object.assign({}, settings.outletLoc, { radius:r() }); saveSettings(); openCafeLocation(); });
+  var of = sheet.querySelector("#cl_off"); if(of) of.addEventListener("click", function(){ askConfirm("Stop checking the place for check-ins?", function(){ settings.outletLoc = null; saveSettings(); openCafeLocation(); }); });
+}
+
 // ---------- ORDER TYPES & LIVE ORDERS ----------
 // Dine-in (table, bill at the end), Takeaway (pay first), Delivery (own rider; pay now or cash on
 // delivery), Zomato and Swiggy (entered from the partner app with the platform's order ID).
@@ -12224,6 +12372,7 @@ function renderCounter(){
     (tiffinOn() && canReadKey(TF_SUBS_KEY) ? '<button id="ct_tiffin">🍱 Tiffin</button>' : '')+
     (cateringOn() && canReadKey(CATER_ORDERS_KEY) ? '<button id="ct_cater">🎉 Party orders</button>' : '')+
     (hotelsOn() && canReadKey(HOTEL_ORDERS_KEY) ? '<button id="ct_hotel">🏨 Hotel order</button>' : '')+
+    (canReadKey(STAFF_KEY) && staff.some(function(x){ return x.faceAt; }) ? '<button id="ct_checkin">🙂 Staff check-in</button>' : '')+
     (canWriteKey(LIVE_KEY) && waiterOn() ? (function(){ var wm = waiterMode(), wn = wm ? waiterTasks(wm!=="all"?wm:"").length : waiterTasks("").length; return '<button id="ct_waiter" class="'+(wm?"on":"")+(wn?" warn":"")+'">🛎️ Waiter'+(wn?' ('+wn+')':'')+(wm?' · 🔔':'')+'</button>'; })() : '')+
     (canWriteKey(CHECKS_KEY) ? '<button id="ct_checks" class="'+(checksInUse() && checklistStatus().some(function(x){ return x.missed; })?"warn":"")+'">✅ Checks</button>' : '')+
     '<button id="ct_simple" class="'+(simple?"on":"")+'">'+(simple?"🔠 Big & simple: ON":"🔠 Big & simple")+'</button>'+
@@ -12273,6 +12422,7 @@ function wireCounterTools(el){
   var lv = document.getElementById("ct_live"); if(lv) lv.addEventListener("click", function(){ openLiveOrders(false); });
   var rsh = document.getElementById("ct_rush"); if(rsh) rsh.addEventListener("click", function(){ setRush(!rushOn()); releaseCounterTicket(); counterTable = null; if(rushOn()) counterType = "take"; renderCounter();
     if(rushOn()) appAlert("⚡ Rush hour ON on this phone: tap items, then 💳 Pay now (token) or ⏸️ Pay later. No tables or kitchen steps. Tap ⚡ again to switch off."); });
+  var cki = document.getElementById("ct_checkin"); if(cki) cki.addEventListener("click", openFaceCheckin);
   [["ct_tiffin","tiffin"],["ct_cater","catering"],["ct_hotel","hotels"]].forEach(function(x){ var b = document.getElementById(x[0]); if(b) b.addEventListener("click", function(){ showView("records"); switchRecordsSub(x[1]); }); });
   var cpk = document.getElementById("ct_park"); if(cpk) cpk.addEventListener("click", function(){ showView("records"); switchRecordsSub("parking"); });
   var cst = document.getElementById("ct_store"); if(cst) cst.addEventListener("click", function(){ storeSub = "bill"; showView("records"); switchRecordsSub("store"); });
@@ -14562,7 +14712,14 @@ function monthAttendance(staffId, mKey){
 // at the daily rate; paid leave that is NOT used is owed as extra pay - unless
 // the person waives it, in which case it is recorded as goodwill for a future
 // bonus. Days not marked in attendance count as worked.
-function paidLeavePerMonth(){ var v = settings && settings.paidLeaveDays; return (v===null || v===undefined || v==="") ? 2 : +v; }
+function paidLeavePerMonth(st){ if(st && st.paidLeave!==undefined && st.paidLeave!==null && st.paidLeave!=="") return +st.paidLeave||0; var v = settings && settings.paidLeaveDays; return (v===null || v===undefined || v==="") ? 2 : +v; }
+var STAFF_ID_TYPES = ["Aadhaar","Voter ID","PAN","Driving licence","Passport","Ration card","Other"];
+function ageFromDob(d){ if(!/^\d{4}-\d\d-\d\d$/.test(d||"")) return 0; var t = fmtDate(new Date()), a = +t.slice(0,4) - +d.slice(0,4); if(t.slice(5) < d.slice(5)) a--; return a>0 && a<100 ? a : 0; }
+// Age now: from the date of birth, else the age typed (plus the years since it was typed).
+function staffAge(s){ if(!s) return 0; var a = ageFromDob(s.dob); if(a) return a; if(+s.age>0){ var at = s.ageAt || fmtDate(new Date()); return +s.age + Math.max(0, +fmtDate(new Date()).slice(0,4) - +at.slice(0,4) - (fmtDate(new Date()).slice(5) < at.slice(5) ? 1 : 0)); } return 0; }
+function maskId(s){ var n = String(s.idNo||""); if(!n) return ""; return isFullAccess() ? n : n.replace(/[A-Za-z0-9](?=(?:[\s-]*[A-Za-z0-9]){4})/g, "X"); }
+function dutyHoursText(s){ if(!s.dutyFrom || !s.dutyTo) return ""; var a = s.dutyFrom.split(":"), b = s.dutyTo.split(":"), m = (+b[0]*60 + +b[1]) - (+a[0]*60 + +a[1]); if(m<=0) m += 1440; return s.dutyFrom+"–"+s.dutyTo+" ("+(Math.round(m/6)/10)+" h)"; }
+function lockInEnds(s){ if(!(+s.lockIn>0) || !s.joinDate) return ""; var d = parseDate(s.joinDate); d.setMonth(d.getMonth() + (+s.lockIn)); return fmtDate(d); }
 function salaryDueDay(){ var v = settings && settings.salaryDueDay; return v ? +v : 7; }
 function payrollFor(staffId, mKey){ return payroll.find(function(r){ return r.staffId===staffId && r.month===mKey; }) || null; }
 function roundHalf(n){ return Math.round(n*2)/2; }
@@ -14584,7 +14741,7 @@ function salaryFor(st, mKey){
   });
   var offDays = absent + leave + half*0.5;
   // Paid leave comes with a full month's work; a part month (joining or leaving) has none.
-  var allowedLeave = fullMonth ? paidLeavePerMonth() : 0;
+  var allowedLeave = fullMonth ? paidLeavePerMonth(st) : 0;
   var unpaidDays = Math.max(0, offDays - allowedLeave);
   var unusedLeave = Math.max(0, allowedLeave - offDays);
   var base = r2(monthly * factor);
@@ -16223,12 +16380,13 @@ function renderAttendView(){
   var people = activeStaff();
   if(people.length===0){ el.innerHTML = html + '<div class="empty">Add staff first.</div>'; wireDateStepper("att"); wireAttMode(el); return; }
 
-  html += '<button class="btn-additem" id="att_allpresent" style="margin-bottom:12px;">Mark everyone rostered as present</button>';
+  html += '<div class="zbtns" style="margin-bottom:12px;"><button class="btn-save" id="att_face">🙂 Face check-in / out</button>'+(canWriteKey(SETTINGS_KEY) && (isFullAccess() || myAccess()==="manager") ? '<button class="btn-additem" id="att_loc">📍 '+(settings.outletLoc?'Cafe location ✔':'Set cafe location')+'</button>' : '<span></span>')+'</div>';
+  if(canWriteKey(ATTEND_KEY)) html += '<button class="btn-additem" id="att_allpresent" style="margin-bottom:12px;">Mark everyone rostered as present</button>';
   html += people.map(function(s){
     var a = attendFor(staffDate, s.id);
-    var shift = ids[s.id];
+    var shift = ids[s.id], cks = checkinsFor(staffDate, s.id);
     return '<div class="attcard"><div class="attname"><b>'+esc(s.name)+'</b>'+
-           '<span>'+(shift? esc(shift)+" shift" : "not rostered")+'</span></div>'+
+           '<span>'+(shift? esc(shift)+" shift" : "not rostered")+(a && a.via==="face" ? ' · 🙂 by face' : '')+'</span>'+(cks.length ? '<span class="ckrow">'+cks.map(checkinBadge).join("")+'</span>' : '')+'</div>'+
            '<div class="attbtns">'+ATT_STATUS.map(function(st){
              return '<button class="attbtn'+(a&&a.status===st?" on "+st.split(" ")[0].toLowerCase():"")+'" data-att="'+s.id+'" data-status="'+st+'">'+st+'</button>';
            }).join("")+'</div></div>';
@@ -16236,7 +16394,10 @@ function renderAttendView(){
   el.innerHTML = html;
   wireDateStepper("att");
   wireAttMode(el);
-  document.getElementById("att_allpresent").addEventListener("click", function(){
+  document.getElementById("att_face").addEventListener("click", openFaceCheckin);
+  var alc = document.getElementById("att_loc"); if(alc) alc.addEventListener("click", openCafeLocation);
+  Array.prototype.forEach.call(el.querySelectorAll("[data-ckv]"), function(b){ b.addEventListener("click", function(ev){ ev.stopPropagation(); openCheckinView(b.getAttribute("data-ckv")); }); });
+  var allp = document.getElementById("att_allpresent"); if(allp) allp.addEventListener("click", function(){
     todays.forEach(function(r){ setAttendance(r.staffId, "Present", true); });
     saveAttend(); renderStaffSection();
   });
@@ -16335,13 +16496,19 @@ function openStaffForm(staffId){
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">'+(s?"Edit staff":"Add staff member")+'</h2>';
   html += '<div class="field"><label>Name</label><input type="text" id="s_name" placeholder="Full name" value="'+esc(s?s.name:"")+'"></div>';
+  html += '<div class="field two"><div><label>Mobile number</label><input type="text" inputmode="tel" id="s_phone" value="'+esc(s?s.phone:"")+'"></div><div class="two" style="display:flex;gap:6px;"><div style="flex:1;"><label>Age</label><input type="number" inputmode="numeric" id="s_age" value="'+esc(s ? (staffAge(s)||"") : "")+'"></div><div style="flex:1.4;"><label>Date of birth</label><input type="date" id="s_dob" value="'+esc(s&&s.dob||"")+'"></div></div></div>';
+  html += '<div class="field"><label>Address</label><textarea id="s_addr" rows="2" placeholder="House, street, village / city, PIN">'+esc(s&&s.address||"")+'</textarea></div>';
+  html += '<div class="field two"><div><label>ID proof</label><select id="s_idtype">'+STAFF_ID_TYPES.map(function(t){ return '<option'+(s&&s.idType===t?' selected':'')+'>'+t+'</option>'; }).join("")+'</select></div><div><label>ID number</label><input type="text" id="s_idno" autocomplete="off" value="'+esc(s&&s.idNo||"")+'"></div></div>';
+  html += '<div class="field"><label>ID photo (front / back)</label><div class="sidphotos">'+[["idPhoto","Front"],["idPhoto2","Back"]].map(function(x){ var v = s && s[x[0]];
+    return '<label class="sidph" data-sid="'+x[0]+'">'+(v ? '<img src="'+esc(v)+'" alt="">' : '<span>📷 '+x[1]+'</span>')+'<input type="file" accept="image/*" capture="environment" data-sidf="'+x[0]+'" hidden></label>'; }).join("")+'</div></div>';
   var mainPost = s ? s.role : "Waiter";
   html += '<div class="field two"><div><label>Main post · मुख्य काम</label><select id="s_role">'+allPosts().map(function(r){ return '<option value="'+esc(r)+'" '+(mainPost===r?"selected":"")+'>'+esc(postLabel(r))+'</option>'; }).join("")+'</select></div>';
   html += '<div><label>Usual shift</label><select id="s_shift">'+shiftList().map(function(sh){ return sh.name; }).concat(shiftList().length>1 ? ["Both shifts"] : []).concat(["Flexible"]).map(function(n){ return '<option '+(s&&s.defaultShift===n?"selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div></div>';
   html += '<div class="field"><label>Also does · और काम (tap all that apply)</label>'+postChipsHtml("s_posts", s ? staffPosts(s) : [mainPost], mainPost)+
     '<button type="button" class="linkbtn" id="s_ownposts" style="margin-top:4px;">+ Your own posts</button></div>';
-  html += '<div class="field two"><div'+(isFullAccess()?'':' style="display:none;"')+'><label>Monthly salary (₹)</label><input type="number" inputmode="decimal" id="s_salary" value="'+(s?s.salary:"")+'"></div>';
-  html += '<div><label>Phone</label><input type="text" inputmode="tel" id="s_phone" value="'+esc(s?s.phone:"")+'"></div></div>';
+  html += '<div class="field two"'+(isFullAccess()?'':' style="display:none;"')+'><div><label>Monthly salary (₹)</label><input type="number" inputmode="decimal" id="s_salary" value="'+(s?s.salary:"")+'"></div>'+
+    '<div><label>Paid leave days / month</label><input type="number" inputmode="decimal" id="s_pleave" placeholder="shop rule: '+paidLeavePerMonth()+'" value="'+esc(s && s.paidLeave!=null && s.paidLeave!=="" ? s.paidLeave : "")+'"></div></div>';
+  html += '<div class="field two"'+(isFullAccess()?'':' style="display:none;"')+'><div><label>Bonus (₹)</label><input type="number" inputmode="decimal" id="s_bonus" value="'+esc(s&&s.bonus||"")+'"></div><div><label>Bonus is for</label><input type="text" id="s_bonusnote" placeholder="e.g. Diwali, once a year" value="'+esc(s&&s.bonusNote||"")+'"></div></div>';
   var acNow = s ? allowConfig(s, fmtDate(new Date()).slice(0,7), true) : { houseRent:0, foodAllowance:0, travelAllowance:0, foodBasis:"month", travelBasis:"month" };
   function basisSel(id, v){ return '<select id="'+id+'"><option value="month"'+(v!=="day"?" selected":"")+'>per month</option><option value="day"'+(v==="day"?" selected":"")+'>per day worked</option></select>'; }
   html += '<div'+(isFullAccess()?'':' style="display:none;"')+'>';
@@ -16351,7 +16518,13 @@ function openStaffForm(staffId){
   html += '<div class="field two"><div><label>Travel allowance (₹)</label><input type="number" inputmode="decimal" id="s_travel" value="'+(acNow.travelAllowance||"")+'"></div><div><label>Travel is paid</label>'+basisSel("s_travelb", acNow.travelBasis)+'</div></div>';
   html += '<div class="backupnote" style="margin-top:-4px;">Cash allowances paid on top of salary. “Per day worked” pays the amount for every day not marked absent or on leave. Changes here apply from this month on; to change one month only, use Staff → Salary → Edit month. Meals cooked in the cafe are tracked separately under Staff meals.</div>';
   html += '</div>';
+  html += '<div class="field two"><div><label>Duty hours: from</label><input type="time" id="s_dfrom" value="'+esc(s&&s.dutyFrom||"")+'"></div><div><label>to</label><input type="time" id="s_dto" value="'+esc(s&&s.dutyTo||"")+'"></div></div>';
+  html += '<div class="field two"><div><label>Weekly off</label><select id="s_woff">'+["","Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"].map(function(d){ return '<option value="'+d+'"'+((s&&s.weeklyOff||"")===d?' selected':'')+'>'+(d||"None / rotating")+'</option>'; }).join("")+'</select></div><div></div></div>';
+  html += '<div class="field"><label>Scope of work · काम क्या है</label><textarea id="s_scope" rows="3" placeholder="e.g. Tandoor, roti and naan; clean the tandoor area at closing; help in prep">'+esc(s&&s.scope||"")+'</textarea></div>';
+  html += '<div class="field two"><div><label>Lock-in period (months)</label><input type="number" inputmode="numeric" id="s_lockin" value="'+esc(s&&s.lockIn||"")+'"></div><div><label>Notice period (days)</label><input type="number" inputmode="numeric" id="s_notice" value="'+esc(s&&s.noticeDays||"")+'"></div></div>';
   html += '<div class="field two"><div><label>Joined on</label><input type="date" id="s_join" value="'+(s&&s.joinDate?s.joinDate:fmtDate(new Date()))+'"></div>';
+  html += '<div><label>Joining time</label><input type="time" id="s_jtime" value="'+esc(s&&s.joinTime||"")+'"></div></div>';
+  html += '<div class="field two"><div></div>';
   html += '<div><label>Status</label><select id="s_status"><option '+(s&&s.status==="Active"?"selected":"")+'>Active</option><option '+(s&&s.status==="Left"?"selected":"")+'>Left</option></select></div></div>';
   html += '<div class="field" id="s_leftwrap" style="display:'+(s&&s.status==="Left"?"block":"none")+';"><label>Left on</label><input type="date" id="s_left" value="'+(s&&s.leftDate?s.leftDate:fmtDate(new Date()))+'"></div>';
   html += '<div class="backupnote" style="margin-top:-4px;">Salary is only counted from the joining date (and up to the leaving date).'+(s?' A new salary typed here applies from this month on; earlier months keep the old one. To change a past month, use Records → Bills.':'')+'</div>';
@@ -16362,6 +16535,10 @@ function openStaffForm(staffId){
   html += '<button class="btn-save" id="s_save">Save</button></div>';
   sheet.innerHTML = html;
   var spc = document.getElementById("s_posts"); wirePostChips(spc);
+  var sidNew = {};
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sidf]"), function(inp){ inp.addEventListener("change", function(){ var f = inp.files && inp.files[0]; if(!f) return; var k = inp.getAttribute("data-sidf");
+    compressPhoto(f, function(d){ sidNew[k] = d; var lb = sheet.querySelector('[data-sid="'+k+'"]'); var im = lb.querySelector("img"); if(!im){ lb.querySelector("span").remove(); im = document.createElement("img"); lb.insertBefore(im, inp); } im.src = d; }); }); });
+  var dobEl = document.getElementById("s_dob"); dobEl.addEventListener("change", function(){ var a = ageFromDob(dobEl.value); if(a) document.getElementById("s_age").value = a; });
   document.getElementById("s_role").addEventListener("change", function(){ var v = this.value;
     Array.prototype.forEach.call(spc.querySelectorAll(".pchip"), function(b){ var me = b.getAttribute("data-post")===v; b.classList.toggle("main", me); if(me) b.classList.add("on"); }); });
   document.getElementById("s_ownposts").addEventListener("click", function(){ openCustomPosts(function(){ openStaffForm(staffId); }); });
@@ -16391,6 +16568,12 @@ function openStaffForm(staffId){
     var sal = parseFloat(document.getElementById("s_salary").value);
     if(!isFullAccess()) sal = s ? (+s.salary||0) : 0;   // pay is set by the owner; the server keeps it anyway
     if(isNaN(sal) || sal<0){ errEl.textContent = "Enter the monthly salary."; errEl.style.display="block"; return; }
+    var phoneV = document.getElementById("s_phone").value.trim(), phD = phoneV.replace(/\D/g,"");
+    if(phoneV && !(phD.length===10 || (phD.length===12 && phD.indexOf("91")===0))){ errEl.textContent = "Mobile number should have 10 digits."; errEl.style.display="block"; return; }
+    var idT = document.getElementById("s_idtype").value, idN = document.getElementById("s_idno").value.trim();
+    if(idT==="Aadhaar" && idN && idN.replace(/\D/g,"").length!==12){ errEl.textContent = "An Aadhaar number has 12 digits."; errEl.style.display="block"; return; }
+    var dfrom = document.getElementById("s_dfrom").value, dto = document.getElementById("s_dto").value;
+    if((dfrom && !dto) || (!dfrom && dto)){ errEl.textContent = "Fill both duty times (from and to)."; errEl.style.display="block"; return; }
     var mainP = document.getElementById("s_role").value, others = readPostChips(document.getElementById("s_posts")).filter(function(n){ return n!==mainP; });
     var rec = { id: s?s.id:uid(), name:name, role:mainP, roles:[mainP].concat(others),
                 defaultShift:document.getElementById("s_shift").value, salary:sal,
@@ -16403,7 +16586,16 @@ function openStaffForm(staffId){
                 joinDate:document.getElementById("s_join").value,
                 status:document.getElementById("s_status").value,
                 leftDate: document.getElementById("s_status").value==="Left" ? (document.getElementById("s_left").value || fmtDate(new Date())) : "",
-                upi:document.getElementById("s_upi").value.trim() };
+                upi:document.getElementById("s_upi").value.trim(),
+                address:document.getElementById("s_addr").value.trim(), dob:document.getElementById("s_dob").value,
+                age: parseInt(document.getElementById("s_age").value,10) || "", idType:idT, idNo: idT==="Aadhaar" ? idN.replace(/\D/g,"").replace(/(\d{4})(?=\d)/g,"$1 ") : idN,
+                joinTime:document.getElementById("s_jtime").value, dutyFrom:dfrom, dutyTo:dto, weeklyOff:document.getElementById("s_woff").value,
+                scope:document.getElementById("s_scope").value.trim(), lockIn: parseInt(document.getElementById("s_lockin").value,10) || "", noticeDays: parseInt(document.getElementById("s_notice").value,10) || "",
+                bonus: parseFloat(document.getElementById("s_bonus").value) || "", bonusNote: document.getElementById("s_bonusnote").value.trim(),
+                paidLeave: document.getElementById("s_pleave").value==="" ? "" : Math.max(0, parseFloat(document.getElementById("s_pleave").value)||0) };
+    if(rec.dob) rec.ageAt = fmtDate(new Date()); else if(rec.age) rec.ageAt = fmtDate(new Date());
+    ["idPhoto","idPhoto2"].forEach(function(k){ rec[k] = sidNew[k] || (s && s[k]) || ""; });
+    if(!isFullAccess()){ ["bonus","bonusNote","paidLeave"].forEach(function(k){ rec[k] = s ? s[k] : ""; }); }
     if(s){
       if(s.name !== name){
         // Old payments were found by name; link them to this person before the name changes.
@@ -16444,6 +16636,23 @@ function openStaffProfile(staffId){
   var html = '<h2 class="serif">'+esc(s.name)+'</h2>';
   html += '<div class="backupnote">'+esc(s.role)+' · '+esc(/shift/i.test(s.defaultShift||"") ? s.defaultShift : (s.defaultShift||"—")+" shift")+(isFullAccess() ? ' · '+rupee(s.salary||0)+'/month' : '')+(s.phone?' · '+esc(s.phone):'')+'</div>';
 
+  var lie = lockInEnds(s), det = [
+    ["📱 Mobile", s.phone ? '<a href="tel:'+esc(String(s.phone).replace(/[^\d+]/g,""))+'">'+esc(s.phone)+'</a>' : ""],
+    ["🎂 Age", staffAge(s) ? staffAge(s)+" years"+(s.dob ? " · born "+esc(parseDate(s.dob).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"})) : "") : ""],
+    ["🏠 Address", esc(s.address||"")],
+    ["🪪 "+esc(s.idType||"ID"), esc(maskId(s))],
+    ["📅 Joined", s.joinDate ? esc(parseDate(s.joinDate).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}))+(s.joinTime?" · "+esc(s.joinTime):"") : ""],
+    ["⏰ Duty hours", esc(dutyHoursText(s))+(s.weeklyOff?" · off on "+esc(s.weeklyOff):"")],
+    ["🔒 Lock-in", +s.lockIn>0 ? s.lockIn+" months · till "+esc(parseDate(lie).toLocaleDateString("en-IN",{day:"numeric",month:"short",year:"numeric"}))+(lie > fmtDate(new Date()) ? "" : " ✔ over") : ""],
+    ["📝 Notice period", +s.noticeDays>0 ? s.noticeDays+" days" : ""],
+    ["🌴 Paid leave", isFullAccess() ? paidLeavePerMonth(s)+" days a month"+(s.paidLeave!==undefined && s.paidLeave!=="" && s.paidLeave!==null ? "" : " (shop rule)") : ""],
+    ["🎁 Bonus", isFullAccess() && s.bonus ? rupee(s.bonus)+(s.bonusNote?" · "+esc(s.bonusNote):"") : ""],
+    ["🧾 Scope of work", esc(s.scope||"").replace(/\n/g,"<br>")]
+  ].filter(function(r){ return r[1]; });
+  html += '<div class="card sdet"><h3>Details · जानकारी</h3>'+(det.length ? det.map(function(r){ return '<div class="psrow"><span>'+r[0]+'</span><b class="notr">'+r[1]+'</b></div>'; }).join("") : '<div class="muted">Tap ✏️ Edit to add address, ID, duty hours and terms.</div>')+
+    ((s.idPhoto||s.idPhoto2) ? '<div class="sidphotos" style="margin-top:8px;">'+["idPhoto","idPhoto2"].filter(function(k){ return s[k]; }).map(function(k){ return '<button class="sidph" data-sidview="'+k+'"><img src="'+esc(s[k])+'" alt=""></button>'; }).join("")+'</div>' : '')+
+    '<div class="psrow" style="margin-top:6px;"><span>🙂 Face for attendance</span><b>'+(s.faceDesc ? '✔ registered' : '<span class="bad">not registered</span>')+'</b></div>'+
+    (canWriteKey(STAFF_KEY) ? '<button class="btn-additem" id="sp_face" style="margin-top:6px;">📷 '+(s.faceDesc?'Register face again':'Register face')+'</button>' : '')+'</div>';
   html += '<div class="profscore '+band.cls+'"><div><b>'+(perf.score===null?"—":perf.score+"/100")+'</b><span>'+band.label+' · '+monthName+'</span></div></div>';
 
   html += '<div class="profgrid">';
@@ -16490,6 +16699,8 @@ function openStaffProfile(staffId){
 
   document.getElementById("p_close").addEventListener("click", closeForm);
   document.getElementById("p_edit").addEventListener("click", function(){ openStaffForm(s.id); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sidview]"), function(b){ b.addEventListener("click", function(){ viewPhoto(s[b.getAttribute("data-sidview")], s.name+" · "+(s.idType||"ID")); }); });
+  var spf = document.getElementById("sp_face"); if(spf) spf.addEventListener("click", function(){ openFaceRegister(s.id); });
   document.getElementById("p_warn").addEventListener("click", function(){ openConductForm(s.id, "Warning"); });
   document.getElementById("p_appr").addEventListener("click", function(){ openConductForm(s.id, "Appreciation"); });
   if(isFullAccess()){

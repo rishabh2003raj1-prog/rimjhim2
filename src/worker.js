@@ -167,8 +167,8 @@ async function whoIs(req, env) {
 const ACCESS_LEVELS = ["partner", "manager", "chef", "billing", "full"];
 const FULL_ACCESS = { owner: true, partner: true, full: true };
 // Pay details are hidden from staff logins.
-const PAY_FIELDS = ["salary", "salaryHistory", "salaryMonths", "houseRent", "foodAllowance", "travelAllowance", "foodBasis", "travelBasis", "allowHistory", "allowMonths", "upi", "rentMode", "rentMonths"];
-const STAFF_PUBLIC = ["id", "name", "role", "roles", "defaultShift", "status", "joinDate", "leftDate"];
+const PAY_FIELDS = ["salary", "bonus", "bonusNote", "paidLeave", "salaryHistory", "salaryMonths", "houseRent", "foodAllowance", "travelAllowance", "foodBasis", "travelBasis", "allowHistory", "allowMonths", "upi", "rentMode", "rentMonths"];
+const STAFF_PUBLIC = ["id", "name", "role", "roles", "defaultShift", "status", "joinDate", "leftDate", "faceAt", "dutyFrom", "dutyTo", "weeklyOff"];
 const SETTINGS_PRIVATE = ["bankBalance", "bankDate", "bankReviewed"];
 // Readable by the manager but only the owner / partners can change them.
 const SETTINGS_OWNER = ["poManagerLimit"];
@@ -221,6 +221,7 @@ const POLICY = {
   caterorders_v1:    { manager: "rw", chef: "r", billing: "rw" },
   hotels_v1:         { manager: "rw", chef: "r", billing: "r" },
   hotelorders_v1:    { manager: "rw", chef: "r", billing: "rw" },
+  checkins_v1:       { manager: "rw", chef: "r", billing: "r" },
   partners_v1:       { manager: "r", chef: "r", billing: "r" }
   // investments, loans, payroll and anything new: owner / partner / full only.
 };
@@ -247,7 +248,7 @@ const FEATURES = {
   expenses:  { from: "manager", keys: ["expenses_v1"] },
   customers: { from: "manager", keys: ["customers_v1", "custpayments_v1", "creditpayments_v1", "offers_v1"] },
   cash:      { from: "manager", keys: ["cashdays_v1", "cashmoves_v1"] },
-  staff:     { from: "manager", keys: ["roster_v1", "attendance_v1", "tasks_v1", "conduct_v1"] },
+  staff:     { from: "manager", keys: ["roster_v1", "attendance_v1", "tasks_v1", "conduct_v1", "checkins_v1"] },
   meals:     { from: "manager", keys: [] },
   dashboard: { from: "manager", keys: [] },
   calendar:  { from: "manager", keys: [] },
@@ -908,6 +909,57 @@ async function handleExport(env, url, who) {
   return json(out, 200, { "Content-Disposition": `attachment; filename="${outlet}_cloud_export.json"` });
 }
 
+// ---- staff check-in with face + place ----
+// The phone sends the face numbers (from face-api on the phone), its GPS and the selfie's photo id.
+// The face is compared with the registered one and the place with the cafe's saved location here,
+// so a phone can only send what it sees, not decide the result. A passing check-in marks the day Present.
+const FACE_MATCH = 0.5;
+function metersBetween(a, b, c, d) { const R = 6371000, r = Math.PI / 180, x = Math.sin((c - a) * r / 2), y = Math.sin((d - b) * r / 2); return 2 * R * Math.asin(Math.sqrt(x * x + Math.cos(a * r) * Math.cos(c * r) * y * y)); }
+async function handleCheckin(req, env, url, who) {
+  const outlet = outletOf(url);
+  if (!outlet || !canUseOutlet(who, outlet)) return json({ error: "not allowed" }, 403);
+  let b = {}; try { b = await req.json(); } catch (e) { return json({ error: "bad json" }, 400); }
+  const s = arr((await readOne(env, outlet, "staff_v1")).value).find((x) => x && x.id === String(b.staffId || ""));
+  if (!s || s.status === "Left") return json({ error: "Staff member not found." }, 404);
+  const st = (await readOne(env, outlet, "settings_v1")).value || {};
+  const rec = { id: crypto.randomUUID().replace(/-/g, "").slice(0, 16), staffId: s.id, name: s.name || "", date: istDay(0), time: istHM(), at: Date.now(), by: who.login || who.name || who.role };
+  if (typeof b.photo === "string" && /^\/api\/photos\/[a-f0-9]{32}$/.test(b.photo)) rec.photo = b.photo;
+  const d = Array.isArray(b.desc) && b.desc.length === 128 && b.desc.every((v) => typeof v === "number" && isFinite(v)) ? b.desc : null;
+  if (!Array.isArray(s.faceDesc) || s.faceDesc.length !== 128) { rec.faceOk = null; rec.faceNote = "no face registered"; }
+  else if (!d) { rec.faceOk = null; rec.faceNote = "face checker didn't run"; }
+  else { let t = 0; for (let i = 0; i < 128; i++) t += (d[i] - s.faceDesc[i]) ** 2; rec.faceDist = Math.round(Math.sqrt(t) * 1000) / 1000; rec.faceOk = rec.faceDist < FACE_MATCH; }
+  const loc = st.outletLoc, lat = +b.lat, lng = +b.lng, acc = Math.max(0, Math.round(+b.acc || 0));
+  if (isFinite(lat) && isFinite(lng) && b.lat != null && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) { rec.lat = Math.round(lat * 1e5) / 1e5; rec.lng = Math.round(lng * 1e5) / 1e5; rec.acc = acc; }
+  if (!loc || !isFinite(+loc.lat)) { rec.locOk = null; rec.locNote = "cafe location not set"; }
+  else if (rec.lat == null) { rec.locOk = false; rec.locNote = String(b.locError || "no location from the phone").slice(0, 120); }
+  else { rec.dist = Math.round(metersBetween(+loc.lat, +loc.lng, lat, lng)); rec.locOk = rec.dist - Math.min(acc, 100) <= (+loc.radius || 100); }
+  let att = null;
+  for (let tries = 0; tries < 4; tries++) {
+    const cur = await readOne(env, outlet, "checkins_v1"), list = arr(cur.value);
+    const mine = list.filter((c) => c && c.staffId === s.id && c.date === rec.date).sort((x, y) => (x.at || 0) - (y.at || 0)), last = mine[mine.length - 1];
+    rec.kind = last && last.kind === "in" ? "out" : "in";
+    if (last && rec.at - (last.at || 0) < 60000) return json({ error: (last.kind === "in" ? "Already checked in" : "Already checked out") + " at " + last.time + ". Wait a minute to change it." }, 409);
+    const keepFrom = istDayOffset(-120);
+    const next = list.filter((c) => c && c.date >= keepFrom).concat([rec]);
+    const w = await writeOne(env, outlet, "checkins_v1", next, cur.rev);
+    if (w.tooBig) return json({ error: "Storage full." }, 507);
+    if (!w.conflict) break;
+    if (tries === 3) return json({ error: "Busy, please try again." }, 503);
+  }
+  // A check-in that passes both checks marks the day Present (a status already set by a person stays).
+  if (rec.kind === "in" && rec.faceOk !== false && rec.locOk !== false && rec.faceOk !== null) {
+    for (let tries = 0; tries < 4; tries++) {
+      const cur = await readOne(env, outlet, "attendance_v1"), list = arr(cur.value);
+      if (list.some((a) => a && a.date === rec.date && a.staffId === s.id)) break;
+      att = { id: "att_" + rec.date + "_" + s.id, date: rec.date, staffId: s.id, status: "Present", via: "face", checkinId: rec.id, time: rec.time };
+      const w = await writeOne(env, outlet, "attendance_v1", list.concat([att]), cur.rev);
+      if (!w.conflict) break; att = null;
+    }
+  }
+  return json({ ok: true, checkin: rec, attendance: att });
+}
+function istDayOffset(n) { return istDay(n); }
+
 // ---- photos ----
 async function handlePhotoUpload(req, env, url, who) {
   const outlet = outletOf(url);
@@ -1174,6 +1226,7 @@ export default {
       if (path === "/api/data" || path.startsWith("/api/data/")) return await handleData(req, env, url, path, who);
       if (path === "/api/export" && req.method === "GET") return await handleExport(env, url, who);
       if (path === "/api/photos" && req.method === "POST") return await handlePhotoUpload(req, env, url, who);
+      if (path === "/api/checkin" && req.method === "POST") return await handleCheckin(req, env, url, who);
       if (path === "/api/logout-all" && req.method === "POST") {
         if (who.role !== "owner") return json({ error: "Only the owner can sign out every phone." }, 403);
         return await handleLogoutAll(env);
