@@ -579,6 +579,14 @@ drawn on the screen (required for bus / truck; kept as a photo). Each stay gets 
 (PDF)** (on the vehicle and at check-out) prints the same slip in Hindi + English with the signature, Aadhaar masked
 to its last 4 digits, and at check-out the days, free days, total and paid.
 
+**Driver meal waivers, linked to bills and the calendar:** in the Counter's bill, **🅿️ Parked driver's meal? ·
+ड्राइवर का खाना** picks a parked vehicle; saving the bill links it to that stay and makes **that day free** when the bill
+is at least the minimum set in Parking → Rates (🍽️ minimum meal bill; 0 = any meal), and the bill-saved screen says
+so. **📅 Days** on a parked vehicle (and **Stay calendar** on its page) shows every day of the stay as 💰 charged or
+🍽️ free with the meal bill amount; tap a day to switch it (until check-out), with days so far, free days, amount
+charged and meals billed. The app **Calendar** day page has a **🅿️ Parking** card: vehicles parked that day (tap
+one for its stay calendar), free days given and their value, and money collected.
+
 **General store** (`storeitems_v1`, `storesales_v1`, `storebuys_v1`): **🧾 Bill** (tap items, Cash / UPI, separate bill
 numbers), **📦 Stock** (items with buying and selling price, margin %, stock, reorder level, supplier; "stock now"
 records a physical count), **📝 Order list** (items at reorder level, quantity to order, grouped by supplier, share on

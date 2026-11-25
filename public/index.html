@@ -323,6 +323,10 @@
   .belcnt div{display:flex;align-items:center;gap:8px;} .belcnt button{width:40px;height:36px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font-size:20px;font-weight:700;} .belcnt b{min-width:24px;text-align:center;font-size:17px;}
   .keytog{display:grid;grid-template-columns:1fr 1fr;gap:6px;} .keytog button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:10px 4px;font:inherit;font-weight:700;font-size:13px;color:var(--ink);} .keytog button.on{background:#2E7D4F;border-color:#2E7D4F;color:#fff;}
   .signpad{width:100%;height:120px;border:2px dashed var(--line);border-radius:12px;background:#fff;touch-action:none;display:block;} .signshow img{max-width:100%;height:90px;background:#fff;border:1px solid var(--line);border-radius:10px;}
+  .staycal{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:8px;} .sch{text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);}
+  .scd{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;border-radius:10px;border:1.5px solid var(--line);background:var(--panel);font:inherit;color:var(--ink);min-height:58px;}
+  .scd b{font-size:15px;} .scd span{font-size:10.5px;font-weight:700;} .scd small{font-size:9.5px;color:var(--ink-soft);} .scd.free{background:#E8F3EA;border-color:#2E7D4F;} .scd.free span{color:#2E7D4F;}
+  .ppark{margin:8px 0;padding:10px;border-radius:12px;background:#F2EEE5;} .ppark label{display:block;font-size:13px;font-weight:700;margin-bottom:4px;} .ppark select{width:100%;} .ppark small{display:block;margin-top:4px;font-size:12px;}
   .ftabs{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 10px;} .ftabs button{border:1.5px solid var(--line);background:var(--panel);border-radius:12px;padding:7px 4px;font:inherit;font-size:12px;font-weight:700;color:var(--ink);line-height:1.25;}
   .ftabs button small{display:block;font-weight:500;font-size:11px;color:var(--ink-soft);} .ftabs button.on{background:var(--ink);border-color:var(--ink);color:#fff;} .ftabs button.on small{color:#ddd;}
   .ftrow{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--line);} .ftrow.locked{opacity:.55;}
@@ -3748,6 +3752,7 @@ function renderDayPanel(){
   dAdv.forEach(function(x){ html += '<div class="psrow"><span>Salary advance · '+esc((x.description||"").split(" - ")[0])+' <i class="muted">(adjusted against salary)</i></span><b>'+rupeeP(expAmt(x))+'</b></div>'; });
   html += '<div class="billbtns" style="margin-top:10px;"><button class="btn-additem" id="dp_loan">+ Loan entry</button><button class="btn-additem" id="dp_loans">All loans · '+esc(monthLabel(selectedDate.slice(0,7)))+'</button></div></div>';
 
+  html += parkingDayCard(selectedDate);
   if(daySales.length===0 && dayPurch.length===0 && dayInvest.length===0 && dayExpense.length===0){
     html += '<div class="empty">No entries for this day yet.</div>';
   } else {
@@ -3788,6 +3793,7 @@ function renderDayPanel(){
   if(dpd) dpd.addEventListener("click", function(){ openDishLogForm(selectedDate); });
   var dpt = document.getElementById("dp_tally");
   if(dpt) dpt.addEventListener("click", function(){ openTally(selectedDate); });
+  Array.prototype.forEach.call(panel.querySelectorAll("[data-pkcal]"), function(b){ b.addEventListener("click", function(){ openStayCalendar(b.getAttribute("data-pkcal")); }); });
   var dpe = document.getElementById("dp_est");
   if(dpe) dpe.addEventListener("click", function(){ openEstimateSheet(selectedDate); });
 }
@@ -7396,7 +7402,7 @@ function renderParkingView(){
       '<div class="muted" style="font-size:12.5px;">'+esc(p.driver||"")+(p.phone?' · '+esc(p.phone):'')+(p.idNo?' · 🪪 '+esc(idMasked(p)):'')+' · in '+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</div>'+
       '<div style="font-size:13px;">Day '+b.days+(b.waived?' · '+b.waived+' free (ate here)':'')+' · <b>'+rupee(b.amount)+'</b>'+(b.paid?' · paid '+rupee(b.paid):'')+(b.due>0?' · <b class="bad">due '+rupee(b.due)+'</b>':'')+'</div>'+
       '<div class="pkbel">'+parkBelongingsText(p)+((p.pics||[]).length ? ' · 📷 '+(p.pics||[]).filter(function(x){ return x.kind==="vehicle"; }).length+' · 📄 '+(p.pics||[]).filter(function(x){ return x.kind==="doc"; }).length : '')+'</div>'+
-      (canWriteKey(PARK_KEY) ? '<div class="pkbtns"><button class="'+(ateToday?'on':'')+'" data-pkate="'+esc(p.id)+'">'+(ateToday?'✔ Ate here today':'🍽️ Driver ate here today')+'</button><button data-pkout="'+esc(p.id)+'">Check out ›</button></div>' : '')+'</div></div>'; }).join("")
+      (canWriteKey(PARK_KEY) ? '<div class="pkbtns"><button class="'+(ateToday?'on':'')+'" data-pkate="'+esc(p.id)+'">'+(ateToday?'✔ Ate here today':'🍽️ Ate here today')+'</button><button data-pkcal="'+esc(p.id)+'">📅 Days</button><button data-pkout="'+esc(p.id)+'">Check out ›</button></div>' : '')+'</div></div>'; }).join("")
     : '<div class="empty">No vehicle parked right now.</div>';
   var out = parking.filter(function(p){ return p.status==="out"; }).sort(function(a,b){ return (b.outAt||0)-(a.outAt||0); }).slice(0, 10);
   if(out.length) html += '<div class="card" style="margin-top:12px;"><h3>Recently left</h3>'+out.map(function(p){ var b = parkBill(p);
@@ -7406,6 +7412,7 @@ function renderParkingView(){
   var pr = el.querySelector("#pk_rates"); if(pr) pr.addEventListener("click", openParkRates);
   Array.prototype.forEach.call(el.querySelectorAll("[data-pkate]"), function(b){ b.addEventListener("click", function(ev){ ev.stopPropagation(); var p = parking.find(function(x){ return x.id===b.getAttribute("data-pkate"); }); if(!p) return;
     p.waiveDays = p.waiveDays || []; var k = p.waiveDays.indexOf(today); if(k>=0) p.waiveDays.splice(k,1); else p.waiveDays.push(today); saveParking(); renderAll(); }); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-pkcal]"), function(b){ b.addEventListener("click", function(ev){ ev.stopPropagation(); openStayCalendar(b.getAttribute("data-pkcal")); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-pkout]"), function(b){ b.addEventListener("click", function(ev){ ev.stopPropagation(); openParkOut(b.getAttribute("data-pkout")); }); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-pk]"), function(b){ b.addEventListener("click", function(){ openParkIn(b.getAttribute("data-pk")); }); });
   if(recSub==="parking") updateRecordsTotal();
@@ -7417,15 +7424,65 @@ function parkBelongingsText(p){
   if(b.other) parts.push(esc(b.other));
   return parts.length ? 'Left with us: '+parts.join(" · ") : '';
 }
+// Driver meals: a counter bill linked to a parked vehicle makes that day free (if the bill is at least
+// the minimum set in Parking rates). The stay calendar shows every day of a stay: charged or free.
+function parkMealMin(){ var v = settings.parkMealMin; return v>0 ? +v : 0; }
+function parkStayDays(p){
+  var out = [], d = p.inDate, end = p.outDate || fmtDate(new Date()), guard = 0;
+  while(d && d <= end && guard++ < 400){ out.push(d); d = addDays(d, 1); }
+  return out;
+}
+function linkMealToParking(p, sale){
+  p.meals = p.meals || []; p.waiveDays = p.waiveDays || [];
+  p.meals.push({ date:sale.date, saleId:sale.id, amount:sale.amount, no:sale.order && sale.order.no });
+  var ok = sale.amount >= parkMealMin();
+  if(ok && p.waiveDays.indexOf(sale.date)<0) p.waiveDays.push(sale.date);
+  return ok;
+}
+function openStayCalendar(id){
+  var p = parking.find(function(x){ return x.id===id; }); if(!p) return;
+  var sheet = document.getElementById("sheet"), days = parkStayDays(p), canEdit = canWriteKey(PARK_KEY) && p.status==="in", b = parkBill(p), v = vehicleOf(p.vtype);
+  var meals = {}; (p.meals||[]).forEach(function(m){ meals[m.date] = (meals[m.date]||0) + (+m.amount||0); });
+  var html = '<h2 class="serif">📅 Stay calendar · '+v.i+' <span class="notr">'+esc(p.vno)+'</span></h2>';
+  html += '<div class="backupnote">Tap a day when the driver stayed in the vehicle and ate here — that day is free. Meals billed at the Counter for this vehicle mark it by themselves'+(parkMealMin()?' (bill of '+rupee(parkMealMin())+' or more)':'')+'.</div>';
+  var first = parseDate(days[0]).getDay(), lead = (first + 6) % 7;   // weeks start on Monday
+  html += '<div class="staycal"><div class="sch">Mo</div><div class="sch">Tu</div><div class="sch">We</div><div class="sch">Th</div><div class="sch">Fr</div><div class="sch">Sa</div><div class="sch">Su</div>';
+  for(var i=0;i<lead;i++) html += '<div></div>';
+  days.forEach(function(d){ var free = (p.waiveDays||[]).indexOf(d)>=0, m = meals[d];
+    html += '<button class="scd '+(free?'free':'paid')+'" data-sd="'+d+'"'+(canEdit?'':' disabled')+'><b>'+(+d.slice(8))+'</b><span>'+(free?'🍽️ free':'₹ '+(+p.rate||0))+'</span>'+(m?'<small>bill '+rupee(m)+'</small>':'')+'</button>'; });
+  html += '</div>';
+  html += '<div class="card" style="margin-top:10px;"><div class="psrow"><span>Days so far (per 24 hours)</span><b>'+b.days+'</b></div><div class="psrow"><span>🍽️ Free days (ate here)</span><b class="ok">'+b.waived+'</b></div>'+
+    '<div class="psrow"><span>Charged '+b.charged+' × '+rupee(p.rate)+'</span><b>'+rupee(b.amount)+'</b></div>'+((p.meals||[]).length ? '<div class="psrow"><span>Meals billed for this driver</span><b>'+(p.meals||[]).length+' · '+rupee((p.meals||[]).reduce(function(a,m){ return a+(+m.amount||0); },0))+'</b></div>' : '')+'</div>';
+  html += '<div class="sheetbtns"><button class="btn-cancel" id="sc_c" style="flex:1;">Close</button></div>';
+  sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sd]"), function(bt){ bt.addEventListener("click", function(){ var d = bt.getAttribute("data-sd"); p.waiveDays = p.waiveDays || [];
+    var k = p.waiveDays.indexOf(d); if(k>=0) p.waiveDays.splice(k,1); else p.waiveDays.push(d); saveParking(); renderAll(); openStayCalendar(id); }); });
+  document.getElementById("sc_c").addEventListener("click", closeForm);
+}
+// Calendar day panel: parking that day.
+function parkingDayCard(d){
+  if(!parkingOn() || !canReadKey(PARK_KEY)) return "";
+  var here = parking.filter(function(p){ return p.inDate && p.inDate <= d && (p.outDate || fmtDate(new Date())) >= d; });
+  var free = here.filter(function(p){ return (p.waiveDays||[]).indexOf(d)>=0; }), got = parkPaymentsIn(function(x){ return x===d; });
+  var html = '<div class="card cashday" style="margin:4px 0 12px;"><h3>🅿️ Parking</h3>';
+  if(!here.length && !got) return html+'<div class="backupnote" style="margin:0;">No vehicles parked this day.</div></div>';
+  html += '<div class="psrow"><span>Parked this day</span><b>'+here.length+'</b></div>';
+  html += here.map(function(p){ var fr = (p.waiveDays||[]).indexOf(d)>=0;
+    return '<div class="psrow" data-pkcal="'+esc(p.id)+'" style="cursor:pointer;"><span>'+vehicleOf(p.vtype).i+' <span class="notr">'+esc(p.vno)+'</span>'+(p.driver?' · '+esc(p.driver):'')+'</span><b class="'+(fr?'ok':'')+'">'+(fr?'🍽️ free':rupee(p.rate))+' ›</b></div>'; }).join("");
+  html += '<div class="psrow"><span>🍽️ Free days given (driver ate here)</span><b>'+free.length+' · '+rupee(free.reduce(function(a,p){ return a+(+p.rate||0); },0))+'</b></div>';
+  html += '<div class="psrow"><span>Collected this day</span><b>'+rupee(got)+'</b></div></div>';
+  return html;
+}
 function openParkRates(){
   var sheet = document.getElementById("sheet");
   var html = '<h2 class="serif">Parking rates · किराया</h2><div class="backupnote">Charge for every 24 hours (or part) from check-in.</div>'+
     VEHICLES.map(function(v){ return '<div class="field"><label>'+v.i+' '+esc(v.t)+' · '+esc(v.hi)+' (₹ per day)</label><input type="number" inputmode="numeric" data-rate="'+v.k+'" value="'+esc(parkRate(v.k))+'"></div>'; }).join("")+
+    '<div class="field"><label>🍽️ Day is free when the driver’s meal bill is at least (₹, 0 = any meal)</label><input type="number" inputmode="numeric" id="pr_meal" value="'+esc(parkMealMin())+'"></div>'+
     '<div class="sheetbtns"><button class="btn-cancel" id="pr_c">Cancel</button><button class="btn-save" id="pr_s">Save</button></div>';
   sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
   document.getElementById("pr_c").addEventListener("click", closeForm);
   document.getElementById("pr_s").addEventListener("click", function(){ var r = {}; Array.prototype.forEach.call(sheet.querySelectorAll("[data-rate]"), function(i){ var v = parseFloat(i.value); r[i.getAttribute("data-rate")] = v>=0 ? v : 0; });
-    settings.parkingRates = r; saveSettings(); closeForm(); renderAll(); });
+    settings.parkingRates = r; var mm = parseFloat(document.getElementById("pr_meal").value); settings.parkMealMin = mm>0 ? mm : 0; saveSettings(); closeForm(); renderAll(); });
 }
 function openParkIn(id){
   var p = id ? JSON.parse(JSON.stringify(parking.find(function(x){ return x.id===id; }))) : { id:uid(), vtype:"truck", vno:"", driver:"", phone:"", bel:{ key:false }, diesel:"", payments:[], waiveDays:[] };
@@ -7456,7 +7513,7 @@ function openParkIn(id){
       '<div class="psrow"><span>'+b.days+' day'+(b.days!==1?'s':'')+' × '+rupee(p.rate)+(b.waived?' − '+b.waived+' free (driver ate here: '+(p.waiveDays||[]).map(fmtD).join(", ")+')':'')+'</span><b>'+rupee(b.amount)+'</b></div>'+
       (p.payments||[]).map(function(x){ return '<div class="psrow"><span class="muted">Paid '+esc(fmtD(x.date))+' · '+esc(x.mode||"Cash")+'</span><b>'+rupee(x.amount)+'</b></div>'; }).join("")+
       '<div class="psrow"><span><b>'+(b.due>=0?'Due':'Extra paid')+'</b></span><b class="'+(b.due>0?'bad':'')+'">'+rupee(Math.abs(b.due))+'</b></div></div>';
-    html += '<button class="btn-additem" id="pk_slip">🧾 Parking slip (PDF) · पर्ची</button>';
+    html += '<div class="billbtns"><button class="btn-additem" id="pk_cal">📅 Stay calendar · free days</button><button class="btn-additem" id="pk_slip">🧾 Parking slip (PDF)</button></div>';
   }
   html += '<div class="err" id="pk_err"></div><div class="sheetbtns"><button class="btn-cancel" id="pk_c">'+(ro?'Close':'Cancel')+'</button>'+(!isNew && !ro ? '<button class="btn-del" id="pk_del">Delete</button>' : '')+(ro?'':'<button class="btn-save" id="pk_s">'+(isNew?'Park it':'Save')+'</button>')+'</div>';
   sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
@@ -7488,6 +7545,7 @@ function openParkIn(id){
   drawPics();
   var va = document.getElementById("pk_vadd"); if(va) va.addEventListener("click", function(){ pickPhoto(function(d){ p.pics.push({ id:uid(), kind:"vehicle", label:"Vehicle", src:d, at:Date.now() }); drawPics(); }); });
   var da = document.getElementById("pk_dadd"); if(da) da.addEventListener("click", function(){ var lbl = document.getElementById("pk_dkind").value; pickPhoto(function(d){ p.pics.push({ id:uid(), kind:"doc", label:lbl, src:d, at:Date.now() }); drawPics(); }); });
+  var pcl = document.getElementById("pk_cal"); if(pcl) pcl.addEventListener("click", function(){ openStayCalendar(p.id); });
   var sl = document.getElementById("pk_slip"); if(sl) sl.addEventListener("click", function(){ parkSlipPdf(parking.find(function(x){ return x.id===p.id; }) || p); });
   document.getElementById("pk_c").addEventListener("click", closeForm);
   var del = document.getElementById("pk_del"); if(del) del.addEventListener("click", function(){ askConfirm("Delete this parking entry?", function(){ parking = parking.filter(function(x){ return x.id!==p.id; }); saveParking(); closeForm(); renderAll(); }); });
@@ -11498,6 +11556,9 @@ function renderCounterPay(speak){
     }).join("");
     html += '<button class="pdisc'+(disc?" on":"")+'" id="pp_disc"><span>🏷️ '+(disc ? esc(counterDisc.label) : "Discount")+'</span><b>'+(disc ? "− "+rupee(disc) : "Add")+'</b></button>';
     if(disc) html += '<div class="psub"><span>Before discount</span><s>'+rupee(sub)+'</s></div>';
+    var parkedNow = parkingOn() && canWriteKey(PARK_KEY) ? parking.filter(function(p){ return p.status==="in"; }) : [];
+    if(parkedNow.length) html += '<div class="ppark"><label>🅿️ Parked driver’s meal? · ड्राइवर का खाना</label><select id="pp_park"><option value="">No</option>'+parkedNow.map(function(p){ return '<option value="'+esc(p.id)+'"'+(counterMeta.parkId===p.id?' selected':'')+'>'+esc(vehicleOf(p.vtype).i+" "+p.vno+(p.driver?" · "+p.driver:""))+'</option>'; }).join("")+'</select>'+
+      (counterMeta.parkId ? '<small>'+(total >= parkMealMin() ? '✔ Today’s parking becomes free for this vehicle.' : 'Bill below '+rupee(parkMealMin())+' — parking stays charged.')+'</small>' : '')+'</div>';
     if(charge) html += '<div class="psub"><span>🛵 Delivery charge</span><b>'+rupee(charge)+'</b></div>';
     html += '<div class="ptotal"><span>Total</span><b>'+rupee(total)+'</b><button class="psay" id="pp_say" aria-label="say the total">🔊</button></div>';
     html += '<div class="ppay"><button class="cash" data-pay="cash"><span>💵</span>Cash</button><button class="upi" data-pay="upi"><span>📱</span>UPI</button><button class="udh" data-pay="udhaar"><span>📒</span>Udhaar</button></div>';
@@ -11548,6 +11609,7 @@ function renderCounterPay(speak){
   on("[data-note]", function(b){ payGiven += +b.getAttribute("data-note"); renderCounterPay(); var bk = payGiven - total; if(bk>=0) sayHindi(bk>0 ? Math.round(bk)+" रुपये वापस दें" : "पूरे पैसे मिल गए"); });
   on("[data-cust]", function(b){ finishCounterBill("Credit", b.getAttribute("data-cust")); });
   on("#pp_disc", function(){ payStep = "discount"; renderCounterPay(); });
+  var ppk = document.getElementById("pp_park"); if(ppk) ppk.addEventListener("change", function(){ counterMeta.parkId = ppk.value || null; renderCounterPay(); });
   on("[data-offer]", function(b){ var o = offers.find(function(x){ return x.id===b.getAttribute("data-offer"); }); if(!o) return;
     counterDisc = { label:o.name, kind:o.kind==="pct"?"pct":"amt", value:+o.value, offer:o.id }; payStep = "order"; renderCounter(); renderCounterPay(); });
   on("[data-qd]", function(b){ var q = b.getAttribute("data-qd").split(":");
@@ -11595,6 +11657,9 @@ function finishCounterBill(mode, customer, given, plat){
   if(plat){ Object.assign(rec.order, { platform:plat.platform, pid:plat.pid, gross:plat.gross, commission:plat.commission, packing:plat.packing }); }
   if(disc){ rec.order.subtotal = sub; rec.order.discount = disc; rec.order.discountLabel = counterDisc.label; if(counterDisc.offer) rec.order.offerId = counterDisc.offer; }
   rec.desc = (CHANNELS[counterType] ? CHANNELS[counterType].t+" · " : "")+"Bill "+no+": "+billText(rec)+(disc ? " · discount "+rupee(disc) : "")+(plat ? " · "+CHANNELS[plat.platform].t+" #"+plat.pid+", customer paid "+rupee(plat.gross)+", commission ~"+rupee(plat.commission) : "");
+  var parkMsg = "";
+  if(counterMeta.parkId){ var pkv = parking.find(function(x){ return x.id===counterMeta.parkId && x.status==="in"; });
+    if(pkv){ rec.order.parkId = pkv.id; var freeNow = linkMealToParking(pkv, rec); saveParking(); parkMsg = freeNow ? "🅿️ Parking today free for "+pkv.vno : "🅿️ Meal linked to "+pkv.vno+" (below the minimum, still charged)"; } }
   sales.push(rec);
   items.forEach(function(i){ dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:id }); });
   var sentToKitchen = false;
@@ -11608,7 +11673,7 @@ function finishCounterBill(mode, customer, given, plat){
   counterOrder = {}; counterDisc = null; counterTicket = null; counterMeta = {}; counterTable = null;
   closeForm(); renderAll();
   var sheet = document.getElementById("sheet");
-  sheet.innerHTML = '<div class="pdone"><div class="tick">✔</div><b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+(sentToKitchen ? '<div class="muted" style="margin-top:6px;">Sent to the kitchen · Live orders</div>' : '')+
+  sheet.innerHTML = '<div class="pdone"><div class="tick">✔</div><b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+(parkMsg ? '<div class="ok" style="margin-top:6px;">'+esc(parkMsg)+'</div>' : '')+(sentToKitchen ? '<div class="muted" style="margin-top:6px;">Sent to the kitchen · Live orders</div>' : '')+
     '<button class="btn-save" id="pd_ok" style="width:100%;margin-top:16px;">Next customer</button></div>';
   document.getElementById("sheetBg").classList.add("on");
   sayHindi("धन्यवाद");
