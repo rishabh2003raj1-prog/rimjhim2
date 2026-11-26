@@ -663,22 +663,25 @@ the Dashboard an **Other businesses** card. Neither is mixed into cafe sales or 
   bank, paid from the store bank), a **closing count** (staff can count; shows ✔ or the difference) and recent counts. A **Parking** and a **General store** switch are in Logins → What each role can use.
 
 **Parking** (`parking_v1`): **Vehicle in** — type (🚌 Bus, 🚚 Truck, 🚛 Large container truck, 🛻 Tempo, 🚗 Car, 🏍️ Bike, each
-with its **rate per day**, editable), vehicle number, driver and phone, **driver ID** (driving licence or Aadhaar number — **required for bus, truck and
+with its **rate per night**, editable), vehicle number, driver and phone, **driver ID** (driving licence or Aadhaar number — **required for bus, truck and
 container**, together with the driver's name and 10-digit phone, unless a licence / Aadhaar photo is added; Aadhaar must
 be 12 digits and lists show only its last 4), diesel level, what is **left with us** (🔑 key,
 🛞 stepney, 🔋 battery, ⛺ tirpal, papers, tools, anything else) and an optional advance; **📷 vehicle photos** (front, number plate, damage) and **📄 document photos** (RC,
 driving licence, Aadhaar / ID, insurance, permit, other) — taken with the camera, shown as thumbnails (tap for full
-screen), kept in photo storage like bill photos (`pics` on the parking entry). Charged per 24 hours (or part)
-from check-in; **🍽️ Driver ate here today** makes that day free. Parked vehicles show day count, free days, amount,
-paid and due. **Check out** shows the bill, needs every belonging ticked as given back, and takes the payment
+screen), kept in photo storage like bill photos (`pics` on the parking entry). Charged **per night**: every
+midnight the vehicle stays over is one night (a stay inside one day = 1 night; Mon evening → Thu morning = 3 nights).
+**One night free per stay** when the driver stays in the vehicle / eats here: marked by **🍽️ Driver ate here today**,
+a day tapped in the stay calendar, a linked counter meal bill, or the **🛏️ Driver stayed in the vehicle** tick at
+check-out. Parking rates → "Free nights per stay" changes the limit (default 1; 0 = every such night free). Parked
+vehicles show nights, free nights, amount, paid and due. **Check out** shows the bill, needs every belonging ticked as given back, and takes the payment
 (cash / UPI). Recently left vehicles keep their history.
 The form follows the paper parking slip (नाम, आधार, मो., गाड़ी नं., डीज़ल, बैटरी, स्टेपनी, जैक, तिरपाल, पार्किंग,
 ड्राइवर साइन): **counts** for battery / stepney / jack / tirpal / papers / tools (✗ = none), **🔑 key with us or
 driver kept it**, diesel as a preset (लाल पर, लाल से थोड़ा ऊपर, ¼ … full) or **in words** (e.g. "17 अंगुली"), the
-**agreed rate per day** (filled from the vehicle type, can be changed per vehicle), and the **driver's signature**
+**agreed rate per night** (filled from the vehicle type, can be changed per vehicle), and the **driver's signature**
 drawn on the screen (required for bus / truck; kept as a photo). Each stay gets a slip number; **🧾 Parking slip
 (PDF)** (on the vehicle and at check-out) prints the same slip in Hindi + English with the signature, Aadhaar masked
-to its last 4 digits, and at check-out the days, free days, total and paid.
+to its last 4 digits, and at check-out the nights, free nights, total and paid.
 
 **Driver meal waivers, linked to bills and the calendar:** in the Counter's bill, **🅿️ Parked driver's meal? ·
 ड्राइवर का खाना** picks a parked vehicle; saving the bill links it to that stay and makes **that day free** when the bill

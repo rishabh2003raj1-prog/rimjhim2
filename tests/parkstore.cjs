@@ -59,11 +59,12 @@ const dis = (p) => p.click('#dlgBtns button', { timeout:1500 }).catch(()=>{});
   const srvp = (await call(O, 'GET', '/api/data?outlet=rimjhim')).json.items.parking_v1.value[0].pics || [];
   assert(srvp.length===3 && srvp.every(x => /^\/api\/photos\//.test(x.src)) && srvp.some(x => x.kind==='doc' && x.label==='RC (registration)') && srvp.some(x => x.kind==='sign'), 'photos uploaded to photo storage (not kept inside the list)');
   // 3.5 days later, driver ate here two days
-  await E(O, `var p = parking[0]; p.inAt = Date.now() - 3.5*86400000; p.inDate = fmtDate(new Date(p.inAt)); p.waiveDays = [addDays(fmtDate(new Date()), -1)]; saveParking(); renderAll(); switchRecordsSub('parking');`);
+  await E(O, `var p = parking[0]; p.inDate = addDays(fmtDate(new Date()), -3); p.inAt = parseDate(p.inDate).getTime() + 20*3600000; p.waiveDays = [addDays(fmtDate(new Date()), -1)]; saveParking(); renderAll(); switchRecordsSub('parking');`);
   await O.click('[data-pkate]'); await O.waitForTimeout(100);
   let bl = await E(O, 'JSON.stringify(parkBill(parking[0]))');
   console.log('   '+bl);
-  assert(/"days":4,"waived":2,"charged":2,"amount":300,"paid":100,"due":200/.test(bl), '4 days, 2 free (ate here), ₹300, paid ₹100, ₹200 due');
+  assert(/"days":3,"nights":3,"waived":1,"charged":2,"amount":300,"paid":100,"due":200/.test(bl), '3 nights, one night free (two days marked, one free per stay), ₹300, paid ₹100, ₹200 due');
+  assert(await E(O, `JSON.stringify([parkNights({ inDate:"2026-01-05", outDate:"2026-01-05" }), parkNights({ inDate:"2026-01-05", outDate:"2026-01-06" }), parkNights({ inDate:"2026-01-05", outDate:"2026-01-08" })])`)==='[1,1,3]', 'nights: same day = 1, overnight = 1, Mon→Thu = 3');
   await O.screenshot({ path: process.env.S+'/parking_list.png' });
   await O.click('[data-pkout]'); await O.waitForSelector('#po_s');
   await O.click('#po_s'); assert(/Tick everything given back/.test(await O.textContent('#po_err')), 'must tick belongings returned');

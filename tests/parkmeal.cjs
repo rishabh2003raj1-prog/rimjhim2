@@ -37,12 +37,23 @@ const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode
   assert(/bill ₹140/.test(await p.textContent('.staycal')), 'the meal bill shows on that day');
   const y = await E(p, `addDays(fmtDate(new Date()), -1)`);
   await p.click(`[data-sd="${y}"]`); await p.waitForTimeout(100);
-  assert(await E(p, `parkBill(parking[0]).waived`)===2 && /Freedays\(atehere\)2/.test((await p.textContent('#sheet')).replace(/\s+/g,'')), 'tap yesterday: 2 free days');
+  assert(await E(p, `JSON.stringify([parkBill(parking[0]).days, parkBill(parking[0]).waived])`)==='[2,1]' && /Freenights1/.test((await p.textContent('#sheet')).replace(/\s+/g,'')), 'two marked days but 2 nights with one free night per stay');
+  await E(p, `settings.parkMaxFree = 0; openStayCalendar('pk1')`);
+  assert(await E(p, `parkBill(parking[0]).waived`)===2, 'setting "0 = every such night": both nights free');
+  await E(p, `settings.parkMaxFree = 1; openStayCalendar('pk1')`);
   await p.screenshot({ path: process.env.S+'/parkmeal_cal.png' });
   // App Calendar day card
   await E(p, `closeForm(); selectedDate = fmtDate(new Date()); showView('calendar'); renderAll();`); await p.waitForTimeout(150);
   const dc = (await p.textContent('#dayPanel')).replace(/\s+/g,'');
   assert(/Parking/.test(dc) && /BR06PG9390/.test(dc) && /🍽️free/.test(dc) && /Freedaysgiven\(driveratehere\)1/.test(dc), 'Calendar day shows parked vehicles and free days');
   await p.click('#dayPanel [data-pkcal]'); assert(await p.$('.staycal'), 'tap a vehicle in the Calendar to open its stay calendar');
+  // Checkout: tick "driver stayed in the vehicle" = one night free
+  await E(p, `closeForm(); var d0 = addDays(fmtDate(new Date()), -2); parking.push({ id:'pk2', no:2, vtype:'bus', vno:'UP32AB1234', rate:200, inDate:d0, inAt:parseDate(d0).getTime()+19*3600000, inTime:'19:00', status:'in', bel:{}, payments:[], waiveDays:[] }); saveParking(); openParkOut('pk2');`);
+  let co = (await p.textContent('#sheet')).replace(/\s+/g,' ');
+  assert(/2 nights × ₹200/.test(co) && /To collect · लेना है ?₹400/.test(co), 'checkout: 2 nights × ₹200 = ₹400');
+  await p.check('#po_stay'); await p.waitForTimeout(100);
+  co = (await p.textContent('#sheet')).replace(/\s+/g,' ');
+  assert(/1 night free/.test(co) && /To collect · लेना है ?₹200/.test(co) && await p.inputValue('#po_amt')==='200', 'tick "driver stayed in the vehicle": one night free, ₹200 to collect');
+  await p.screenshot({ path: process.env.S+'/park_night_free.png' });
   console.log('ERRORS', JSON.stringify(errs)); await b.close();
 })();

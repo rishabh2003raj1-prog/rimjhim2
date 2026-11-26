@@ -7441,11 +7441,18 @@ function viewPhoto(src, caption){
 var BELONGINGS = [["battery","🔋 Battery","बैटरी"],["stepney","🛞 Stepney","स्टेपनी"],["jack","🔧 Jack","जैक"],["tirpal","⛺ Tirpal","तिरपाल"],["papers","📄 Papers / RC","कागज़"],["tools","🧰 Tools","औज़ार"]];
 function belCount(p, k){ var v = (p.bel||{})[k]; return typeof v==="number" ? v : (v===true ? 1 : (+v||0)); }
 // Days charged so far (or at check-out), waived days, amount, paid and due.
+// Charged per NIGHT: every midnight the vehicle stays over is one night (a stay inside one day = 1).
+// Free nights: days marked "driver stayed in the truck / ate here" (calendar, counter meal bills, or the
+// checkout tick), at most parkMaxFree per stay (default 1; 0 = no limit).
+function parkEndDate(p, atMs){ return p.outDate || fmtDate(new Date(atMs || Date.now())); }
+function parkNights(p, atMs){ var a = parseDate(p.inDate), b = parseDate(parkEndDate(p, atMs)); return Math.max(1, Math.round((b - a) / 86400000)); }
+function parkMaxFree(){ var v = settings.parkMaxFree; return v===0 || v==="0" ? 0 : (+v>0 ? +v : 1); }
+function parkFreeMarks(p, atMs){ var end = parkEndDate(p, atMs), n = (p.waiveDays||[]).filter(function(d, i, a){ return d >= p.inDate && d <= end && a.indexOf(d)===i; }).length; return n + (p.stayFree ? 1 : 0); }
 function parkBill(p, atMs){
   var end = p.outAt || atMs || Date.now(), hrs = Math.max(0, (end - p.inAt) / 3600000);
-  var days = Math.max(1, Math.ceil(hrs / 24 - 0.0001)), waived = Math.min(days, (p.waiveDays||[]).length);
+  var days = parkNights(p, end), max = parkMaxFree(), waived = Math.min(days, parkFreeMarks(p, end), max || days);
   var amount = r2((days - waived) * (+p.rate||0)), paid = r2((p.payments||[]).reduce(function(a,x){ return a+(+x.amount||0); },0));
-  return { days:days, waived:waived, charged:days-waived, amount:amount, paid:paid, due:r2(amount - paid), hrs:hrs };
+  return { days:days, nights:days, waived:waived, charged:days-waived, amount:amount, paid:paid, due:r2(amount - paid), hrs:hrs };
 }
 function parkPaymentsIn(test, mode){ var t = 0; parking.forEach(function(p){ (p.payments||[]).forEach(function(x){ if(test(x.date) && (!mode || (mode==="Cash" ? (x.mode||"Cash")==="Cash" : (x.mode||"Cash")!=="Cash"))) t += +x.amount||0; }); }); return r2(t); }
 function renderParkingView(){
@@ -7459,13 +7466,13 @@ function renderParkingView(){
   html += inside.length ? inside.map(function(p){ var b = parkBill(p), v = vehicleOf(p.vtype), ateToday = (p.waiveDays||[]).indexOf(today)>=0;
     return '<div class="pkcard" data-pk="'+esc(p.id)+'"><div class="pki">'+v.i+'</div><div class="pkb"><b class="notr">'+esc(p.vno||"—")+'</b> <span class="muted">'+esc(v.t)+'</span>'+
       '<div class="muted" style="font-size:12.5px;">'+esc(p.driver||"")+(p.phone?' · '+esc(p.phone):'')+(p.idNo?' · 🪪 '+esc(idMasked(p)):'')+' · in '+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</div>'+
-      '<div style="font-size:13px;">Day '+b.days+(b.waived?' · '+b.waived+' free (ate here)':'')+' · <b>'+rupee(b.amount)+'</b>'+(b.paid?' · paid '+rupee(b.paid):'')+(b.due>0?' · <b class="bad">due '+rupee(b.due)+'</b>':'')+'</div>'+
+      '<div style="font-size:13px;">'+b.days+' night'+(b.days!==1?'s':'')+(b.waived?' · '+b.waived+' free':'')+' · <b>'+rupee(b.amount)+'</b>'+(b.paid?' · paid '+rupee(b.paid):'')+(b.due>0?' · <b class="bad">due '+rupee(b.due)+'</b>':'')+'</div>'+
       '<div class="pkbel">'+parkBelongingsText(p)+((p.pics||[]).length ? ' · 📷 '+(p.pics||[]).filter(function(x){ return x.kind==="vehicle"; }).length+' · 📄 '+(p.pics||[]).filter(function(x){ return x.kind==="doc"; }).length : '')+'</div>'+
       (canWriteKey(PARK_KEY) ? '<div class="pkbtns"><button class="'+(ateToday?'on':'')+'" data-pkate="'+esc(p.id)+'">'+(ateToday?'✔ Ate here today':'🍽️ Ate here today')+'</button><button data-pkcal="'+esc(p.id)+'">📅 Days</button><button data-pkout="'+esc(p.id)+'">Check out ›</button></div>' : '')+'</div></div>'; }).join("")
     : '<div class="empty">No vehicle parked right now.</div>';
   var out = parking.filter(function(p){ return p.status==="out"; }).sort(function(a,b){ return (b.outAt||0)-(a.outAt||0); }).slice(0, 10);
   if(out.length) html += '<div class="card" style="margin-top:12px;"><h3>Recently left</h3>'+out.map(function(p){ var b = parkBill(p);
-    return '<div class="psrow" data-pk="'+esc(p.id)+'" style="cursor:pointer;"><span>'+vehicleOf(p.vtype).i+' <span class="notr">'+esc(p.vno)+'</span><br><small class="muted">'+esc(fmtD(p.inDate))+' → '+esc(fmtD(p.outDate))+' · '+b.days+' day'+(b.days!==1?'s':'')+(b.waived?', '+b.waived+' free':'')+'</small></span><b class="'+(b.due>0?'bad':'')+'">'+rupee(b.paid)+(b.due>0?' (due '+rupee(b.due)+')':'')+'</b></div>'; }).join("")+'</div>';
+    return '<div class="psrow" data-pk="'+esc(p.id)+'" style="cursor:pointer;"><span>'+vehicleOf(p.vtype).i+' <span class="notr">'+esc(p.vno)+'</span><br><small class="muted">'+esc(fmtD(p.inDate))+' → '+esc(fmtD(p.outDate))+' · '+b.days+' night'+(b.days!==1?'s':'')+(b.waived?', '+b.waived+' free':'')+'</small></span><b class="'+(b.due>0?'bad':'')+'">'+rupee(b.paid)+(b.due>0?' (due '+rupee(b.due)+')':'')+'</b></div>'; }).join("")+'</div>';
   el.innerHTML = html;
   var pi = el.querySelector("#pk_in"); if(pi) pi.addEventListener("click", function(){ openParkIn(null); });
   var pr = el.querySelector("#pk_rates"); if(pr) pr.addEventListener("click", openParkRates);
@@ -7486,8 +7493,9 @@ function parkBelongingsText(p){
 // Driver meals: a counter bill linked to a parked vehicle makes that day free (if the bill is at least
 // the minimum set in Parking rates). The stay calendar shows every day of a stay: charged or free.
 function parkMealMin(){ var v = settings.parkMealMin; return v>0 ? +v : 0; }
+// Every date of a stay (check-in day to today / check-out day); the bill counts the nights between.
 function parkStayDays(p){
-  var out = [], d = p.inDate, end = p.outDate || fmtDate(new Date()), guard = 0;
+  var out = [], d = p.inDate, end = parkEndDate(p), guard = 0;
   while(d && d <= end && guard++ < 400){ out.push(d); d = addDays(d, 1); }
   return out;
 }
@@ -7503,14 +7511,14 @@ function openStayCalendar(id){
   var sheet = document.getElementById("sheet"), days = parkStayDays(p), canEdit = canWriteKey(PARK_KEY) && p.status==="in", b = parkBill(p), v = vehicleOf(p.vtype);
   var meals = {}; (p.meals||[]).forEach(function(m){ meals[m.date] = (meals[m.date]||0) + (+m.amount||0); });
   var html = '<h2 class="serif">📅 Stay calendar · '+v.i+' <span class="notr">'+esc(p.vno)+'</span></h2>';
-  html += '<div class="backupnote">Tap a day when the driver stayed in the vehicle and ate here — that day is free. Meals billed at the Counter for this vehicle mark it by themselves'+(parkMealMin()?' (bill of '+rupee(parkMealMin())+' or more)':'')+'.</div>';
+  html += '<div class="backupnote">Charged per night ('+b.days+' night'+(b.days!==1?'s':'')+' so far). Tap a day when the driver stayed in the vehicle / ate here to give a free night'+(parkMaxFree() ? ' (up to '+parkMaxFree()+' free night'+(parkMaxFree()!==1?'s':'')+' per stay)' : '')+'. Meals billed at the Counter for this vehicle mark it by themselves'+(parkMealMin()?' (bill of '+rupee(parkMealMin())+' or more)':'')+'.</div>';
   var first = parseDate(days[0]).getDay(), lead = (first + 6) % 7;   // weeks start on Monday
   html += '<div class="staycal"><div class="sch">Mo</div><div class="sch">Tu</div><div class="sch">We</div><div class="sch">Th</div><div class="sch">Fr</div><div class="sch">Sa</div><div class="sch">Su</div>';
   for(var i=0;i<lead;i++) html += '<div></div>';
   days.forEach(function(d){ var free = (p.waiveDays||[]).indexOf(d)>=0, m = meals[d];
-    html += '<button class="scd '+(free?'free':'paid')+'" data-sd="'+d+'"'+(canEdit?'':' disabled')+'><b>'+(+d.slice(8))+'</b><span>'+(free?'🍽️ free':'₹ '+(+p.rate||0))+'</span>'+(m?'<small>bill '+rupee(m)+'</small>':'')+'</button>'; });
+    html += '<button class="scd '+(free?'free':'paid')+'" data-sd="'+d+'"'+(canEdit?'':' disabled')+'><b>'+(+d.slice(8))+'</b><span>'+(free?'🛏️ free':'🅿️')+'</span>'+(m?'<small>bill '+rupee(m)+'</small>':'')+'</button>'; });
   html += '</div>';
-  html += '<div class="card" style="margin-top:10px;"><div class="psrow"><span>Days so far (per 24 hours)</span><b>'+b.days+'</b></div><div class="psrow"><span>🍽️ Free days (ate here)</span><b class="ok">'+b.waived+'</b></div>'+
+  html += '<div class="card" style="margin-top:10px;"><div class="psrow"><span>Nights so far</span><b>'+b.days+'</b></div><div class="psrow"><span>🛏️ Free nights</span><b class="ok">'+b.waived+'</b></div>'+
     '<div class="psrow"><span>Charged '+b.charged+' × '+rupee(p.rate)+'</span><b>'+rupee(b.amount)+'</b></div>'+((p.meals||[]).length ? '<div class="psrow"><span>Meals billed for this driver</span><b>'+(p.meals||[]).length+' · '+rupee((p.meals||[]).reduce(function(a,m){ return a+(+m.amount||0); },0))+'</b></div>' : '')+'</div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="sc_c" style="flex:1;">Close</button></div>';
   sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
@@ -7534,14 +7542,16 @@ function parkingDayCard(d){
 }
 function openParkRates(){
   var sheet = document.getElementById("sheet");
-  var html = '<h2 class="serif">Parking rates · किराया</h2><div class="backupnote">Charge for every 24 hours (or part) from check-in.</div>'+
-    VEHICLES.map(function(v){ return '<div class="field"><label>'+v.i+' '+esc(v.t)+' · '+esc(v.hi)+' (₹ per day)</label><input type="number" inputmode="numeric" data-rate="'+v.k+'" value="'+esc(parkRate(v.k))+'"></div>'; }).join("")+
-    '<div class="field"><label>🍽️ Day is free when the driver’s meal bill is at least (₹, 0 = any meal)</label><input type="number" inputmode="numeric" id="pr_meal" value="'+esc(parkMealMin())+'"></div>'+
+  var html = '<h2 class="serif">Parking rates · किराया</h2><div class="backupnote">Charged per night: every night the vehicle stays over (a stay within one day = 1 night).</div>'+
+    VEHICLES.map(function(v){ return '<div class="field"><label>'+v.i+' '+esc(v.t)+' · '+esc(v.hi)+' (₹ per night)</label><input type="number" inputmode="numeric" data-rate="'+v.k+'" value="'+esc(parkRate(v.k))+'"></div>'; }).join("")+
+    '<div class="field"><label>🛏️ Free nights per stay when the driver stays in the vehicle / eats here (0 = every such night)</label><input type="number" inputmode="numeric" id="pr_free" value="'+esc(parkMaxFree())+'"></div>'+
+    '<div class="field"><label>🍽️ A meal bill marks the night free when it is at least (₹, 0 = any meal)</label><input type="number" inputmode="numeric" id="pr_meal" value="'+esc(parkMealMin())+'"></div>'+
     '<div class="sheetbtns"><button class="btn-cancel" id="pr_c">Cancel</button><button class="btn-save" id="pr_s">Save</button></div>';
   sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
   document.getElementById("pr_c").addEventListener("click", closeForm);
   document.getElementById("pr_s").addEventListener("click", function(){ var r = {}; Array.prototype.forEach.call(sheet.querySelectorAll("[data-rate]"), function(i){ var v = parseFloat(i.value); r[i.getAttribute("data-rate")] = v>=0 ? v : 0; });
-    settings.parkingRates = r; var mm = parseFloat(document.getElementById("pr_meal").value); settings.parkMealMin = mm>0 ? mm : 0; saveSettings(); closeForm(); renderAll(); });
+    settings.parkingRates = r; var mm = parseFloat(document.getElementById("pr_meal").value); settings.parkMealMin = mm>0 ? mm : 0;
+    var mf = parseInt(document.getElementById("pr_free").value, 10); settings.parkMaxFree = mf>=0 ? mf : 1; saveSettings(); closeForm(); renderAll(); });
 }
 function openParkIn(id){
   var p = id ? JSON.parse(JSON.stringify(parking.find(function(x){ return x.id===id; }))) : { id:uid(), vtype:"truck", vno:"", driver:"", phone:"", bel:{ key:false }, diesel:"", payments:[], waiveDays:[] };
@@ -7556,7 +7566,7 @@ function openParkIn(id){
   html += '<div class="field two"><div><label>Driver ID <span class="reqheavy">'+(HEAVY_VEHICLES.indexOf(p.vtype)>=0?'(needed for bus / truck)':'')+'</span></label><select id="pk_idt"'+dis+'><option'+(p.idType!=="Aadhaar"?' selected':'')+'>Driving licence</option><option'+(p.idType==="Aadhaar"?' selected':'')+'>Aadhaar</option></select></div>'+
     '<div><label>आधार / DL नं. · ID number</label><input id="pk_idn" value="'+esc(p.idNo||"")+'" placeholder="DL / Aadhaar no." autocomplete="off"'+dis+'></div></div>';
   html += '<div class="field two"><div><label>गाड़ी नं. · Vehicle number</label><input id="pk_no" value="'+esc(p.vno)+'" placeholder="NL 01 AF 9426" style="text-transform:uppercase;"'+dis+'></div>'+
-    '<div><label>पार्किंग · ₹ per day</label><input id="pk_rate" type="number" inputmode="numeric" value="'+esc(isNew ? parkRate(p.vtype) : p.rate)+'"'+dis+'></div></div>';
+    '<div><label>पार्किंग · ₹ per night</label><input id="pk_rate" type="number" inputmode="numeric" value="'+esc(isNew ? parkRate(p.vtype) : p.rate)+'"'+dis+'></div></div>';
   html += '<div class="field two"><div><label>डीज़ल · Diesel</label><select id="pk_ds"'+dis+'><option value="">—</option>'+DIESEL.map(function(d){ return '<option'+(presetD===d?' selected':'')+'>'+d+'</option>'; }).join("")+'</select></div>'+
     '<div><label>or write it (e.g. 17 अंगुली)</label><input id="pk_ds2" value="'+esc(freeD)+'" placeholder="लाल से थोड़ा ऊपर"'+dis+'></div></div>';
   html += '<div class="field"><label>चाबी · Key</label><div class="keytog"><button type="button" data-key="1" class="'+(keyWithUs?'on':'')+'"'+dis+'>🔑 With us · हमारे पास</button><button type="button" data-key="0" class="'+(!keyWithUs?'on':'')+'"'+dis+'>🙋 Driver kept it · ड्राइवर के पास</button></div></div>';
@@ -7569,7 +7579,7 @@ function openParkIn(id){
   if(isNew) html += '<div class="field two"><div><label>Advance paid (₹, optional)</label><input id="pk_adv" type="number" inputmode="numeric"></div><div><label>Paid by</label><select id="pk_advm"><option>Cash</option><option>UPI</option></select></div></div>';
   if(!isNew){ var b = parkBill(p);
     html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>In</span><b>'+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+'</b></div>'+(p.outAt?'<div class="psrow"><span>Out</span><b>'+esc(fmtD(p.outDate))+' '+esc(p.outTime||"")+'</b></div>':'')+
-      '<div class="psrow"><span>'+b.days+' day'+(b.days!==1?'s':'')+' × '+rupee(p.rate)+(b.waived?' − '+b.waived+' free (driver ate here: '+(p.waiveDays||[]).map(fmtD).join(", ")+')':'')+'</span><b>'+rupee(b.amount)+'</b></div>'+
+      '<div class="psrow"><span>'+b.days+' night'+(b.days!==1?'s':'')+' × '+rupee(p.rate)+(b.waived?' − '+b.waived+' free (driver stayed / ate: '+(p.waiveDays||[]).map(fmtD).join(", ")+')':'')+'</span><b>'+rupee(b.amount)+'</b></div>'+
       (p.payments||[]).map(function(x){ return '<div class="psrow"><span class="muted">Paid '+esc(fmtD(x.date))+' · '+esc(x.mode||"Cash")+'</span><b>'+rupee(x.amount)+'</b></div>'; }).join("")+
       '<div class="psrow"><span><b>'+(b.due>=0?'Due':'Extra paid')+'</b></span><b class="'+(b.due>0?'bad':'')+'">'+rupee(Math.abs(b.due))+'</b></div></div>';
     html += '<div class="billbtns"><button class="btn-additem" id="pk_cal">📅 Stay calendar · free days</button><button class="btn-additem" id="pk_slip">🧾 Parking slip (PDF)</button></div>';
@@ -7616,7 +7626,7 @@ function openParkIn(id){
     if(isNew && parking.some(function(x){ return x.status==="in" && (x.vno||"").replace(/[\s-]/g,"")===no.replace(/[\s-]/g,""); })) return bad("This vehicle is already parked.");
     var idType = document.getElementById("pk_idt").value==="Aadhaar" ? "Aadhaar" : "DL", idNo = document.getElementById("pk_idn").value.trim().toUpperCase();
     var rate = parseFloat(document.getElementById("pk_rate").value);
-    if(!(rate>=0)) return bad("Enter the parking charge per day.");
+    if(!(rate>=0)) return bad("Enter the parking charge per night.");
     if(HEAVY_VEHICLES.indexOf(p.vtype)>=0){
       var drv = document.getElementById("pk_dr").value.trim(), ph = document.getElementById("pk_ph").value.replace(/\D/g,"");
       var idPhoto = p.pics.some(function(pc){ return pc.kind==="doc" && /licence|Aadhaar/i.test(pc.label||""); });
@@ -7653,13 +7663,13 @@ function parkSlipPdf(p){
     ["बैटरी · Battery", belTxt("battery")], ["स्टेपनी · Stepney", belTxt("stepney")], ["जैक · Jack", belTxt("jack")], ["तिरपाल · Tirpal", belTxt("tirpal")],
     ["चाबी · Key", (p.bel||{}).key ? "हमारे पास · with us" : "ड्राइवर के पास · with driver"], ["पार्किंग · Parking", "Rs. "+(+p.rate||0)+" / day"]];
   if((p.bel||{}).other) rows.push(["और · Other", p.bel.other]);
-  if(p.outAt) rows.push(["निकली · Out", fmtDP(p.outDate)+"  "+(p.outTime||"")], ["दिन · Days", b.days+(b.waived ? "  ("+b.waived+" free – ate here)" : "")], ["कुल · Total", "Rs. "+b.amount]);
+  if(p.outAt) rows.push(["निकली · Out", fmtDP(p.outDate)+"  "+(p.outTime||"")], ["रात · Nights", b.days+(b.waived ? "  ("+b.waived+" free - driver stayed)" : "")], ["कुल · Total", "Rs. "+b.amount]);
   if(b.paid) rows.push(["जमा · Paid", "Rs. "+b.paid]);
   rows.forEach(function(r, i){ g.font = "18px "+F; g.fillStyle = "#5b5044"; g.fillText((i+1)+". "+r[0], 36, y); g.font = "bold 20px "+F; g.fillStyle = "#1f1a14"; g.fillText(String(r[1]).slice(0, 34), 300, y); y += 38; });
   y += 8; g.font = "18px "+F; g.fillStyle = "#5b5044"; g.fillText("ड्राइवर साइन · Driver sign", 36, y);
   var sig = (p.pics||[]).find(function(x){ return x.kind==="sign"; });
   function finish(){
-    g.font = "14px "+F; g.fillStyle = "#777"; g.fillText("Vehicle parked at owner's risk. Charges per 24 hours.", 36, H-30);
+    g.font = "14px "+F; g.fillStyle = "#777"; g.fillText("Vehicle parked at owner's risk. Charges per night.", 36, H-30);
     ensurePdfLib().then(function(){ var doc = new window.jspdf.jsPDF({ unit:"pt", format:[310, 490] }); doc.addImage(c.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 310, 490);
       sharePdf(doc, ("Parking_"+(p.vno||"slip")+"_"+(p.inDate||"")).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf"); }).catch(function(){ appAlert("Couldn't create the PDF. Check the internet connection."); });
   }
@@ -7671,10 +7681,11 @@ function openParkOut(id){
   if((p.bel||{}).key) bel.unshift(["key","🔑 Key · चाबी"]);
   var html = '<h2 class="serif">Check out · '+v.i+' <span class="notr">'+esc(p.vno)+'</span></h2>';
   html += '<div class="card" style="margin-bottom:10px;"><div class="psrow"><span>Parked</span><b>'+esc(fmtD(p.inDate))+' '+esc(p.inTime||"")+' → now</b></div>'+
-    '<div class="psrow"><span>'+b.days+' day'+(b.days!==1?'s':'')+' × '+rupee(p.rate)+'</span><b>'+rupee(b.days*p.rate)+'</b></div>'+
-    (b.waived ? '<div class="psrow"><span>🍽️ Driver ate here ('+b.waived+' day'+(b.waived!==1?'s':'')+' free)</span><b class="ok">− '+rupee(b.waived*p.rate)+'</b></div>' : '')+
+    '<div class="psrow"><span>'+b.days+' night'+(b.days!==1?'s':'')+' × '+rupee(p.rate)+'</span><b>'+rupee(b.days*p.rate)+'</b></div>'+
+    (b.waived ? '<div class="psrow"><span>🛏️ Driver stayed / ate here ('+b.waived+' night'+(b.waived!==1?'s':'')+' free)</span><b class="ok">− '+rupee(b.waived*p.rate)+'</b></div>' : '')+
     (b.paid ? '<div class="psrow"><span>Already paid</span><b>− '+rupee(b.paid)+'</b></div>' : '')+
     '<div class="psrow tot"><span><b>To collect · लेना है</b></span><b>'+rupee(Math.max(0,b.due))+'</b></div></div>';
+  html += '<label class="poclose" style="margin-bottom:10px;"><input type="checkbox" id="po_stay"'+(p.stayFree || parkFreeMarks(p)>0 ?' checked':'')+(parkFreeMarks(p) - (p.stayFree?1:0) > 0 ? ' disabled' : '')+'> 🛏️ Driver stayed in the vehicle — '+(parkMaxFree()===1 ? 'one night free' : 'night free')+' · ड्राइवर गाड़ी में रुका</label>';
   if(bel.length || p.diesel || (p.bel||{}).other) html += '<div class="field"><label>Give back and tick · वापस दें</label>'+bel.map(function(x){ return '<label class="belret"><input type="checkbox" data-ret="'+x[0]+'"> '+esc(x[1])+'</label>'; }).join("")+
     ((p.bel||{}).other ? '<label class="belret"><input type="checkbox" data-ret="other"> '+esc(p.bel.other)+'</label>' : '')+(p.diesel ? '<div class="muted" style="font-size:12.5px;">Diesel when parked: '+esc(p.diesel)+'</div>' : '')+'</div>';
   html += '<div class="field two"><div><label>Collect now (₹)</label><input id="po_amt" type="number" inputmode="numeric" value="'+Math.max(0, Math.round(b.due))+'"></div><div><label>Paid by</label><select id="po_m"><option>Cash</option><option>UPI</option></select></div></div>';
@@ -7683,6 +7694,7 @@ function openParkOut(id){
   sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
   document.getElementById("po_c").addEventListener("click", closeForm);
   document.getElementById("po_slip").addEventListener("click", function(){ parkSlipPdf(p); });
+  var pst = document.getElementById("po_stay"); if(pst && !pst.disabled) pst.addEventListener("change", function(){ p.stayFree = pst.checked; saveParking(); openParkOut(id); });
   document.getElementById("po_s").addEventListener("click", function(){
     var boxes = sheet.querySelectorAll("[data-ret]"), notBack = Array.prototype.filter.call(boxes, function(c){ return !c.checked; });
     if(notBack.length){ var e = document.getElementById("po_err"); e.textContent = "Tick everything given back to the driver first."; e.style.display = "block"; return; }
