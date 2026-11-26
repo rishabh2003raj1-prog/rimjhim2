@@ -266,6 +266,7 @@
   .attname:has(.ckrow){flex-wrap:wrap;} .ckrow{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;flex-basis:100%;} .ckb{font-size:11.5px;border-radius:999px;padding:2px 8px;cursor:pointer;border:1px solid;} .ckb.ok{color:#2E7D4F;border-color:#9FD0B2;background:#EEF7F1;} .ckb.bad{color:#A6402D;border-color:#E3B1A6;background:#FBEDEA;}
   .ckphotos{display:flex;gap:8px;} .ckphotos figure{flex:1;margin:0;text-align:center;font-size:12px;color:var(--ink-soft);} .ckphotos img{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:12px;}
   .ckdone .tokbig{font-size:54px;} .ckdone.bad .tokbig{color:#A6402D;}
+  .rcost{margin-bottom:6px;} .rcost .psrow{align-items:flex-start;} .rcost small{font-size:11.5px;} .warnrow{background:#FBEDEA;border-radius:8px;padding-left:6px;padding-right:6px;}
   .sidphotos{display:flex;gap:8px;} .sidph{flex:1;height:96px;border:1.5px dashed var(--line);border-radius:12px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#fff;cursor:pointer;font-size:13px;color:var(--ink-soft);}
   .sidph img{width:100%;height:100%;object-fit:cover;}
   .tfdays{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;} .tfdays button,.tfopts button,.tfsug button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 12px;font:inherit;font-size:13.5px;font-weight:600;}
@@ -5410,14 +5411,33 @@ function seedMenuAndIngredients(){
 }
 
 // Ingredient cost comes from what you actually paid, not a guessed market rate.
+// A purchase belongs to an ingredient when the whole name matches, or the ingredient's first word
+// appears as a whole word ("Eggs 1 tray" → Egg), never inside another word ("Veggies" is not Egg).
+function itemWords(t){ return String(t||"").toLowerCase().replace(/[^a-z0-9\u0900-\u097F]+/g," ").trim().split(/\s+/).filter(Boolean).map(function(w){ return w.length>3 ? w.replace(/(es|s)$/,"") : w; }); }
+function purchaseMatches(p, ingredient){
+  var iw = itemWords(ingredient.name), pw = itemWords(p && p.item); if(!iw.length || !pw.length) return false;
+  return iw.join(" ")===pw.join(" ") || pw.indexOf(iw[0]) >= 0;
+}
 function latestRate(ingredient){
   var matches = purchases.filter(function(p){
-    return !p.isDelivery && p.item && p.item.toLowerCase().indexOf(ingredient.name.toLowerCase().split(" ")[0]) >= 0;
+    return !p.isDelivery && p.item && +p.rate>0 && purchaseMatches(p, ingredient);
   }).sort(function(a,b){ return b.date.localeCompare(a.date); });
   if(!matches.length) return null;
   var p = matches[0];
   var rate = p.rate * (1 + (p.gst||0)/100);
-  return { rate: rate, purchaseUnit: p.unit, date: p.date, vendor: p.vendor };
+  return { rate: rate, purchaseUnit: p.unit, date: p.date, vendor: p.vendor, item: p.item };
+}
+// How many recipe units are in ONE purchase unit (1 kg = 1000 g, 1 tray = 30 pcs, 1 packet = the
+// ingredient's pack size…); null when it can't be known — then the cost is not guessed.
+var PACK_PCS = { dozen:12, tray:30 };
+function recipePerPurchase(ingredient, purchaseUnit){
+  var pu = normUnit(purchaseUnit), ru = normUnit(ingredient.unit);
+  if(!pu || pu===ru) return 1;
+  if((pu==="kg" && ru==="g") || (pu==="litre" && ru==="ml")) return 1000;
+  if((pu==="g" && ru==="kg") || (pu==="ml" && ru==="litre")) return 0.001;
+  if(+ingredient.packSize > 0) return +ingredient.packSize;
+  if(ru==="pcs" && PACK_PCS[pu]) return PACK_PCS[pu];
+  return null;
 }
 
 // Purchases are bought in kg/litre/packets but recipes use g/ml/pcs - bridge the two.
@@ -5430,6 +5450,8 @@ function normUnit(u){
   if(/^(g|gm|gms|gram|grams|gr)$/.test(u)) return "g";
   if(/^(pc|pcs|piece|pieces|nos|no)$/.test(u)) return "pcs";
   if(/^(pkt|pkts|packet|packets|pack|packs)$/.test(u)) return "packet";
+  if(/^(dozen|dozens|dz|dzn|doz|darjan|दर्जन)$/.test(u)) return "dozen";
+  if(/^(tray|trays|tre|ट्रे)$/.test(u)) return "tray";
   return u;
 }
 function unitFactor(purchaseUnit, recipeUnit){
@@ -5447,7 +5469,10 @@ function costPerUnit(ingredient, depth){
   }
   var lr = latestRate(ingredient);
   if(lr){
-    return { cost: lr.rate * unitFactor(lr.purchaseUnit, ingredient.unit), source:"last bought "+parseDate(lr.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"}) };
+    var per = recipePerPurchase(ingredient, lr.purchaseUnit), when = parseDate(lr.date).toLocaleDateString("en-IN",{day:"numeric",month:"short"});
+    var bought = "₹"+(Math.round(lr.rate*100)/100)+" per "+(lr.purchaseUnit||"unit")+" ("+lr.item+", "+when+")";
+    if(per===null) return { cost:null, source:"bought per "+lr.purchaseUnit+" — set how many "+ingredient.unit+" are in 1 "+lr.purchaseUnit, mismatch:true, bought:bought, purchaseUnit:lr.purchaseUnit };
+    return { cost: lr.rate / per, source:"last bought "+when, bought:bought, per:per, purchaseUnit:lr.purchaseUnit };
   }
   // A cooked item is never bought, so its cost comes from the raw material that
   // went into the last batch of it.
@@ -5482,6 +5507,14 @@ function recipeCost(menuItem){
   });
   return { cost: total, missing: missing };
 }
+// Each recipe line with how its cost was found, for the dish form.
+function recipeLines(menuItem){
+  return (menuItem.recipe||[]).filter(function(r){ return r.ingredientId; }).map(function(r){
+    var ing = ingById(r.ingredientId); if(!ing) return null;
+    var c = costPerUnit(ing), q = +r.qty||0;
+    return { ing:ing, qty:q, unitCost:c.cost, cost: c.cost===null ? null : c.cost*q, c:c };
+  }).filter(Boolean);
+}
 
 // How much of an ingredient the logged dishes used up.
 function consumedQty(ingredientId, fromDate, toDate){
@@ -5505,10 +5538,9 @@ function purchasedInRecipeUnit(ingredient, fromDate){
     if(p.isDelivery) return;
     if(fromDate && p.date < fromDate) return;
     if(!p.item) return;
-    if(p.item.toLowerCase().indexOf(ingredient.name.toLowerCase().split(" ")[0]) < 0) return;
-    var f = unitFactor(p.unit, ingredient.unit);
-    var qtyInIngUnit = f===0.001 ? (p.qty*1000) : (f===1000 ? (p.qty/1000) : p.qty);
-    total += qtyInIngUnit;
+    if(!purchaseMatches(p, ingredient)) return;
+    var per = recipePerPurchase(ingredient, p.unit);
+    total += (+p.qty||0) * (per===null ? 1 : per);
   });
   return total;
 }
@@ -5948,11 +5980,17 @@ function renderMenuFormSheet(draft, isEdit){
     sheet.querySelectorAll("[data-ru]").forEach(function(sp){ var r = draft.recipe[+sp.getAttribute("data-ru")], g = r && ingById(r.ingredientId); sp.textContent = g ? g.unit : ""; });
     if(!box) return;
     var rc = recipeCost({ recipe:(draft.recipe||[]).map(function(r){ return { ingredientId:r.ingredientId, qty:parseFloat(r.qty)||0 }; }) }), price = parseFloat(draft.price)||0, fc = price>0 ? rc.cost/price*100 : null;
-    box.innerHTML = '<div class="psrow"><span>Ingredient cost per plate</span><b>'+rupeeFine(rc.cost)+'</b></div>'+
+    var lines = recipeLines({ recipe:(draft.recipe||[]).map(function(r){ return { ingredientId:r.ingredientId, qty:parseFloat(r.qty)||0 }; }) });
+    box.innerHTML = (lines.length ? '<div class="rcost">'+lines.map(function(l){ var big = l.cost!==null && price>0 && l.cost > price*0.6;
+        return '<div class="psrow'+(big?' warnrow':'')+'"><span><b class="notr">'+esc(l.ing.name)+'</b> · '+fmtQty(l.qty)+' '+esc(l.ing.unit)+(l.unitCost!==null ? ' × '+rupeeFine(l.unitCost)+'/'+esc(l.ing.unit) : '')+
+          '<br><small class="muted">'+(l.c.source==="manual" ? 'cost set by hand' : l.c.bought ? esc(l.c.bought)+(l.c.per && l.c.per!==1 ? ' · 1 '+esc(l.c.purchaseUnit)+' = '+fmtQty(l.c.per)+' '+esc(l.ing.unit) : '') : esc(l.c.source))+'</small>'+
+          (l.c.mismatch ? '<br><small class="bad">⚠️ '+esc(l.c.source)+' (Stock → '+esc(l.ing.name)+' → pack size)</small>' : big ? '<br><small class="bad">⚠️ Looks too high — check the unit of the last purchase or the pack size.</small>' : (l.qty ? '' : '<br><small class="muted">type the amount</small>'))+
+          '</span><b>'+(l.cost===null ? '—' : rupeeFine(l.cost))+'</b></div>'; }).join("")+'</div>' : '')+
+      '<div class="psrow"><span>Ingredient cost per plate</span><b>'+rupeeFine(rc.cost)+'</b></div>'+
       '<div class="psrow"><span>Food cost</span><b class="'+(fc===null?"":fc<=targetFoodCost()?"ok":fc<=targetFoodCost()+10?"warnamt":"bad")+'">'+(fc===null?"—":Math.round(fc)+"% of price")+'</b></div>'+
       '<div class="psrow"><span>Earns per plate</span><b>'+rupee(price - rc.cost)+'</b></div>'+
       (rc.cost>0 ? '<div class="psrow"><span>Price for a '+targetFoodCost()+'% food cost</span><b>'+rupee(suggestedPrice(rc.cost))+'</b></div>' : '')+
-      (rc.missing>0 ? '<div class="backupnote" style="margin-top:6px;">'+rc.missing+' ingredient(s) have no purchase rate yet, so this cost is understated.</div>' : '');
+      (rc.missing>0 ? '<div class="backupnote" style="margin-top:6px;">'+rc.missing+' ingredient(s) have no usable purchase rate yet, so this cost is understated.</div>' : '');
   }
   costBox();
   Array.prototype.forEach.call(sheet.querySelectorAll(".ri"), function(inp){ inp.addEventListener("input", function(){ sync(); costBox(); }); inp.addEventListener("change", function(){ sync(); costBox(); }); });
@@ -9155,6 +9193,7 @@ function openIngredientForm(ingId, presetType){
             '<div class="psrow"><span>Source</span><b style="font-size:12px;">'+esc(c.source)+'</b></div>'+
             '<div class="psrow"><span>Used since '+(g.openingDate?parseDate(g.openingDate).toLocaleDateString("en-IN",{day:"numeric",month:"short"}):"start")+'</span><b>'+fmtQty(consumedQty(g.id, g.openingDate, null))+' '+esc(g.unit)+'</b></div></div>';
   }
+  html += '<div class="field"><label>Bought in packs? 1 tray / packet / box / bottle = how many '+esc(g?g.unit:"recipe units")+' (optional)</label><input type="number" inputmode="decimal" id="i_pack" placeholder="e.g. egg tray = 30 pcs, oil tin = 15000 ml" value="'+esc(g&&g.packSize||"")+'"></div>';
   html += '<div class="field"><label>Override cost per unit (₹, optional)</label><input type="number" inputmode="decimal" id="i_cost" placeholder="Leave blank to use purchase rates" value="'+(g&&g.costOverride!==null&&g.costOverride!==undefined?g.costOverride:"")+'"></div>';
   html += '<div class="err" id="i_err"></div>';
   html += '<div class="sheetbtns"><button class="btn-cancel" id="i_cancel">Cancel</button>';
@@ -9184,7 +9223,7 @@ function openIngredientForm(ingId, presetType){
                 vendor: document.getElementById("i_vendor").value.trim(),
                 openingStock: parseFloat(document.getElementById("i_open").value)||0,
                 openingDate: document.getElementById("i_opendate").value || fmtDate(new Date()),
-                costOverride: co===""?null:parseFloat(co) };
+                costOverride: co===""?null:parseFloat(co), packSize: parseFloat(document.getElementById("i_pack").value) || "" };
     var ld = parseFloat(document.getElementById("i_lead").value), sh = parseFloat(document.getElementById("i_shelf").value);
     rec.leadDays = ld>=0 ? ld : 1; rec.shelfDays = sh>0 ? sh : null;
     rec.localName = document.getElementById("i_local").value.trim(); rec.photo = iPhoto;

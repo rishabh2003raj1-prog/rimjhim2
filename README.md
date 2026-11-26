@@ -548,6 +548,16 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### 🧮 How a dish's ingredient cost is worked out
+For each recipe line: **amount per plate × cost of one recipe unit**. The cost of one unit comes from the **latest
+purchase of that ingredient**: its rate (with GST) divided by how many recipe units are in one purchase unit:
+1 kg = 1000 g, 1 litre = 1000 ml, **1 dozen = 12 pcs, 1 tray = 30 pcs**, or the ingredient's **pack size**
+(Stock → ingredient → "1 tray / packet / box / bottle = how many…", e.g. oil tin = 15000 g). If the purchase unit
+can't be converted (e.g. bought per "tin" with no pack size), the cost is **not guessed**: the line says what to set.
+A purchase belongs to an ingredient when its name matches as a whole word ("Eggs 1 tray" → Egg, but "Veggies" or
+"Eggless cake" are not Egg). A cost typed by hand on the ingredient always wins. The dish form lists every line with
+its amount, unit cost and the purchase it came from, and flags a line costing more than 60% of the price.
+
 ### 🧑‍🍳 Staff details (Staff → Team → ✏️ Edit)
 Each staff member has: **name, mobile number, age** (typed, or worked out from the date of birth), **address**, **ID
 proof** (Aadhaar / Voter ID / PAN / Driving licence / Passport / Ration card / Other) with its number (an Aadhaar
