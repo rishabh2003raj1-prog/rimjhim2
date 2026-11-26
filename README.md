@@ -548,6 +548,13 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### 📄 Bill PDF for the customer
+After a bill is saved (**📄 Bill PDF for the customer**) or later from **Today's bills → 📄 Bill PDF**: type the
+customer's name and phone (filled in if known) and share the PDF (WhatsApp etc.). The bill shows the cafe name,
+address, phone and GSTIN, bill number, date and time, order type / table / token, customer, items with qty, rate and
+amount, discount, delivery charge, total, how it was paid and a thank-you line. The cafe details are set once per
+outlet in Counter → ⚙️ Settings → **Bill details** (the first bill PDF asks for the address if it is missing).
+
 ### 🧮 How a dish's ingredient cost is worked out
 For each recipe line: **amount per plate × cost of one recipe unit**. The cost of one unit comes from the **latest
 purchase of that ingredient**: its rate (with GST) divided by how many recipe units are in one purchase unit:

@@ -12493,6 +12493,11 @@ function openUpiSettings(){
       '<div class="dgroup">UPI</div><div class="backupnote">The Counter shows a QR code with the bill amount filled in, so the customer just scans and pays.</div>'+
       '<div class="field"><label>UPI ID</label><input id="up_id" placeholder="e.g. rimjhimcafe@okaxis" value="'+esc(settings.upiId||"")+'"></div>'+
       '<div class="field"><label>Name shown to the customer</label><input id="up_name" placeholder="RimJhim Cafe" value="'+esc(settings.upiName||"")+'"></div>'+
+      '<div class="dgroup">Bill details (on PDF bills)</div>'+
+      '<div class="field"><label>Cafe name on the bill</label><input id="up_bname" value="'+esc(billInfo().name)+'"></div>'+
+      '<div class="field"><label>Cafe address</label><textarea id="up_baddr" rows="2" placeholder="Street / area, city, state, PIN">'+esc((settings.billInfo||{}).address||"")+'</textarea></div>'+
+      '<div class="field two"><div><label>Cafe phone</label><input id="up_bphone" inputmode="tel" value="'+esc(billInfo().phone)+'"></div><div><label>GSTIN (optional)</label><input id="up_bgst" value="'+esc(billInfo().gstin)+'"></div></div>'+
+      '<div class="field"><label>Line at the bottom</label><input id="up_bfoot" value="'+esc(billInfo().footer)+'"></div>'+
       '<div class="dgroup">Discounts</div>'+
       '<div class="field"><label>Most a billing login can give by itself (% of the bill)</label><input type="number" inputmode="decimal" id="up_max" value="'+esc(maxDiscPct())+'"></div>';
     if(canOffers){
@@ -12518,7 +12523,7 @@ function openUpiSettings(){
         return '<label class="poclose"><input type="checkbox" id="up_ts_'+x[0]+'"'+(takeSrcOn(x[0])?' checked':'')+'> '+x[1]+'</label>'+
           (x[0]!=="customer" ? '<div class="field two" style="margin:-2px 0 8px 26px;"><div><label>Commission %</label><input id="up_pc_'+x[0]+'" type="number" inputmode="decimal" value="'+esc(platformCfg(x[0]).commission)+'"></div><div><label>Packing ₹</label><input id="up_pp_'+x[0]+'" type="number" inputmode="decimal" value="'+esc(platformCfg(x[0]).packing)+'"></div></div>' : ''); }).join("");
     html += '<div class="err" id="up_err"></div><div class="sheetbtns"><button class="btn-cancel" id="up_cancel">Cancel</button><button class="btn-save" id="up_save">Save</button></div>';
-    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge","up_waiter","up_park","up_store","up_tiffin","up_cater","up_hotels","up_pc_zomato","up_pp_zomato","up_pc_swiggy","up_pp_swiggy"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
+    var keep = {}; ["up_id","up_name","up_max","of_name","of_val","of_kind","up_dcharge","up_waiter","up_park","up_store","up_tiffin","up_cater","up_hotels","up_bname","up_baddr","up_bphone","up_bgst","up_bfoot","up_pc_zomato","up_pp_zomato","up_pc_swiggy","up_pp_swiggy"].forEach(function(k){ var e = document.getElementById(k); if(e) keep[k] = e.value; });
     sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
     Object.keys(keep).forEach(function(k){ var e = document.getElementById(k); if(e) e.value = keep[k]; });
     function err(m){ var e = document.getElementById("up_err"); e.textContent = m; e.style.display = "block"; }
@@ -12540,6 +12545,7 @@ function openUpiSettings(){
       settings.upiId = id; settings.upiName = nm; settings.maxDiscountPct = mx;
       var dc = parseFloat(document.getElementById("up_dcharge").value); settings.deliveryCharge = dc>=0 ? dc : 0;
       settings.waiterService = document.getElementById("up_waiter").value !== "off";
+      settings.billInfo = { name: document.getElementById("up_bname").value.trim(), address: document.getElementById("up_baddr").value.trim(), phone: document.getElementById("up_bphone").value.trim(), gstin: document.getElementById("up_bgst").value.trim().toUpperCase(), footer: document.getElementById("up_bfoot").value.trim() };
       var ts = {}; ["customer","zomato","swiggy"].forEach(function(k){ ts[k] = document.getElementById("up_ts_"+k).checked; }); settings.takeawaySrc = ts;
       var pl = Object.assign({}, settings.platforms||{});
       ["zomato","swiggy"].forEach(function(k){ var c = Object.assign({}, pl[k]||{}), cm = parseFloat(document.getElementById("up_pc_"+k).value), pk = parseFloat(document.getElementById("up_pp_"+k).value);
@@ -12703,11 +12709,76 @@ function finishCounterBill(mode, customer, given, plat){
   var sheet = document.getElementById("sheet");
   var tokNo = rec.order.token;
   sheet.innerHTML = '<div class="pdone">'+(tokNo ? '<div class="tokbig">Token '+tokNo+'</div>' : '<div class="tick">✔</div>')+'<b>Bill '+no+' saved</b><div>'+rupee(total)+' · '+(mode==="Credit" ? "Udhaar: "+esc(customer) : mode)+'</div>'+(parkMsg ? '<div class="ok" style="margin-top:6px;">'+esc(parkMsg)+'</div>' : '')+(sentToKitchen ? '<div class="muted" style="margin-top:6px;">Sent to the kitchen · Live orders</div>' : '')+
-    '<button class="btn-save" id="pd_ok" style="width:100%;margin-top:16px;">Next customer</button></div>';
+    '<button class="btn-additem" id="pd_pdf" style="width:100%;margin-top:14px;">📄 Bill PDF for the customer</button>'+
+    '<button class="btn-save" id="pd_ok" style="width:100%;margin-top:10px;">Next customer</button></div>';
   document.getElementById("sheetBg").classList.add("on");
   sayHindi("धन्यवाद");
   var t = setTimeout(function(){ if(document.getElementById("pd_ok")) closeForm(); }, 2500);
   document.getElementById("pd_ok").addEventListener("click", function(){ clearTimeout(t); closeForm(); });
+  document.getElementById("pd_pdf").addEventListener("click", function(){ clearTimeout(t); openBillPdf(rec.id); });
+}
+// ---------- 📄 BILL PDF FOR THE CUSTOMER ----------
+// Cafe name, address, phone and GSTIN come from Counter → ⚙️ Settings → Bill details (per outlet).
+function billInfo(){ var b = settings.billInfo || {}; return { name: b.name || OUTLET.name || "Cafe", address: b.address || "", phone: b.phone || "", gstin: b.gstin || "", footer: b.footer || "Thank you! Visit again." }; }
+function openBillPdf(saleId, back){
+  var s = sales.find(function(x){ return x.id===saleId; }); if(!s || !s.order) return;
+  var bt = s.order.billTo || {}, generic = /^(counter|walk-?in|)$/i.test(String(s.customer||"").trim()) || s.order.platform;
+  var bi = billInfo(), needInfo = !(settings.billInfo && settings.billInfo.address);
+  var sheet = tfOpenSheet('<h2 class="serif">📄 Bill PDF · Bill '+esc(s.order.no)+'</h2>'+
+    (needInfo ? '<div class="backupnote" style="background:#FFF4E0;">Add the cafe address once (it shows on every bill):</div>'+
+      '<div class="field"><label>Cafe name on the bill</label><input id="bp_cn" value="'+esc(bi.name)+'"></div><div class="field"><label>Cafe address</label><textarea id="bp_ca" rows="2" placeholder="Street / area, city, state, PIN"></textarea></div>'+
+      '<div class="field two"><div><label>Cafe phone (optional)</label><input id="bp_cp" inputmode="tel" value="'+esc(bi.phone)+'"></div><div><label>GSTIN (optional)</label><input id="bp_cg" value="'+esc(bi.gstin)+'"></div></div>' : '<div class="backupnote">'+esc(bi.name)+' · '+esc(bi.address)+'</div>')+
+    '<div class="field two"><div><label>Customer name</label><input id="bp_name" value="'+esc(bt.name || (generic ? "" : s.customer))+'" autocomplete="off"></div><div><label>Customer phone (optional)</label><input id="bp_phone" inputmode="tel" value="'+esc(bt.phone || s.order.phone || "")+'"></div></div>'+
+    '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="bp_back">'+(back?'← Back':'Close')+'</button><button class="btn-save" id="bp_go">📄 Make PDF</button></div>');
+  sheet.querySelector("#bp_back").addEventListener("click", function(){ if(back) back(); else closeForm(); });
+  sheet.querySelector("#bp_go").addEventListener("click", function(){
+    var btn = this;
+    if(needInfo){ var addr = sheet.querySelector("#bp_ca").value.trim(); if(!addr) return tfErr(sheet, "Type the cafe address.");
+      settings.billInfo = Object.assign({}, settings.billInfo||{}, { name: sheet.querySelector("#bp_cn").value.trim() || bi.name, address:addr, phone: sheet.querySelector("#bp_cp").value.trim(), gstin: sheet.querySelector("#bp_cg").value.trim().toUpperCase() });
+      if(canWriteKey(SETTINGS_KEY)) saveSettings(); }
+    var nm = sheet.querySelector("#bp_name").value.trim(), ph = sheet.querySelector("#bp_phone").value.replace(/[^\d+]/g,"");
+    if(nm || ph){ s.order.billTo = { name:nm, phone:ph }; if(canWriteKey(SALES_KEY)) saveSales(); }
+    billPdf(s, { name:nm, phone:ph }, btn);
+  });
+}
+function billPdf(s, to, btn){
+  var label = btn ? btn.textContent : ""; if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }
+  function done(){ if(btn){ btn.disabled = false; btn.textContent = label; } }
+  ensurePdfLib().then(function(){
+    var bi = billInfo(), o = s.order, items = o.items||[], W = 300, M = 18;
+    var H = 225 + items.length*17 + (bi.address ? 30 : 0) + (to.name||to.phone ? 28 : 0) + (o.discount ? 14 : 0) + (o.deliveryCharge ? 14 : 0);
+    var doc = new window.jspdf.jsPDF({ unit:"pt", format:[W, Math.max(300, H)] }), y = 34, C = W/2;
+    doc.setFont("helvetica","bold"); doc.setFontSize(16); doc.setTextColor(36,26,18); doc.text(pdfClean(bi.name), C, y, { align:"center" }); y += 14;
+    doc.setFont("helvetica","normal"); doc.setFontSize(8.5); doc.setTextColor(70,60,50);
+    if(bi.address){ doc.splitTextToSize(pdfClean(bi.address), W-2*M).forEach(function(l){ doc.text(l, C, y, { align:"center" }); y += 11; }); }
+    if(bi.phone){ doc.text("Phone: "+pdfClean(bi.phone), C, y, { align:"center" }); y += 11; }
+    if(bi.gstin){ doc.text("GSTIN: "+pdfClean(bi.gstin), C, y, { align:"center" }); y += 11; }
+    y += 4; doc.setDrawColor(150); doc.setLineDashPattern([2,2],0); doc.line(M, y, W-M, y); y += 14;
+    doc.setFont("helvetica","bold"); doc.setFontSize(11); doc.setTextColor(36,26,18); doc.text("BILL", C, y, { align:"center" }); y += 14;
+    doc.setFont("helvetica","normal"); doc.setFontSize(9);
+    doc.text("Bill No: "+o.no+(o.token?"   Token: "+o.token:""), M, y); doc.text(pdfDate(s.date)+"  "+(o.time||""), W-M, y, { align:"right" }); y += 12;
+    var typ = (CHANNELS[o.type] ? CHANNELS[o.type].t : o.type==="hotel" ? "Hotel" : "")+(o.table?" - "+o.table:"")+(o.pid?" #"+o.pid:"");
+    if(typ){ doc.text(pdfClean(typ), M, y); y += 12; }
+    if(to.name || to.phone){ doc.setFont("helvetica","bold"); doc.text("Customer: "+pdfClean(to.name||""), M, y); doc.setFont("helvetica","normal"); y += 12; if(to.phone){ doc.text("Phone: "+pdfClean(to.phone), M, y); y += 12; } }
+    y += 2; doc.line(M, y, W-M, y); y += 4;
+    doc.autoTable({ startY:y, margin:{ left:M, right:M }, theme:"plain", head:[["Item","Qty","Rate","Amount"]],
+      headStyles:{ fontStyle:"bold", fontSize:8.5, cellPadding:2.5, textColor:[36,26,18] }, styles:{ fontSize:8.5, cellPadding:2.5, textColor:[36,26,18], overflow:"linebreak" },
+      columnStyles:{ 0:{ cellWidth:W-2*M-150 }, 1:{ halign:"right", cellWidth:30 }, 2:{ halign:"right", cellWidth:55 }, 3:{ halign:"right", cellWidth:65 } },
+      didParseCell:function(d){ if(d.section==="head" && d.column.index>=1) d.cell.styles.halign = "right"; },
+      body: items.map(function(i){ return [pdfClean(i.name), String(i.qty), pdfMoneyP(i.price).replace("Rs. ",""), pdfMoneyP(i.qty*i.price).replace("Rs. ","")]; }) });
+    y = doc.lastAutoTable.finalY + 6; doc.line(M, y, W-M, y); y += 13;
+    function row(a, b, bold){ doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(bold ? 11 : 9); doc.text(a, M, y); doc.text(b, W-M, y, { align:"right" }); y += bold ? 16 : 13; }
+    var sub = items.reduce(function(a,i){ return a + i.qty*i.price; },0);
+    if(o.discount || o.deliveryCharge) row("Subtotal", pdfMoneyP(o.subtotal || sub));
+    if(o.discount) row("Discount"+(o.discountLabel?" ("+pdfClean(o.discountLabel)+")":""), "- "+pdfMoneyP(o.discount));
+    if(o.deliveryCharge) row("Delivery charge", pdfMoneyP(o.deliveryCharge));
+    if(+s.gst) row("GST "+s.gst+"%", pdfMoneyP(saleTotal(s) - (+s.amount||0)));
+    row("TOTAL", pdfMoneyP(o.platform ? (o.gross || saleTotal(s)) : saleTotal(s)), true);
+    doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.text("Paid by: "+(s.mode==="Credit" ? "Udhaar (to pay later)" : pdfClean(s.mode||"")), M, y); y += 18;
+    doc.setLineDashPattern([2,2],0); doc.line(M, y-8, W-M, y-8);
+    doc.setFont("helvetica","italic"); doc.setFontSize(9); doc.setTextColor(70,60,50); doc.text(pdfClean(bi.footer), C, y+4, { align:"center" });
+    done(); sharePdf(doc, (bi.name+"_Bill_"+s.date+"_"+o.no).replace(/[^A-Za-z0-9_-]+/g,"_")+".pdf");
+  }).catch(function(){ done(); appAlert("Couldn't create the PDF. Check the internet connection."); });
 }
 function openCounterBills(dateStr){
   var list = counterBills(dateStr), sheet = document.getElementById("sheet");
@@ -12725,12 +12796,13 @@ function openCounterBills(dateStr){
     return '<div class="entry"><div><div class="who">'+(CHANNELS[s.order.type] ? CHANNELS[s.order.type].i+' ' : '')+'#'+s.order.no+(s.order.table?' · '+esc(s.order.table):'')+(s.order.pid?' · '+esc(CHANNELS[s.order.platform].t)+' #'+esc(s.order.pid):'')+' · '+esc(s.order.time||"")+' · '+(s.mode==="Credit"?"Udhaar ("+esc(s.customer)+")":esc(s.mode))+'</div>'+
       '<div class="meta">'+esc(billText(s))+'</div>'+
       (s.order.discount ? '<div class="meta warnamt">🏷️ − '+rupee(s.order.discount)+' · '+esc(s.order.discountLabel||"discount")+' (bill was '+rupee(s.order.subtotal)+')</div>' : '')+
-      '<div class="meta"><a href="#" data-share="'+esc(s.id)+'">Share</a>'+(canCancel?' · <a href="#" data-void="'+esc(s.id)+'" class="bad">Cancel bill</a>':'')+'</div></div>'+
+      '<div class="meta"><a href="#" data-share="'+esc(s.id)+'">Share</a> · <a href="#" data-billpdf="'+esc(s.id)+'">📄 Bill PDF</a>'+(canCancel?' · <a href="#" data-void="'+esc(s.id)+'" class="bad">Cancel bill</a>':'')+'</div></div>'+
       '<div class="amt sale">'+rupee(saleTotal(s))+'</div></div>';
   }).join("");
   html += '<div class="sheetbtns" style="margin-top:12px;"><button class="btn-cancel" id="cb_close" style="flex:1;">Close</button></div>';
   sheet.innerHTML = html; document.getElementById("sheetBg").classList.add("on");
   document.getElementById("cb_close").addEventListener("click", closeForm);
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-billpdf]"), function(a){ a.addEventListener("click", function(ev){ ev.preventDefault(); openBillPdf(a.getAttribute("data-billpdf"), function(){ openCounterBills(dateStr); }); }); });
   Array.prototype.forEach.call(sheet.querySelectorAll("[data-share]"), function(a){ a.addEventListener("click", function(ev){
     ev.preventDefault(); var s = sales.find(function(x){ return x.id===a.getAttribute("data-share"); }); if(!s) return;
     var txt = (OUTLET.name||"RimJhim Cafe")+"\nBill "+s.order.no+" · "+parseDate(s.date).toLocaleDateString("en-IN")+" "+(s.order.time||"")+"\n"+
