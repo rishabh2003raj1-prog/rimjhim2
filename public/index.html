@@ -1641,7 +1641,19 @@ function purgeOutletCaches(keepId){
 }
 // Who is signed in decides which store this phone may open. Returns true when the
 // app is reloading to open the login's own store.
-var DATA_OWNER = "data_owner_v1";
+var DATA_OWNER = "data_owner_v1", WHO_CACHE = "who_cache_v1";
+// Until the server answers "who is this?", the phone uses the last login it saw, so a staff phone never
+// shows the owner's screens for a moment on opening. A staff phone with nothing saved starts with the
+// counter screens (no lists readable) until the answer comes.
+(function(){
+  try{
+    var owner = localStorage.getItem("data_owner_v1");
+    if(!owner || owner==="owner") return;
+    var c = JSON.parse(localStorage.getItem("who_cache_v1")||"null");
+    cloud.who = (c && c.role==="store" && "u:"+c.login===owner) ? c : { role:"store", access:"billing", login:owner.slice(2), perms:{}, features:null, provisional:true };
+    cloud.who.cached = true;
+  }catch(e){}
+})();
 function applyWho(w){
   if(!w) return false;
   cloud.who = w;
@@ -1656,6 +1668,7 @@ function applyWho(w){
       location.reload(); return true;
     }
     localStorage.setItem(DATA_OWNER, me);
+    localStorage.setItem(WHO_CACHE, JSON.stringify(w));
     // Lists this login may not see never stay on the phone.
     SYNC_KEYS.forEach(function(k){
       if(canReadKey(k)) return;
@@ -1871,7 +1884,7 @@ function signOut(){
   askConfirm("Sign out on this phone? Your data stays safe on the server.", function(){
     api("POST", "/api/logout").then(function(){
       purgeOutletCaches(null);   // every store's offline copy, not just this one
-      try{ localStorage.removeItem(STORE_LOGIN); localStorage.removeItem(OFFLINE_UNLOCK); localStorage.removeItem(SESSION_EXP); localStorage.removeItem(DATA_OWNER); }catch(e){}
+      try{ localStorage.removeItem(STORE_LOGIN); localStorage.removeItem(OFFLINE_UNLOCK); localStorage.removeItem(SESSION_EXP); localStorage.removeItem(DATA_OWNER); localStorage.removeItem(WHO_CACHE); }catch(e){}
       location.reload();
     }).catch(function(){ appAlert("You need internet to sign out."); });
   });

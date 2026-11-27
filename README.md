@@ -548,6 +548,11 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### Opening the app on a staff phone
+Until the server answers "who is signed in?", a phone uses the last login it saw (kept on the phone as
+`who_cache_v1`, cleared on sign-out), so a staff phone never shows the owner's screens for a moment while opening.
+A staff phone with nothing saved yet starts with the counter screens and no lists until the answer comes.
+
 ### 📄 Bill PDF for the customer
 After a bill is saved (**📄 Bill PDF for the customer**) or later from **Today's bills → 📄 Bill PDF**: type the
 customer's name and phone (filled in if known) and share the PDF (WhatsApp etc.). The bill shows the cafe name,
