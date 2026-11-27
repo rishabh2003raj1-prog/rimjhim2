@@ -26,7 +26,7 @@ function png(){ // tiny valid PNG (8x8 grey)
   assert(+(await p.inputValue('#s_age')) >= 27, 'age filled from the date of birth');
   await p.fill('#s_addr', 'H.No 12, Ward 4, Rampur, 244901');
   await p.selectOption('#s_idtype', 'Aadhaar'); await p.fill('#s_idno', '1234 5678 901');
-  await p.setInputFiles('[data-sidf="idPhoto"]', { name:'aadhaar.png', mimeType:'image/png', buffer: png() }); await p.waitForTimeout(300);
+  await p.click('[data-sid="idPhoto"]'); { const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.click('#dlgBtns button:nth-child(1)')]); assert(await fc.element().evaluate(e => e.getAttribute('capture'))==='environment', 'ID photo: camera option'); await fc.setFiles({ name:'aadhaar.png', mimeType:'image/png', buffer: png() }); } await p.waitForTimeout(300);
   await p.fill('#s_salary', '12000'); await p.fill('#s_pleave', '3'); await p.fill('#s_bonus', '5000'); await p.fill('#s_bonusnote', 'Diwali');
   await p.fill('#s_dfrom', '09:00'); await p.fill('#s_dto', '18:00'); await p.selectOption('#s_woff', 'Tuesday');
   await p.fill('#s_scope', 'Tandoor: roti, naan\nClean tandoor area at closing'); await p.fill('#s_lockin', '6'); await p.fill('#s_notice', '30');

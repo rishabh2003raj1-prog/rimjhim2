@@ -12,7 +12,7 @@ async function open(b, errs){ const p = await (await b.newContext({ viewport:{wi
   await E(p, `ingredients=[{id:'g1',name:'Milk',unit:'ml',type:'Raw material',minStock:0,openingStock:0,openingDate:'2026-01-01'},{id:'g2',name:'Tea leaves',unit:'g',type:'Raw material',minStock:0,openingStock:0,openingDate:'2026-01-01'},{id:'g3',name:'Sugar',unit:'g',type:'Raw material',minStock:0,openingStock:0,openingDate:'2026-01-01'}];
     purchases=[{id:'p1',date:'2026-11-01',vendor:'Dairy',item:'Milk',qty:10,unit:'litre',rate:60,gst:0,mode:'Cash'},{id:'p2',date:'2026-11-01',vendor:'Kirana',item:'Tea leaves',qty:1,unit:'kg',rate:400,gst:0,mode:'Cash'},{id:'p3',date:'2026-11-01',vendor:'Kirana',item:'Sugar',qty:1,unit:'kg',rate:45,gst:0,mode:'Cash'}];
     menuItems=[]; dishLog=[]; saveIngredients(); savePurch(); saveMenu(); saveDishLog(); renderAll(); showView('records'); switchRecordsSub('menu');`);
-  const choosePhoto = async (sel) => { const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.click(sel)]); await fc.setFiles({ name:'dish.png', mimeType:'image/png', buffer: Buffer.from(PIX.split(',')[1], 'base64') }); await p.waitForTimeout(500); };
+  const choosePhoto = async (sel) => { await p.click(sel); const [fc] = await Promise.all([p.waitForEvent('filechooser'), p.click('#dlgBtns button:nth-child(2)')]); await fc.setFiles({ name:'dish.png', mimeType:'image/png', buffer: Buffer.from(PIX.split(',')[1], 'base64') }); await p.waitForTimeout(500); };
   assert(/No dishes yet/.test(await p.textContent('#menuView')), 'empty menu');
   await p.click('#menu_add');
   await choosePhoto('#m_imgadd');

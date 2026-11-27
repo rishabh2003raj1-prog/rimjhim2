@@ -5230,7 +5230,7 @@ function renderBillForm(){
     renderBillForm();
   });
   var addImg = document.getElementById("b_imgadd") || document.getElementById("b_imgchange");
-  if(addImg) addImg.addEventListener("click", function(){ syncDraft(); document.getElementById("billPhotoFile").click(); });
+  if(addImg) addImg.addEventListener("click", function(){ syncDraft(); choosePhotoSource(function(cam){ openFileInput(document.getElementById("billPhotoFile"), cam); }); });
   var rmImg = document.getElementById("b_imgremove");
   if(rmImg) rmImg.addEventListener("click", function(){ syncDraft(); billDraft.image = null; renderBillForm(); });
   var imgView = document.getElementById("b_imgview");
@@ -5751,11 +5751,26 @@ function dishGaps(m){
   return g;
 }
 function suggestedPrice(cost){ var p = cost / (targetFoodCost()/100); return p>0 ? Math.ceil(p/5)*5 : 0; }
+// Every "add photo" asks: take it with the camera, or choose one from the gallery. (Some phones open only
+// the gallery for a plain file picker; capture="environment" opens the camera directly.)
+function choosePhotoSource(open){
+  __queueDlg(function(){ __showDlg("Add a photo · फोटो लगाएँ", [
+    { label:"📷 Take photo with camera · कैमरा", cls:"dlgyes", fn:function(){ open(true); } },
+    { label:"🖼️ Choose from gallery · गैलरी", cls:"dlgyes", fn:function(){ open(false); } },
+    { label:"Cancel", cls:"dlgno" } ]); });
+}
+function openFileInput(inp, camera){
+  if(camera) inp.setAttribute("capture", "environment"); else inp.removeAttribute("capture");
+  try{ inp.value = ""; }catch(e){}
+  inp.click();
+}
 function pickPhoto(cb){
-  var inp = document.createElement("input");
-  inp.type = "file"; inp.accept = "image/*"; inp.style.display = "none";
-  inp.addEventListener("change", function(){ var f = inp.files && inp.files[0]; if(f) compressPhoto(f, cb); document.body.removeChild(inp); });
-  document.body.appendChild(inp); inp.click();
+  choosePhotoSource(function(camera){
+    var inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*"; inp.style.display = "none"; inp.className = "photopick";
+    inp.addEventListener("change", function(){ var f = inp.files && inp.files[0]; if(f) compressPhoto(f, cb); if(inp.parentNode) inp.parentNode.removeChild(inp); });
+    document.body.appendChild(inp); openFileInput(inp, camera);
+  });
 }
 
 function renderMenuView(){
@@ -9779,7 +9794,7 @@ function renderAssetForm(isEdit){
     document.getElementById(id).addEventListener("change", function(){ sync(); renderAssetForm(isEdit); });
   });
   var addImg = document.getElementById("a_imgadd") || document.getElementById("a_imgchange");
-  if(addImg) addImg.addEventListener("click", function(){ sync(); document.getElementById("assetPhotoFile").click(); });
+  if(addImg) addImg.addEventListener("click", function(){ sync(); choosePhotoSource(function(cam){ openFileInput(document.getElementById("assetPhotoFile"), cam); }); });
   var rmImg = document.getElementById("a_imgremove");
   if(rmImg) rmImg.addEventListener("click", function(){ sync(); d.photo = null; renderAssetForm(isEdit); });
 
@@ -16656,7 +16671,7 @@ function openStaffForm(staffId){
   html += '<div class="field"><label>Address</label><textarea id="s_addr" rows="2" placeholder="House, street, village / city, PIN">'+esc(s&&s.address||"")+'</textarea></div>';
   html += '<div class="field two"><div><label>ID proof</label><select id="s_idtype">'+STAFF_ID_TYPES.map(function(t){ return '<option'+(s&&s.idType===t?' selected':'')+'>'+t+'</option>'; }).join("")+'</select></div><div><label>ID number</label><input type="text" id="s_idno" autocomplete="off" value="'+esc(s&&s.idNo||"")+'"></div></div>';
   html += '<div class="field"><label>ID photo (front / back)</label><div class="sidphotos">'+[["idPhoto","Front"],["idPhoto2","Back"]].map(function(x){ var v = s && s[x[0]];
-    return '<label class="sidph" data-sid="'+x[0]+'">'+(v ? '<img src="'+esc(v)+'" alt="">' : '<span>📷 '+x[1]+'</span>')+'<input type="file" accept="image/*" capture="environment" data-sidf="'+x[0]+'" hidden></label>'; }).join("")+'</div></div>';
+    return '<button type="button" class="sidph" data-sid="'+x[0]+'">'+(v ? '<img src="'+esc(v)+'" alt="">' : '<span>📷 '+x[1]+'</span>')+'</button>'; }).join("")+'</div></div>';
   var mainPost = s ? s.role : "Waiter";
   html += '<div class="field two"><div><label>Main post · मुख्य काम</label><select id="s_role">'+allPosts().map(function(r){ return '<option value="'+esc(r)+'" '+(mainPost===r?"selected":"")+'>'+esc(postLabel(r))+'</option>'; }).join("")+'</select></div>';
   html += '<div><label>Usual shift</label><select id="s_shift">'+shiftList().map(function(sh){ return sh.name; }).concat(shiftList().length>1 ? ["Both shifts"] : []).concat(["Flexible"]).map(function(n){ return '<option '+(s&&s.defaultShift===n?"selected":"")+'>'+esc(n)+'</option>'; }).join("")+'</select></div></div>';
@@ -16692,8 +16707,8 @@ function openStaffForm(staffId){
   sheet.innerHTML = html;
   var spc = document.getElementById("s_posts"); wirePostChips(spc);
   var sidNew = {};
-  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sidf]"), function(inp){ inp.addEventListener("change", function(){ var f = inp.files && inp.files[0]; if(!f) return; var k = inp.getAttribute("data-sidf");
-    compressPhoto(f, function(d){ sidNew[k] = d; var lb = sheet.querySelector('[data-sid="'+k+'"]'); var im = lb.querySelector("img"); if(!im){ lb.querySelector("span").remove(); im = document.createElement("img"); lb.insertBefore(im, inp); } im.src = d; }); }); });
+  Array.prototype.forEach.call(sheet.querySelectorAll("[data-sid]"), function(lb){ lb.addEventListener("click", function(){ var k = lb.getAttribute("data-sid");
+    pickPhoto(function(d){ sidNew[k] = d; lb.innerHTML = '<img src="'+esc(d)+'" alt="">'; }); }); });
   var dobEl = document.getElementById("s_dob"); dobEl.addEventListener("change", function(){ var a = ageFromDob(dobEl.value); if(a) document.getElementById("s_age").value = a; });
   document.getElementById("s_role").addEventListener("change", function(){ var v = this.value;
     Array.prototype.forEach.call(spc.querySelectorAll(".pchip"), function(b){ var me = b.getAttribute("data-post")===v; b.classList.toggle("main", me); if(me) b.classList.add("on"); }); });

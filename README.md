@@ -548,6 +548,12 @@ or "🙋 Self service — customers collect at the counter" (`settings.waiterSer
 the 🛎️ Waiter button, banner and alerts on every phone of that outlet, and the Live orders guide says "call order N
 to collect it at the counter" (✔ Collected) instead of serving at the table.
 
+### Adding photos: camera or gallery
+Every place that takes a photo — parking vehicle and document photos, dish and SOP step photos, ingredient photos,
+purchase bill photos, asset photos and staff ID photos — first asks **📷 Take photo with camera** or **🖼️ Choose
+from gallery**. The camera choice opens the phone's back camera directly (`capture="environment"`), since some
+phones show only the gallery for a plain photo picker.
+
 ### Opening the app on a staff phone
 Until the server answers "who is signed in?", a phone uses the last login it saw (kept on the phone as
 `who_cache_v1`, cleared on sign-out), so a staff phone never shows the owner's screens for a moment while opening.

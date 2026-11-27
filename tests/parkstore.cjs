@@ -26,10 +26,14 @@ const dis = (p) => p.click('#dlgBtns button', { timeout:1500 }).catch(()=>{});
   await O.fill('#pk_other', 'key no. 14');
   // photos: vehicle + a document (RC)
   const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAHUlEQVR4nGP8z8Dwn4GBgYGJgYGBgYGBgYEBAA0IAQH7c9e7AAAAAElFTkSuQmCC', 'base64');
-  let [fc] = await Promise.all([O.waitForEvent('filechooser'), O.click('#pk_vadd')]); await fc.setFiles({ name:'truck.png', mimeType:'image/png', buffer:png });
+  await O.click('#pk_vadd');
+  assert(/Add a photo/.test(await O.textContent('#dlgMsg')) && /Take photo with camera/.test(await O.textContent('#dlgBtns')) && /Choose from gallery/.test(await O.textContent('#dlgBtns')), 'vehicle photo: choose camera or gallery');
+  let [fc] = await Promise.all([O.waitForEvent('filechooser'), O.click('#dlgBtns button:nth-child(1)')]);
+  assert(await fc.element().evaluate(e => e.getAttribute('capture'))==='environment', 'camera choice opens the camera (capture=environment)'); await fc.setFiles({ name:'truck.png', mimeType:'image/png', buffer:png });
   await O.waitForSelector('#pk_vpics img');
   await O.selectOption('#pk_dkind', 'RC (registration)');
-  [fc] = await Promise.all([O.waitForEvent('filechooser'), O.click('#pk_dadd')]); await fc.setFiles({ name:'rc.png', mimeType:'image/png', buffer:png });
+  await O.click('#pk_dadd'); [fc] = await Promise.all([O.waitForEvent('filechooser'), O.click('#dlgBtns button:nth-child(2)')]);
+  assert(!(await fc.element().evaluate(e => e.hasAttribute('capture'))), 'gallery choice opens the gallery (no capture)'); await fc.setFiles({ name:'rc.png', mimeType:'image/png', buffer:png });
   await O.waitForSelector('#pk_dpics img');
   assert(/RC \(registration\)/.test(await O.textContent('#pk_dpics')), 'vehicle photo and RC document added');
   await O.click('#pk_vpics img'); assert(await O.$('.photoview img'), 'tap a photo to see it large'); await O.click('.photoview');
