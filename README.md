@@ -553,7 +553,10 @@ After a bill is saved (**📄 Bill PDF for the customer**) or later from **Today
 customer's name and phone (filled in if known) and share the PDF (WhatsApp etc.). The bill shows the cafe name,
 address, phone and GSTIN, bill number, date and time, order type / table / token, customer, items with qty, rate and
 amount, discount, delivery charge, total, how it was paid and a thank-you line. The cafe details are set once per
-outlet in Counter → ⚙️ Settings → **Bill details** (the first bill PDF asks for the address if it is missing).
+outlet in Counter → ⚙️ Settings → **Bill details**. If they are missing, the first bill PDF asks for the address
+once and saves it for every phone of the outlet — also from a counter login (`POST /api/billinfo`, allowed for a
+counter login only while no address is saved; owner / partners / managers can always change it). The bill PDF screen
+also has **Order type on the bill** (Dine-in / Takeaway / Delivery) to correct a bill; the change is saved on it.
 
 ### 🧮 How a dish's ingredient cost is worked out
 For each recipe line: **amount per plate × cost of one recipe unit**. The cost of one unit comes from the **latest
@@ -653,6 +656,8 @@ Settings → Extra businesses → **🏨 Hotel orders: On**. Records → **Hotel
 For busy hours or a small cafe with 2–3 staff. Counter → **⚡ Rush hour** turns it on or off **for that phone**
 (`rush_mode_v1`). While it is on, the counter skips the order steps (no order type, tables, kitchen tickets or
 waiter jobs):
+- **🍽️ Dine-in / 🛍️ Takeaway** buttons in the rush bar (remembered on the phone, Dine-in by default) set the order
+  type saved on each rush bill; Pay later tokens keep the choice made when they were opened.
 - Tap the items, then **💳 Pay now ➜**: payment is taken at once and the done screen shows a big **Token N** to call
   out when the food is ready.
 - Or tap **⏸️ Pay later**: the items are saved as an open token (optional name, e.g. "Table 4" or "Blue shirt") for

@@ -19,7 +19,11 @@ const assert = (c, m) => { if (!c) { console.log('FAIL: ' + m); process.exitCode
   await p.click('#ct_go'); await p.click('[data-pay="cash"]'); await p.click('#pp_done'); await p.waitForTimeout(150);
   assert(/Token 1/.test(await p.textContent('.pdone')), 'paid: big Token 1');
   assert(await E(p, `liveOrders.length===0 && sales.length===1 && sales[0].order.rush===true && sales[0].amount===40`), 'bill saved, no kitchen ticket made');
+  assert(await E(p, 'sales[0].order.type')==='dine' && /^Dine-in · Bill/.test(await E(p, 'sales[0].desc')), 'rush bill is Dine-in by default');
   await E(p, 'closeForm()');
+  await p.click('[data-rtype="take"]'); await p.click('.ctile[data-add="chai"]'); await p.click('#ct_go'); await p.click('[data-pay="cash"]'); await p.click('#pp_done'); await p.waitForTimeout(150);
+  assert(await E(p, 'sales[1].order.type')==='take', 'switch to 🛍️ Takeaway: next bill is Takeaway');
+  await E(p, 'closeForm(); sales = sales.slice(0,1); saveSales();'); await p.click('[data-rtype="dine"]');
   // Pay later: two customers
   await p.click('.ctile[data-add="thali"]'); await p.click('#ct_later'); await p.waitForTimeout(100);
   assert(/Token 2/.test(await p.textContent('.pdone')) && /pay later/.test(await p.textContent('.pdone')), 'pay later: Token 2 (one sequence with Pay now)');

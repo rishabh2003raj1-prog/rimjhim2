@@ -286,6 +286,8 @@
   .htmenu{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0;} .htmenu button{position:relative;text-align:left;border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px;font:inherit;font-size:13.5px;}
   .htmenu button b{display:block;margin-top:3px;} .htmenu button s{color:var(--ink-soft);font-weight:400;font-size:11.5px;} .htmenu button.on{border-color:#1F5C52;background:#E4F0EC;}
   .htmenu button i{position:absolute;top:-6px;right:-6px;background:#1F5C52;color:#fff;border-radius:999px;font-style:normal;font-weight:700;font-size:12px;padding:2px 7px;}
+  .rtype{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:6px 0 8px;} .rtype button{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:10px;font:inherit;font-weight:700;font-size:14.5px;}
+  .rtype button.on{background:#1F5C52;border-color:#1F5C52;color:#fff;}
   .tsrc{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 8px;} .tsrcl{font-size:12px;color:var(--ink-soft);width:100%;}
   .tsrc button{border:1.5px solid var(--line);background:#fff;border-radius:999px;padding:7px 13px;font:inherit;font-size:14px;font-weight:600;}
   .tsrc button.on{background:#8A6D1F;border-color:#8A6D1F;color:#fff;} .tsrc button.zomato.on{background:#CB202D;border-color:#CB202D;} .tsrc button.swiggy.on{background:#FC8019;border-color:#FC8019;}
@@ -11940,9 +11942,13 @@ function tokenVoids(dateStr){
 }
 function openTabs(){ return liveOrders.filter(function(t){ return t.type==="tab" && t.status==="tab" && !t.paid; }).sort(function(a,b){ return (a.at||0)-(b.at||0); }); }
 function tabTotal(t){ return (t.items||[]).reduce(function(a,i){ return a + (+i.qty||0)*(+i.price||0); },0); }
+var RUSH_TYPE_KEY = "rush_type_v1";
+function rushType(){ try{ return localStorage.getItem(RUSH_TYPE_KEY)==="take" ? "take" : "dine"; }catch(e){ return "dine"; } }
+function setRushType(t){ try{ localStorage.setItem(RUSH_TYPE_KEY, t==="take" ? "take" : "dine"); }catch(e){} }
 function rushBarHtml(){
   var tabs = openTabs(), held = counterTicket ? liveOrders.find(function(x){ return x.id===counterTicket; }) : null;
-  var html = '<div class="rushbar"><b>⚡ Rush hour</b> <span>Tap items → 💳 Pay now, or ⏸️ Pay later for customers who pay after eating.</span></div>';
+  var html = '<div class="rushbar"><b>⚡ Rush hour</b> <span>Tap items → 💳 Pay now, or ⏸️ Pay later for customers who pay after eating.</span></div>'+
+    '<div class="rtype"><button data-rtype="dine" class="'+(rushType()==="dine"?'on':'')+'">🍽️ Dine-in · यहीं खाना</button><button data-rtype="take" class="'+(rushType()==="take"?'on':'')+'">🛍️ Takeaway · पैक</button></div>';
   if(tabs.length) html += '<div class="tabchips">'+tabs.map(function(t){ var m = ticketMins(t);
     return '<button data-tab="'+esc(t.id)+'" class="'+(held && held.id===t.id?'on':'')+(m>=45?' old':'')+'"><b>Token '+t.no+'</b>'+(t.label?'<small class="notr">'+esc(t.label)+'</small>':'')+'<span>'+rupee(tabTotal(t))+'</span><small>'+m+' min</small></button>'; }).join("")+'</div>';
   return html;
@@ -11952,7 +11958,7 @@ function saveTabFromCounter(){
   var items = lines.map(function(l){ return { menuId:l.m.id, name:l.m.name, qty:l.qty, price:unitPrice(l.m, "take") }; });
   var held = counterTicket ? liveOrders.find(function(x){ return x.id===counterTicket && x.type==="tab"; }) : null, now = new Date(), t;
   if(held){ held.items = items; held.amount = tabTotal(held); held.updated = now.getTime(); t = held; }
-  else { t = { id:uid(), type:"tab", status:"tab", no:nextRushToken(), date:fmtDate(now), time:nowHM(), at:now.getTime(), items:items, byName:myName() }; t.amount = tabTotal(t); liveOrders.push(t); }
+  else { t = { id:uid(), type:"tab", status:"tab", eat:rushType(), no:nextRushToken(), date:fmtDate(now), time:nowHM(), at:now.getTime(), items:items, byName:myName() }; t.amount = tabTotal(t); liveOrders.push(t); }
   saveLive(); counterOrder = {}; counterDisc = null; counterTicket = null; renderAll();
   var sheet = document.getElementById("sheet");
   sheet.innerHTML = '<div class="pdone"><div class="tokbig">Token '+t.no+'</div><b>'+(held ? 'Updated' : 'Saved')+' — pay later</b><div>'+rupee(t.amount)+' · '+items.reduce(function(a,i){ return a+i.qty; },0)+' items</div>'+
@@ -12090,6 +12096,7 @@ function wireCounterType(el){
   var cp = el.querySelector("#ct_cphone"); if(cp) cp.addEventListener("input", function(){ counterMeta.phone = cp.value.replace(/[^\d+]/g,""); });
   Array.prototype.forEach.call(el.querySelectorAll("[data-table]"), function(b){ b.addEventListener("click", function(){ var tb = b.getAttribute("data-table"); counterTable = counterTable===tb ? null : tb; renderCounter(); }); });
   var te = el.querySelector("#ct_tables"); if(te) te.addEventListener("click", function(){ openTablesEditor(null); });
+  Array.prototype.forEach.call(el.querySelectorAll("[data-rtype]"), function(b){ b.addEventListener("click", function(){ setRushType(b.getAttribute("data-rtype")); var hk = heldTab(); if(hk){ hk.eat = rushType(); saveLive(); } renderCounter(); }); });
   var tcx = el.querySelector("#ct_tabcx"); if(tcx) tcx.addEventListener("click", function(ev){ ev.preventDefault(); cancelTab(heldTab()); });
   var ub = el.querySelector("#ct_unbill"); if(ub) ub.addEventListener("click", function(ev){ ev.preventDefault(); releaseCounterTicket(); counterTable = null; renderCounter(); });
 }
@@ -12696,13 +12703,14 @@ function finishCounterBill(mode, customer, given, plat){
   sales.push(rec);
   items.forEach(function(i){ dishLog.push({ id:uid(), date:day, menuId:i.menuId, qty:i.qty, orderId:id }); });
   var sentToKitchen = false;
-  if(tk){ tk.paid = true; tk.paidAt = Date.now(); tk.saleId = id; tk.amount = total; tLog(tk, "paid"); if(tk.status==="out" || tk.type==="tab") { tk.status = "done"; tLog(tk, "done"); } saveLive(); if(tk.type==="tab") rec.order.token = tk.no; }
-  else if(rushOn()){ rec.order.token = nextRushToken(); rec.order.rush = true; }
+  if(tk){ tk.paid = true; tk.paidAt = Date.now(); tk.saleId = id; tk.amount = total; tLog(tk, "paid"); if(tk.status==="out" || tk.type==="tab") { tk.status = "done"; tLog(tk, "done"); } saveLive(); if(tk.type==="tab"){ rec.order.token = tk.no; rec.order.type = tk.eat==="take" ? "take" : "dine"; rec.order.rush = true; } }
+  else if(rushOn()){ rec.order.token = nextRushToken(); rec.order.rush = true; rec.order.type = rushType(); }
   else if(counterType!=="dine"){
     createTicket({ type:counterType, paid:true, saleId:id, amount:total, items:items, cname: plat ? plat.cname : (counterMeta.cname||""), phone:counterMeta.phone||"", address:counterMeta.address||"", charge:charge,
                    platform: plat ? plat.platform : null, pid: plat ? plat.pid : null, accepted: plat ? !!plat.accepted : undefined });
     sentToKitchen = true;
   }
+  if(rec.order.rush && CHANNELS[rec.order.type]) rec.desc = rec.desc.replace(/^[^·]+ · Bill /, CHANNELS[rec.order.type].t+" · Bill ");
   saveSales(); saveDishLog();
   counterOrder = {}; counterDisc = null; counterTicket = null; counterMeta = {}; counterTable = null;
   closeForm(); renderAll();
@@ -12719,27 +12727,39 @@ function finishCounterBill(mode, customer, given, plat){
 }
 // ---------- 📄 BILL PDF FOR THE CUSTOMER ----------
 // Cafe name, address, phone and GSTIN come from Counter → ⚙️ Settings → Bill details (per outlet).
-function billInfo(){ var b = settings.billInfo || {}; return { name: b.name || OUTLET.name || "Cafe", address: b.address || "", phone: b.phone || "", gstin: b.gstin || "", footer: b.footer || "Thank you! Visit again." }; }
+var BILLINFO_KEY = "bill_info_v1";
+function billInfoLocal(){ try{ return JSON.parse(localStorage.getItem(storeKey(BILLINFO_KEY))||"null") || {}; }catch(e){ return {}; } }
+function billInfo(){ var b = (settings.billInfo && settings.billInfo.address) ? settings.billInfo : Object.assign({}, billInfoLocal(), settings.billInfo && settings.billInfo.name ? { name:settings.billInfo.name } : {}); return { name: b.name || OUTLET.name || "Cafe", address: b.address || "", phone: b.phone || "", gstin: b.gstin || "", footer: b.footer || "Thank you! Visit again." }; }
 function openBillPdf(saleId, back){
   var s = sales.find(function(x){ return x.id===saleId; }); if(!s || !s.order) return;
   var bt = s.order.billTo || {}, generic = /^(counter|walk-?in|)$/i.test(String(s.customer||"").trim()) || s.order.platform;
-  var bi = billInfo(), needInfo = !(settings.billInfo && settings.billInfo.address);
+  var bi = billInfo(), needInfo = !bi.address;
   var sheet = tfOpenSheet('<h2 class="serif">📄 Bill PDF · Bill '+esc(s.order.no)+'</h2>'+
     (needInfo ? '<div class="backupnote" style="background:#FFF4E0;">Add the cafe address once (it shows on every bill):</div>'+
       '<div class="field"><label>Cafe name on the bill</label><input id="bp_cn" value="'+esc(bi.name)+'"></div><div class="field"><label>Cafe address</label><textarea id="bp_ca" rows="2" placeholder="Street / area, city, state, PIN"></textarea></div>'+
       '<div class="field two"><div><label>Cafe phone (optional)</label><input id="bp_cp" inputmode="tel" value="'+esc(bi.phone)+'"></div><div><label>GSTIN (optional)</label><input id="bp_cg" value="'+esc(bi.gstin)+'"></div></div>' : '<div class="backupnote">'+esc(bi.name)+' · '+esc(bi.address)+'</div>')+
+    '<div class="field"><label>Order type on the bill</label><select id="bp_type">'+[["dine","🍽️ Dine-in"],["take","🛍️ Takeaway"],["delivery","🛵 Delivery"]].concat(CHANNELS[s.order.type] || s.order.type==="hotel" ? [] : [[s.order.type||"","—"]]).concat(s.order.platform ? [[s.order.type, CHANNELS[s.order.type].t]] : []).concat(s.order.type==="hotel" ? [["hotel","🏨 Hotel"]] : []).map(function(x){ return '<option value="'+esc(x[0])+'"'+(x[0]===s.order.type?' selected':'')+'>'+x[1]+'</option>'; }).join("")+'</select></div>'+
     '<div class="field two"><div><label>Customer name</label><input id="bp_name" value="'+esc(bt.name || (generic ? "" : s.customer))+'" autocomplete="off"></div><div><label>Customer phone (optional)</label><input id="bp_phone" inputmode="tel" value="'+esc(bt.phone || s.order.phone || "")+'"></div></div>'+
     '<div class="err"></div><div class="sheetbtns"><button class="btn-cancel" id="bp_back">'+(back?'← Back':'Close')+'</button><button class="btn-save" id="bp_go">📄 Make PDF</button></div>');
   sheet.querySelector("#bp_back").addEventListener("click", function(){ if(back) back(); else closeForm(); });
   sheet.querySelector("#bp_go").addEventListener("click", function(){
     var btn = this;
     if(needInfo){ var addr = sheet.querySelector("#bp_ca").value.trim(); if(!addr) return tfErr(sheet, "Type the cafe address.");
-      settings.billInfo = Object.assign({}, settings.billInfo||{}, { name: sheet.querySelector("#bp_cn").value.trim() || bi.name, address:addr, phone: sheet.querySelector("#bp_cp").value.trim(), gstin: sheet.querySelector("#bp_cg").value.trim().toUpperCase() });
-      if(canWriteKey(SETTINGS_KEY)) saveSettings(); }
+      var nb = Object.assign({}, settings.billInfo||{}, { name: sheet.querySelector("#bp_cn").value.trim() || bi.name, address:addr, phone: sheet.querySelector("#bp_cp").value.trim(), gstin: sheet.querySelector("#bp_cg").value.trim().toUpperCase() });
+      saveBillInfo(nb); }
+    var ot = sheet.querySelector("#bp_type").value;
+    if(ot && ot!==s.order.type){ s.order.type = ot; if(ot!=="dine") delete s.order.table; if(canWriteKey(SALES_KEY)) saveSales(); }
     var nm = sheet.querySelector("#bp_name").value.trim(), ph = sheet.querySelector("#bp_phone").value.replace(/[^\d+]/g,"");
     if(nm || ph){ s.order.billTo = { name:nm, phone:ph }; if(canWriteKey(SALES_KEY)) saveSales(); }
     billPdf(s, { name:nm, phone:ph }, btn);
   });
+}
+// Kept on this phone at once, and for every phone: settings (owner / manager) or, from a counter
+// login, the server's one-time bill details save.
+function saveBillInfo(nb){
+  try{ localStorage.setItem(storeKey(BILLINFO_KEY), JSON.stringify(nb)); }catch(e){}
+  if(canWriteKey(SETTINGS_KEY)){ settings.billInfo = nb; saveSettings(); return; }
+  api("POST", "/api/billinfo"+API_Q, nb).then(function(r){ if(r.ok){ settings.billInfo = r.data.billInfo; setTimeout(function(){ try{ pollRemote(); }catch(e){} }, 300); } }).catch(function(){});
 }
 function billPdf(s, to, btn){
   var label = btn ? btn.textContent : ""; if(btn){ btn.disabled = true; btn.textContent = "Creating…"; }

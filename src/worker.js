@@ -960,6 +960,30 @@ async function handleCheckin(req, env, url, who) {
 }
 function istDayOffset(n) { return istDay(n); }
 
+// ---- bill details (cafe name / address on customer bill PDFs) ----
+// Counter logins can't change settings, but they may save the bill details once when none are set,
+// so the address typed on the first bill PDF is kept for every phone. Owner / partners / managers can
+// always change them (also from Counter settings).
+async function handleBillInfo(req, env, url, who) {
+  const outlet = outletOf(url);
+  if (!outlet || !canUseOutlet(who, outlet)) return json({ error: "not allowed" }, 403);
+  let b = {}; try { b = await req.json(); } catch (e) { return json({ error: "bad json" }, 400); }
+  const clean = (v, n) => String(v == null ? "" : v).trim().slice(0, n);
+  const info = { name: clean(b.name, 80), address: clean(b.address, 240), phone: clean(b.phone, 40), gstin: clean(b.gstin, 20).toUpperCase(), footer: clean(b.footer, 120) };
+  if (!info.address) return json({ error: "Type the cafe address." }, 400);
+  const boss = isFull(who) || accessOf(who) === "manager";
+  for (let tries = 0; tries < 4; tries++) {
+    const cur = await readOne(env, outlet, "settings_v1"), st = Object.assign({}, cur.value || {});
+    const old = st.billInfo || {};
+    if (old.address && !boss) return json({ error: "The bill details are already set. Ask the owner or manager to change them." }, 403, {});
+    st.billInfo = Object.assign({}, old, info, { footer: info.footer || old.footer || "" });
+    const w = await writeOne(env, outlet, "settings_v1", st, cur.rev);
+    if (w.tooBig) return json({ error: "Storage full." }, 507);
+    if (!w.conflict) return json({ ok: true, billInfo: st.billInfo });
+  }
+  return json({ error: "Busy, please try again." }, 503);
+}
+
 // ---- photos ----
 async function handlePhotoUpload(req, env, url, who) {
   const outlet = outletOf(url);
@@ -1227,6 +1251,7 @@ export default {
       if (path === "/api/export" && req.method === "GET") return await handleExport(env, url, who);
       if (path === "/api/photos" && req.method === "POST") return await handlePhotoUpload(req, env, url, who);
       if (path === "/api/checkin" && req.method === "POST") return await handleCheckin(req, env, url, who);
+      if (path === "/api/billinfo" && req.method === "POST") return await handleBillInfo(req, env, url, who);
       if (path === "/api/logout-all" && req.method === "POST") {
         if (who.role !== "owner") return json({ error: "Only the owner can sign out every phone." }, 403);
         return await handleLogoutAll(env);
